@@ -1,6 +1,4 @@
 <?php
-// core/Database.php
-// PDO connection banata hai — settings ab .env se aati hain, code mein hardcode nahi.
 
 require_once __DIR__ . '/../config/app.php';
 

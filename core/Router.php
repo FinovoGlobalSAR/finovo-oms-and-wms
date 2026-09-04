@@ -1,5 +1,4 @@
 <?php
-// core/Router.php
 class Router
 {
     private array $routes = [];
