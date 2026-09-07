@@ -5,3 +5,4 @@ $router->get('/orders/create', ['OrderController', 'showCreateForm']);
 $router->post('/orders/create', ['OrderController', 'handleCreate']);
 $router->post('/api/orders', ['OrderController', 'apiCreate']);
 
+$router->get('/dashboard', ['DashboardController', 'index']);
