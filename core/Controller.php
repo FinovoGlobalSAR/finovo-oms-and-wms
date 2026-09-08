@@ -4,6 +4,17 @@ require_once __DIR__ . '/../config/app.php';
 
 abstract class Controller
 {
+    protected int $companyId;
+
+    public function __construct()
+    {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        $this->companyId = (int) ($_SESSION['company_id'] ?? 0);
+    }
+
     protected function view(string $viewPath, array $data = []): void
     {
         extract($data);
@@ -31,7 +42,11 @@ abstract class Controller
         $providedUser = $_SERVER['PHP_AUTH_USER'] ?? '';
         $providedPass = $_SERVER['PHP_AUTH_PW'] ?? '';
 
-        if ($validPass === '' || $providedUser !== $validUser || $providedPass !== $validPass) {
+        if (
+            $validPass === '' ||
+            $providedUser !== $validUser ||
+            $providedPass !== $validPass
+        ) {
             header('WWW-Authenticate: Basic realm="Super Admin Area"');
             http_response_code(401);
             echo "Access denied. Super Admin credentials required.";
