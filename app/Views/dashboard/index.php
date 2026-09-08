@@ -4,12 +4,8 @@ $title = 'Dashboard';
 
 <div class="space-y-6">
 
-    <!-- Tailwind Test -->
-    <div class="bg-red-500 text-white p-10 text-3xl font-bold">
-        TAILWIND TEST
-    </div>
+   
 
-    <!-- Page heading -->
     <div>
         <h1 class="text-2xl font-bold text-gray-900">
             Dashboard

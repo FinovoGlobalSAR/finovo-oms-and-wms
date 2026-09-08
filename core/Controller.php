@@ -7,7 +7,14 @@ abstract class Controller
     protected function view(string $viewPath, array $data = []): void
     {
         extract($data);
+
+        ob_start();
+
         require __DIR__ . "/../app/Views/{$viewPath}.php";
+
+        $content = ob_get_clean();
+
+        require __DIR__ . '/../app/Views/layout/layout.php';
     }
 
     protected function redirect(string $path): void
