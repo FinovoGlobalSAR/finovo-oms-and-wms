@@ -2,20 +2,6 @@
 
 $title = 'Employee Management';
 
-$employees = [
-    [
-        'name' => 'Liam Smith',
-        'email' => 'liam@example.com',
-        'role' => 'Manager',
-        'status' => 'Active',
-        'date' => '24 Jun 2024',
-        'initials' => 'LS',
-        'avatar' => 'blue',
-        'role_color' => 'purple',
-    ],
-   
-];  
-
 $avatarClasses = [
     'blue' => 'bg-blue-100 text-blue-600',
     'green' => 'bg-green-100 text-green-600',
@@ -24,459 +10,76 @@ $avatarClasses = [
 ];
 
 $roleClasses = [
-    'purple' => 'bg-purple-50 text-purple-700',
-    'blue' => 'bg-blue-50 text-blue-700',
-    'orange' => 'bg-orange-50 text-orange-700',
-    'indigo' => 'bg-indigo-50 text-indigo-700',
+    'Admin' => 'bg-purple-50 text-purple-700',
+    'Manager' => 'bg-blue-50 text-blue-700',
+    'Warehouse Staff' => 'bg-orange-50 text-orange-700',
 ];
 
-$totalEmployees = 24;
+$totalEmployees = count($employees);
 
 ?>
 
 <div class="space-y-5">
 
+```
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
 
-        <div>
+        <div class="flex items-center gap-2">
 
-            <div class="flex items-center gap-2">
+            <h1 class="text-2xl font-bold text-gray-900">
+                Employee Management
+            </h1>
 
-                <h1 class="text-2xl font-bold text-gray-900">
-                    Employee Management
-                </h1>
-
-                <span class="text-sm bg-gray-100 text-gray-600 px-2 py-1 rounded-md">
-                    <?= $totalEmployees ?>
-                </span>
-
-            </div>
-
-            <p class="text-sm text-gray-500 mt-1">
-                Manage your team members and their roles.
-            </p>
+            <span class="text-sm bg-gray-100 text-gray-600 px-2 py-1 rounded-md">
+                <?= $totalEmployees ?>
+            </span>
 
         </div>
 
-
-        <button
-            onclick="openEmployeeModal()"
-            type="button"
-            class="inline-flex items-center justify-center gap-2
-                   bg-blue-600 hover:bg-blue-700 text-white
-                   px-4 py-2.5 rounded-lg text-sm font-medium transition"
-        >
-
-            <svg
-                class="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-            >
-                <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M12 5v14M5 12h14"
-                />
-            </svg>
-
-            Add Employee
-
-        </button>
+        <p class="text-sm text-gray-500 mt-1">
+            Manage your team members and their roles.
+        </p>
 
     </div>
 
-
-    <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
-
-
-
-        <div class="p-4 border-b border-gray-200">
-
-            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-
-
-
-                <div class="relative w-full lg:w-80">
-
-                    <svg
-                        class="absolute left-3 top-1/2 -translate-y-1/2
-                               w-4 h-4 text-gray-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M21 21l-4.35-4.35m2.35-5.65a8 8 0 11-16 0 8 8 0 0116 0z"
-                        />
-                    </svg>
-
-                    <input
-                        type="text"
-                        placeholder="Search employees..."
-                        class="w-full pl-9 pr-4 py-2 border border-gray-200
-                               rounded-lg text-sm focus:outline-none
-                               focus:ring-2 focus:ring-blue-500"
-                    >
-
-                </div>
-
-
-                <!-- Filters -->
-
-                <div class="flex flex-wrap gap-2">
-
-                    <select
-                        class="px-3 py-2 border border-gray-200 rounded-lg
-                               text-sm text-gray-600 focus:outline-none
-                               focus:ring-2 focus:ring-blue-500"
-                    >
-                        <option>All Roles</option>
-                        <option>Admin</option>
-                        <option>Manager</option>
-                        <option>Sales</option>
-                        <option>Warehouse</option>
-                    </select>
-
-
-                    <select
-                        class="px-3 py-2 border border-gray-200 rounded-lg
-                               text-sm text-gray-600 focus:outline-none
-                               focus:ring-2 focus:ring-blue-500"
-                    >
-                        <option>All Status</option>
-                        <option>Active</option>
-                        <option>Inactive</option>
-                    </select>
-
-                </div>
-
-            </div>
-
-        </div>
-
-
-        <div class="overflow-x-auto">
-
-            <table class="w-full text-sm">
-
-                <thead class="bg-gray-50 border-b border-gray-200">
-
-                    <tr>
-
-                        <th class="text-left px-5 py-3 font-semibold text-gray-500">
-                            Employee
-                        </th>
-
-                        <th class="text-left px-5 py-3 font-semibold text-gray-500">
-                            Email
-                        </th>
-
-                        <th class="text-left px-5 py-3 font-semibold text-gray-500">
-                            Role
-                        </th>
-
-                        <th class="text-left px-5 py-3 font-semibold text-gray-500">
-                            Status
-                        </th>
-
-                        <th class="text-left px-5 py-3 font-semibold text-gray-500">
-                            Joined Date
-                        </th>
-
-                        <th class="text-right px-5 py-3 font-semibold text-gray-500">
-                            Actions
-                        </th>
-
-                    </tr>
-
-                </thead>
-
-
-                <tbody class="divide-y divide-gray-100">
-
-
-                    <?php foreach ($employees as $employee): ?>
-
-                        <?php
-                        $avatarClass = $avatarClasses[$employee['avatar']] ?? 'bg-gray-100 text-gray-600';
-                        $roleClass = $roleClasses[$employee['role_color']] ?? 'bg-gray-50 text-gray-700';
-
-                        $isActive = $employee['status'] === 'Active';
-
-                        $statusTextClass = $isActive
-                            ? 'text-green-600'
-                            : 'text-red-600';
-
-                        $statusDotClass = $isActive
-                            ? 'bg-green-500'
-                            : 'bg-red-500';
-                        ?>
-
-
-
-                        <tr class="hover:bg-gray-50 transition">
-
-
-
-                            <td class="px-5 py-4">
-
-                                <div class="flex items-center gap-3">
-
-                                    <div
-                                        class="w-9 h-9 rounded-full
-                                               flex items-center justify-center
-                                               <?= $avatarClass ?>"
-                                    >
-
-                                        <span class="text-sm font-semibold">
-                                            <?= htmlspecialchars($employee['initials']) ?>
-                                        </span>
-
-                                    </div>
-
-
-                                    <span class="font-medium text-gray-800">
-                                        <?= htmlspecialchars($employee['name']) ?>
-                                    </span>
-
-                                </div>
-
-                            </td>
-
-
-
-                            <td class="px-5 py-4 text-gray-500">
-
-                                <?= htmlspecialchars($employee['email']) ?>
-
-                            </td>
-
-
-
-                            <td class="px-5 py-4">
-
-                                <span
-                                    class="px-2.5 py-1 rounded-md
-                                           text-xs font-medium
-                                           <?= $roleClass ?>"
-                                >
-
-                                    <?= htmlspecialchars($employee['role']) ?>
-
-                                </span>
-
-                            </td>
-
-
-
-                            <td class="px-5 py-4">
-
-                                <span
-                                    class="inline-flex items-center gap-1.5
-                                           text-xs font-medium
-                                           <?= $statusTextClass ?>"
-                                >
-
-                                    <span
-                                        class="w-2 h-2 rounded-full
-                                               <?= $statusDotClass ?>"
-                                    ></span>
-
-                                    <?= htmlspecialchars($employee['status']) ?>
-
-                                </span>
-
-                            </td>
-
-
-
-                            <td class="px-5 py-4 text-gray-500">
-
-                                <?= htmlspecialchars($employee['date']) ?>
-
-                            </td>
-
-
-
-                            <td class="px-5 py-4">
-
-                                <div class="flex items-center justify-end gap-2">
-
-                                    <button
-                                        type="button"
-                                        onclick="openEditModal('<?= htmlspecialchars($employee['name'], ENT_QUOTES) ?>')"
-                                        class="px-3 py-1.5 border border-gray-200
-                                               rounded-md text-xs font-medium
-                                               text-gray-600 hover:bg-gray-50"
-                                    >
-                                        Edit
-                                    </button>
-
-
-                                    <button
-                                        type="button"
-                                        class="px-3 py-1.5 border border-red-200
-                                               rounded-md text-xs font-medium
-                                               text-red-600 hover:bg-red-50"
-                                    >
-                                        Delete
-                                    </button>
-
-                                </div>
-
-                            </td>
-
-                        </tr>
-
-
-                    <?php endforeach; ?>
-
-
-                </tbody>
-
-            </table>
-
-        </div>
-
-        <div
-            class="px-5 py-4 border-t border-gray-200
-                   flex flex-col sm:flex-row sm:items-center
-                   sm:justify-between gap-3"
+    <button
+        onclick="openEmployeeModal()"
+        type="button"
+        class="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition"
+    >
+
+        <svg
+            class="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
         >
+            <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 5v14M5 12h14"
+            />
+        </svg>
 
-            <p class="text-sm text-gray-500">
+        Add Employee
 
-                Showing
-
-                <span class="font-medium text-gray-700">
-                    1
-                </span>
-
-                to
-
-                <span class="font-medium text-gray-700">
-                    <?= count($employees) ?>
-                </span>
-
-                of
-
-                <span class="font-medium text-gray-700">
-                    <?= $totalEmployees ?>
-                </span>
-
-                employees
-
-            </p>
-
-
-            <div class="flex items-center gap-1">
-
-                <button
-                    type="button"
-                    class="px-3 py-1.5 border border-gray-200
-                           rounded-md text-sm text-gray-400"
-                >
-                    Previous
-                </button>
-
-
-                <button
-                    type="button"
-                    class="px-3 py-1.5 rounded-md
-                           bg-blue-600 text-white text-sm"
-                >
-                    1
-                </button>
-
-
-                <button
-                    type="button"
-                    class="px-3 py-1.5 border border-gray-200
-                           rounded-md text-sm text-gray-600 hover:bg-gray-50"
-                >
-                    2
-                </button>
-
-
-                <button
-                    type="button"
-                    class="px-3 py-1.5 border border-gray-200
-                           rounded-md text-sm text-gray-600 hover:bg-gray-50"
-                >
-                    3
-                </button>
-
-
-                <button
-                    type="button"
-                    class="px-3 py-1.5 border border-gray-200
-                           rounded-md text-sm text-gray-600 hover:bg-gray-50"
-                >
-                    Next
-                </button>
-
-            </div>
-
-        </div>
-
-    </div>
+    </button>
 
 </div>
 
+<div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
 
-<div
-    id="employeeModal"
-    class="fixed inset-0 z-50 hidden items-center justify-center p-4"
->
+    <div class="p-4 border-b border-gray-200">
 
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
 
-    <div
-        onclick="closeEmployeeModal()"
-        class="absolute inset-0 bg-black/40 backdrop-blur-sm"
-    ></div>
-
-
-
-    <div
-        class="relative bg-white rounded-2xl shadow-xl
-               w-full max-w-lg max-h-[90vh] overflow-y-auto"
-    >
-
-
-
-        <div
-            class="flex items-center justify-between
-                   px-6 py-5 border-b border-gray-200"
-        >
-
-            <div>
-
-                <h2 class="text-lg font-bold text-gray-900">
-                    Create Employee
-                </h2>
-
-                <p class="text-sm text-gray-500 mt-1">
-                    Add a new employee to your company.
-                </p>
-
-            </div>
-
-
-            <button
-                type="button"
-                onclick="closeEmployeeModal()"
-                class="w-8 h-8 rounded-lg hover:bg-gray-100
-                       flex items-center justify-center"
-            >
+            <div class="relative w-full lg:w-80">
 
                 <svg
-                    class="w-5 h-5 text-gray-500"
+                    class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -485,247 +88,723 @@ $totalEmployees = 24;
                         stroke-linecap="round"
                         stroke-linejoin="round"
                         stroke-width="2"
-                        d="M6 18L18 6M6 6l12-12"
+                        d="M21 21l-4.35-4.35m2.35-5.65a8 8 0 11-16 0 8 8 0 0116 0z"
                     />
                 </svg>
 
-            </button>
-
-        </div>
-
-
-
-        <form class="p-6 space-y-5">
-
-
-
-            <div>
-
-                <label class="block text-sm font-medium text-gray-700 mb-1.5">
-                    Full Name
-                </label>
-
                 <input
                     type="text"
-                    name="name"
-                    placeholder="Enter employee name"
-                    class="w-full px-3.5 py-2.5 border border-gray-200
-                           rounded-lg text-sm focus:outline-none
-                           focus:ring-2 focus:ring-blue-500"
+                    id="employeeSearch"
+                    placeholder="Search employees..."
+                    class="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
 
             </div>
 
-
-
-            <div>
-
-                <label class="block text-sm font-medium text-gray-700 mb-1.5">
-                    Email Address
-                </label>
-
-                <input
-                    type="email"
-                    name="email"
-                    placeholder="employee@example.com"
-                    class="w-full px-3.5 py-2.5 border border-gray-200
-                           rounded-lg text-sm focus:outline-none
-                           focus:ring-2 focus:ring-blue-500"
-                >
-
-            </div>
-
-
-
-            <div>
-
-                <label class="block text-sm font-medium text-gray-700 mb-1.5">
-                    Password
-                </label>
-
-                <input
-                    type="password"
-                    name="password"
-                    placeholder="Enter temporary password"
-                    class="w-full px-3.5 py-2.5 border border-gray-200
-                           rounded-lg text-sm focus:outline-none
-                           focus:ring-2 focus:ring-blue-500"
-                >
-
-                <p class="text-xs text-gray-400 mt-1.5">
-                    The employee will use this password to login.
-                </p>
-
-            </div>
-
-
-
-            <div>
-
-                <label class="block text-sm font-medium text-gray-700 mb-1.5">
-                    Role
-                </label>
+            <div class="flex flex-wrap gap-2">
 
                 <select
-                    name="role"
-                    class="w-full px-3.5 py-2.5 border border-gray-200
-                           rounded-lg text-sm focus:outline-none
-                           focus:ring-2 focus:ring-blue-500"
+                    id="roleFilter"
+                    class="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
+                    <option value="">All Roles</option>
+                    <option value="Admin">Admin</option>
+                    <option value="Manager">Manager</option>
+                    <option value="Warehouse Staff">Warehouse Staff</option>
+                </select>
 
-                    <option value="">
-                        Select employee role
-                    </option>
-
-                    <option value="Admin">
-                        Admin
-                    </option>
-
-                    <option value="Manager">
-                        Manager
-                    </option>
-
-                    <option value="Sales">
-                        Sales
-                    </option>
-
-                    <option value="Warehouse">
-                        Warehouse
-                    </option>
-
+                <select
+                    id="statusFilter"
+                    class="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                    <option value="">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
                 </select>
 
             </div>
 
+        </div>
 
+    </div>
 
-            <div class="bg-blue-50 border border-blue-100 rounded-lg p-4">
+    <div class="overflow-x-auto">
 
-                <div class="flex gap-3">
+        <table class="w-full text-sm">
 
-                    <svg
-                        class="w-5 h-5 text-blue-600 mt-0.5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="1.8"
-                            d="M13 16h-1v-4h-1m1-8h.01M12 20a8 8 0 100-16 8 8 0 000 16z"
-                        />
-                    </svg>
+            <thead class="bg-gray-50 border-b border-gray-200">
 
-                    <div>
+                <tr>
 
-                        <p class="text-sm font-medium text-blue-800">
-                            Role-based permissions
-                        </p>
+                    <th class="text-left px-5 py-3 font-semibold text-gray-500">
+                        Employee
+                    </th>
 
-                        <p class="text-xs text-blue-600 mt-1 leading-relaxed">
-                            The selected role determines which features
-                            and actions this employee can access.
-                        </p>
+                    <th class="text-left px-5 py-3 font-semibold text-gray-500">
+                        Email
+                    </th>
 
-                    </div>
+                    <th class="text-left px-5 py-3 font-semibold text-gray-500">
+                        Role
+                    </th>
 
-                </div>
+                    <th class="text-left px-5 py-3 font-semibold text-gray-500">
+                        Status
+                    </th>
 
-            </div>
+                    <th class="text-left px-5 py-3 font-semibold text-gray-500">
+                        Joined Date
+                    </th>
 
+                    <th class="text-right px-5 py-3 font-semibold text-gray-500">
+                        Actions
+                    </th>
 
+                </tr>
 
-            <div>
+            </thead>
 
-                <label class="block text-sm font-medium text-gray-700 mb-2">
-                    Account Status
-                </label>
-
-                <div class="flex gap-4">
-
-                    <label class="flex items-center gap-2 cursor-pointer">
-
-                        <input
-                            type="radio"
-                            name="status"
-                            value="active"
-                            checked
-                            class="text-blue-600 focus:ring-blue-500"
-                        >
-
-                        <span class="text-sm text-gray-700">
-                            Active
-                        </span>
-
-                    </label>
-
-
-                    <label class="flex items-center gap-2 cursor-pointer">
-
-                        <input
-                            type="radio"
-                            name="status"
-                            value="inactive"
-                            class="text-blue-600 focus:ring-blue-500"
-                        >
-
-                        <span class="text-sm text-gray-700">
-                            Inactive
-                        </span>
-
-                    </label>
-
-                </div>
-
-            </div>
-
-
-
-            <div
-                class="flex justify-end gap-3 pt-3 border-t border-gray-100"
+            <tbody
+                id="employeeTableBody"
+                class="divide-y divide-gray-100"
             >
 
-                <button
-                    type="button"
-                    onclick="closeEmployeeModal()"
-                    class="px-4 py-2.5 border border-gray-200
-                           rounded-lg text-sm font-medium
-                           text-gray-600 hover:bg-gray-50"
-                >
-                    Cancel
-                </button>
+                <?php foreach ($employees as $employee): ?>
 
+                    <?php
+                    $name = $employee['name'] ?? '';
+                    $email = $employee['email'] ?? '';
+                    $role = $employee['role'] ?? '';
+                    $status = strtolower($employee['status'] ?? 'inactive');
+                    $date = !empty($employee['created_at'])
+                        ? date('d M Y', strtotime($employee['created_at']))
+                        : '-';
 
-                <button
-                    type="submit"
-                    class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700
-                           text-white rounded-lg text-sm font-medium"
-                >
-                    Create Employee
-                </button>
+                    $nameParts = preg_split('/\s+/', trim($name));
+                    $initials = '';
 
-            </div>
+                    foreach ($nameParts as $part) {
+                        if ($part !== '') {
+                            $initials .= strtoupper(substr($part, 0, 1));
+                        }
+                    }
 
-        </form>
+                    $initials = substr($initials, 0, 2);
+
+                    $avatarKey = ['blue', 'green', 'orange', 'pink'][$employee['id'] % 4] ?? 'blue';
+                    $avatarClass = $avatarClasses[$avatarKey];
+
+                    $roleClass = $roleClasses[$role] ?? 'bg-gray-50 text-gray-700';
+
+                    $isActive = $status === 'active';
+
+                    $statusTextClass = $isActive
+                        ? 'text-green-600'
+                        : 'text-red-600';
+
+                    $statusDotClass = $isActive
+                        ? 'bg-green-500'
+                        : 'bg-red-500';
+                    ?>
+
+                    <tr
+                        class="employee-row hover:bg-gray-50 transition"
+                        data-name="<?= htmlspecialchars(strtolower($name)) ?>"
+                        data-email="<?= htmlspecialchars(strtolower($email)) ?>"
+                        data-role="<?= htmlspecialchars($role) ?>"
+                        data-status="<?= htmlspecialchars($status) ?>"
+                    >
+
+                        <td class="px-5 py-4">
+
+                            <div class="flex items-center gap-3">
+
+                                <div class="w-9 h-9 rounded-full flex items-center justify-center <?= $avatarClass ?>">
+
+                                    <span class="text-sm font-semibold">
+                                        <?= htmlspecialchars($initials) ?>
+                                    </span>
+
+                                </div>
+
+                                <span class="font-medium text-gray-800">
+                                    <?= htmlspecialchars($name) ?>
+                                </span>
+
+                            </div>
+
+                        </td>
+
+                        <td class="px-5 py-4 text-gray-500">
+                            <?= htmlspecialchars($email) ?>
+                        </td>
+
+                        <td class="px-5 py-4">
+
+                            <span class="px-2.5 py-1 rounded-md text-xs font-medium <?= $roleClass ?>">
+                                <?= htmlspecialchars($role) ?>
+                            </span>
+
+                        </td>
+
+                        <td class="px-5 py-4">
+
+                            <span class="inline-flex items-center gap-1.5 text-xs font-medium <?= $statusTextClass ?>">
+
+                                <span class="w-2 h-2 rounded-full <?= $statusDotClass ?>"></span>
+
+                                <?= ucfirst(htmlspecialchars($status)) ?>
+
+                            </span>
+
+                        </td>
+
+                        <td class="px-5 py-4 text-gray-500">
+                            <?= htmlspecialchars($date) ?>
+                        </td>
+
+                        <td class="px-5 py-4">
+
+                            <div class="flex items-center justify-end gap-2">
+
+                                <button
+                                    type="button"
+                                    onclick="openEditModal(<?= (int) $employee['id'] ?>)"
+                                    class="px-3 py-1.5 border border-gray-200 rounded-md text-xs font-medium text-gray-600 hover:bg-gray-50"
+                                >
+                                    Edit
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onclick="deleteEmployee(<?= (int) $employee['id'] ?>)"
+                                    class="px-3 py-1.5 border border-red-200 rounded-md text-xs font-medium text-red-600 hover:bg-red-50"
+                                >
+                                    Delete
+                                </button>
+
+                            </div>
+
+                        </td>
+
+                    </tr>
+
+                <?php endforeach; ?>
+
+                <?php if (empty($employees)): ?>
+
+                    <tr>
+
+                        <td
+                            colspan="6"
+                            class="px-5 py-12 text-center text-gray-500"
+                        >
+                            No employees found.
+                        </td>
+
+                    </tr>
+
+                <?php endif; ?>
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+    <div class="px-5 py-4 border-t border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+
+        <p class="text-sm text-gray-500">
+
+            Showing
+
+            <span
+                id="visibleEmployeeCount"
+                class="font-medium text-gray-700"
+            >
+                <?= $totalEmployees ?>
+            </span>
+
+            employees
+
+        </p>
 
     </div>
 
 </div>
+```
 
+</div>
+
+<div
+    id="employeeModal"
+    class="fixed inset-0 z-50 hidden items-center justify-center p-4"
+>
+
+```
+<div
+    onclick="closeEmployeeModal()"
+    class="absolute inset-0 bg-black/40 backdrop-blur-sm"
+></div>
+
+<div class="relative bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+
+    <div class="flex items-center justify-between px-6 py-5 border-b border-gray-200">
+
+        <div>
+
+            <h2
+                id="modalTitle"
+                class="text-lg font-bold text-gray-900"
+            >
+                Create Employee
+            </h2>
+
+            <p class="text-sm text-gray-500 mt-1">
+                Add a new employee to your company.
+            </p>
+
+        </div>
+
+        <button
+            type="button"
+            onclick="closeEmployeeModal()"
+            class="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center"
+        >
+
+            <svg
+                class="w-5 h-5 text-gray-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+            >
+                <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M6 18L18 6M6 6l12 12"
+                />
+            </svg>
+
+        </button>
+
+    </div>
+
+    <form
+        id="employeeForm"
+        method="POST"
+        action="/finovo-oms-and-wms/public/index.php/employees/create"
+        class="p-6 space-y-5"
+    >
+
+        <input
+            type="hidden"
+            name="employee_id"
+            id="employeeId"
+            value=""
+        >
+
+        <div>
+
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                Full Name
+            </label>
+
+            <input
+                type="text"
+                name="name"
+                id="employeeName"
+                required
+                placeholder="Enter employee name"
+                class="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+
+        </div>
+
+        <div>
+
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                Email Address
+            </label>
+
+            <input
+                type="email"
+                name="email"
+                id="employeeEmail"
+                required
+                placeholder="employee@example.com"
+                class="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+
+        </div>
+
+        <div id="passwordField">
+
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                Password
+            </label>
+
+            <input
+                type="password"
+                name="password"
+                id="employeePassword"
+                placeholder="Enter temporary password"
+                class="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+
+            <p class="text-xs text-gray-400 mt-1.5">
+                The employee will use this password to login.
+            </p>
+
+        </div>
+
+        <div>
+
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                Role
+            </label>
+
+            <select
+                name="role"
+                id="employeeRole"
+                required
+                onchange="updatePermissions()"
+                class="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+
+                <option value="">
+                    Select employee role
+                </option>
+
+                <option value="Admin">
+                    Admin
+                </option>
+
+                <option value="Manager">
+                    Manager
+                </option>
+
+                <option value="Warehouse Staff">
+                    Warehouse Staff
+                </option>
+
+            </select>
+
+        </div>
+
+        <div>
+
+            <div class="flex items-center justify-between mb-2">
+
+                <label class="block text-sm font-medium text-gray-700">
+                    Permissions
+                </label>
+
+                <button
+                    type="button"
+                    onclick="togglePermissions()"
+                    class="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                >
+                    Select all
+                </button>
+
+            </div>
+
+            <div class="border border-gray-200 rounded-lg overflow-hidden">
+
+                <div class="px-4 py-3 bg-gray-50 border-b border-gray-200">
+
+                    <p class="text-xs text-gray-500">
+                        Select the permissions this employee should have.
+                    </p>
+
+                </div>
+
+                <div
+                    id="permissionsList"
+                    class="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3"
+                >
+
+                    <label class="flex items-center gap-2 cursor-pointer">
+
+                        <input
+                            type="checkbox"
+                            name="permissions[]"
+                            value="manage_employees"
+                            class="permission-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        >
+
+                        <span class="text-sm text-gray-700">
+                            Manage Employees
+                        </span>
+
+                    </label>
+
+                    <label class="flex items-center gap-2 cursor-pointer">
+
+                        <input
+                            type="checkbox"
+                            name="permissions[]"
+                            value="manage_products"
+                            class="permission-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        >
+
+                        <span class="text-sm text-gray-700">
+                            Manage Products
+                        </span>
+
+                    </label>
+
+                    <label class="flex items-center gap-2 cursor-pointer">
+
+                        <input
+                            type="checkbox"
+                            name="permissions[]"
+                            value="manage_inventory"
+                            class="permission-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        >
+
+                        <span class="text-sm text-gray-700">
+                            Manage Inventory
+                        </span>
+
+                    </label>
+
+                    <label class="flex items-center gap-2 cursor-pointer">
+
+                        <input
+                            type="checkbox"
+                            name="permissions[]"
+                            value="create_orders"
+                            class="permission-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        >
+
+                        <span class="text-sm text-gray-700">
+                            Create Orders
+                        </span>
+
+                    </label>
+
+                    <label class="flex items-center gap-2 cursor-pointer">
+
+                        <input
+                            type="checkbox"
+                            name="permissions[]"
+                            value="confirm_orders"
+                            class="permission-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        >
+
+                        <span class="text-sm text-gray-700">
+                            Confirm Orders
+                        </span>
+
+                    </label>
+
+                    <label class="flex items-center gap-2 cursor-pointer">
+
+                        <input
+                            type="checkbox"
+                            name="permissions[]"
+                            value="pick_pack"
+                            class="permission-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        >
+
+                        <span class="text-sm text-gray-700">
+                            Pick & Pack
+                        </span>
+
+                    </label>
+
+                    <label class="flex items-center gap-2 cursor-pointer">
+
+                        <input
+                            type="checkbox"
+                            name="permissions[]"
+                            value="dispatch_orders"
+                            class="permission-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        >
+
+                        <span class="text-sm text-gray-700">
+                            Dispatch Orders
+                        </span>
+
+                    </label>
+
+                    <label class="flex items-center gap-2 cursor-pointer">
+
+                        <input
+                            type="checkbox"
+                            name="permissions[]"
+                            value="manage_invoices"
+                            class="permission-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        >
+
+                        <span class="text-sm text-gray-700">
+                            Manage Invoices
+                        </span>
+
+                    </label>
+
+                    <label class="flex items-center gap-2 cursor-pointer">
+
+                        <input
+                            type="checkbox"
+                            name="permissions[]"
+                            value="manage_payments"
+                            class="permission-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        >
+
+                        <span class="text-sm text-gray-700">
+                            Manage Payments
+                        </span>
+
+                    </label>
+
+                    <label class="flex items-center gap-2 cursor-pointer">
+
+                        <input
+                            type="checkbox"
+                            name="permissions[]"
+                            value="view_reports"
+                            class="permission-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        >
+
+                        <span class="text-sm text-gray-700">
+                            View Reports
+                        </span>
+
+                    </label>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div>
+
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+                Account Status
+            </label>
+
+            <div class="flex gap-4">
+
+                <label class="flex items-center gap-2 cursor-pointer">
+
+                    <input
+                        type="radio"
+                        name="status"
+                        value="active"
+                        checked
+                        class="text-blue-600 focus:ring-blue-500"
+                    >
+
+                    <span class="text-sm text-gray-700">
+                        Active
+                    </span>
+
+                </label>
+
+                <label class="flex items-center gap-2 cursor-pointer">
+
+                    <input
+                        type="radio"
+                        name="status"
+                        value="inactive"
+                        class="text-blue-600 focus:ring-blue-500"
+                    >
+
+                    <span class="text-sm text-gray-700">
+                        Inactive
+                    </span>
+
+                </label>
+
+            </div>
+
+        </div>
+
+        <div class="flex justify-end gap-3 pt-3 border-t border-gray-100">
+
+            <button
+                type="button"
+                onclick="closeEmployeeModal()"
+                class="px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50"
+            >
+                Cancel
+            </button>
+
+            <button
+                id="submitEmployeeButton"
+                type="submit"
+                class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium"
+            >
+                Create Employee
+            </button>
+
+        </div>
+
+    </form>
+
+</div>
+```
+
+</div>
 
 <script>
+
+const rolePermissions = {
+    Admin: [
+        'manage_employees',
+        'manage_products',
+        'manage_inventory',
+        'create_orders',
+        'confirm_orders',
+        'pick_pack',
+        'dispatch_orders',
+        'manage_invoices',
+        'manage_payments',
+        'view_reports'
+    ],
+    Manager: [
+        'manage_products',
+        'manage_inventory',
+        'create_orders',
+        'confirm_orders',
+        'pick_pack',
+        'dispatch_orders',
+        'manage_invoices',
+        'manage_payments',
+        'view_reports'
+    ],
+    'Warehouse Staff': [
+        'manage_inventory',
+        'pick_pack',
+        'dispatch_orders',
+        'view_reports'
+    ]
+};
 
 function openEmployeeModal() {
 
     const modal = document.getElementById('employeeModal');
+
+    document.getElementById('modalTitle').textContent = 'Create Employee';
+    document.getElementById('submitEmployeeButton').textContent = 'Create Employee';
+    document.getElementById('employeeForm').action = '/finovo-oms-and-wms/public/index.php/employees/create';
+
+    document.getElementById('employeeId').value = '';
+    document.getElementById('employeeForm').reset();
+
+    document.querySelectorAll('.permission-checkbox').forEach(checkbox => {
+        checkbox.checked = false;
+    });
 
     modal.classList.remove('hidden');
     modal.classList.add('flex');
 
     document.body.classList.add('overflow-hidden');
 }
-
 
 function closeEmployeeModal() {
 
@@ -737,11 +816,130 @@ function closeEmployeeModal() {
     document.body.classList.remove('overflow-hidden');
 }
 
+function updatePermissions() {
 
-function openEditModal(name) {
+    const role = document.getElementById('employeeRole').value;
+    const permissions = rolePermissions[role] || [];
 
-    alert('Edit employee: ' + name);
+    document.querySelectorAll('.permission-checkbox').forEach(checkbox => {
+        checkbox.checked = permissions.includes(checkbox.value);
+    });
+}
+
+function togglePermissions() {
+
+    const checkboxes = document.querySelectorAll('.permission-checkbox');
+
+    const allChecked = [...checkboxes].every(checkbox => checkbox.checked);
+
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = !allChecked;
+    });
 
 }
+
+function openEditModal(id) {
+
+    document.getElementById('modalTitle').textContent = 'Edit Employee';
+    document.getElementById('submitEmployeeButton').textContent = 'Update Employee';
+    document.getElementById('employeeForm').action = '/finovo-oms-and-wms/public/index.php/employees/update';
+
+    document.getElementById('employeeId').value = id;
+
+    document.getElementById('passwordField').classList.add('hidden');
+
+    const modal = document.getElementById('employeeModal');
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+
+    document.body.classList.add('overflow-hidden');
+}
+
+function deleteEmployee(id) {
+
+    if (!confirm('Are you sure you want to delete this employee?')) {
+        return;
+    }
+
+    const form = document.createElement('form');
+
+    form.method = 'POST';
+    form.action = '/finovo-oms-and-wms/public/index.php/employees/delete';
+
+    const input = document.createElement('input');
+
+    input.type = 'hidden';
+    input.name = 'employee_id';
+    input.value = id;
+
+    form.appendChild(input);
+
+    document.body.appendChild(form);
+
+    form.submit();
+}
+
+const searchInput = document.getElementById('employeeSearch');
+const roleFilter = document.getElementById('roleFilter');
+const statusFilter = document.getElementById('statusFilter');
+
+function filterEmployees() {
+
+    const search = searchInput.value.toLowerCase();
+    const role = roleFilter.value;
+    const status = statusFilter.value;
+
+    const rows = document.querySelectorAll('.employee-row');
+
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+
+        const name = row.dataset.name;
+        const email = row.dataset.email;
+        const rowRole = row.dataset.role;
+        const rowStatus = row.dataset.status;
+
+        const matchesSearch =
+            name.includes(search) ||
+            email.includes(search);
+
+        const matchesRole =
+            role === '' ||
+            rowRole === role;
+
+        const matchesStatus =
+            status === '' ||
+            rowStatus === status;
+
+        const visible =
+            matchesSearch &&
+            matchesRole &&
+            matchesStatus;
+
+        row.classList.toggle('hidden', !visible);
+
+        if (visible) {
+            visibleCount++;
+        }
+
+    });
+
+    document.getElementById('visibleEmployeeCount').textContent = visibleCount;
+
+}
+
+searchInput.addEventListener('input', filterEmployees);
+roleFilter.addEventListener('change', filterEmployees);
+statusFilter.addEventListener('change', filterEmployees);
+
+document.getElementById('employeeModal').addEventListener('click', function(event) {
+
+    if (event.target === this) {
+        closeEmployeeModal();
+    }
+
+});
 
 </script>
