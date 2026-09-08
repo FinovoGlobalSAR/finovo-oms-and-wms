@@ -1,120 +1,272 @@
 <?php
 
-require_once __DIR__ . '/../../core/Model.php';
+require_once __DIR__ . '/../../core/Database.php';
 
-class User extends Model
+class User
 {
-    public function allByCompany(int $companyId): array
-    {
-        $sql = "SELECT
-                    users.id,
-                    users.company_id,
-                    users.role_id,
-                    users.name,
-                    users.email,
-                    users.status,
-                    users.created_at,
-                    roles.name AS role_name
-                FROM users
-                INNER JOIN roles ON roles.id = users.role_id
-                WHERE users.company_id = :company_id
-                ORDER BY users.id DESC";
+    private PDO $db;
 
-        return $this->query($sql, ['company_id' => $companyId])->fetchAll();
+    public function __construct()
+    {
+        $this->db = Database::getConnection();
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Get all employees of a company
+    |--------------------------------------------------------------------------
+    */
+    public function allByCompany(int $companyId): array
+    {
+        $stmt = $this->db->prepare("
+            SELECT
+                u.id,
+                u.company_id,
+                u.role_id,
+                u.name,
+                u.email,
+                u.status,
+                u.created_at,
+                r.name AS role_name
+            FROM users u
+            LEFT JOIN roles r
+                ON r.id = u.role_id
+                AND r.company_id = u.company_id
+            WHERE u.company_id = ?
+            ORDER BY u.id DESC
+        ");
+
+        $stmt->execute([$companyId]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Find employee by ID and company
+    |--------------------------------------------------------------------------
+    */
     public function findByIdAndCompany(int $id, int $companyId): ?array
     {
-        $sql = "SELECT id, company_id, role_id, name, email, status, created_at
-                FROM users
-                WHERE id = :id AND company_id = :company_id
-                LIMIT 1";
+        $stmt = $this->db->prepare("
+            SELECT
+                u.id,
+                u.company_id,
+                u.role_id,
+                u.name,
+                u.email,
+                u.status,
+                u.created_at,
+                r.name AS role_name
+            FROM users u
+            LEFT JOIN roles r
+                ON r.id = u.role_id
+                AND r.company_id = u.company_id
+            WHERE u.id = ?
+            AND u.company_id = ?
+            LIMIT 1
+        ");
 
-        $user = $this->query($sql, [
-            'id' => $id,
-            'company_id' => $companyId,
-        ])->fetch();
+        $stmt->execute([
+            $id,
+            $companyId
+        ]);
+
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return $user ?: null;
     }
 
-    public function emailExists(string $email, int $companyId, ?int $ignoreId = null): bool
+    /*
+    |--------------------------------------------------------------------------
+    | Find user by email - used for login
+    |--------------------------------------------------------------------------
+    */
+    public function findByEmail(string $email): ?array
     {
-        $sql = "SELECT id FROM users
-                WHERE company_id = :company_id AND email = :email";
+        $stmt = $this->db->prepare("
+            SELECT
+                u.id,
+                u.company_id,
+                u.role_id,
+                u.name,
+                u.email,
+                u.password_hash AS password,
+                u.status,
+                r.name AS role,
+                c.name AS company_name
+            FROM users u
 
-        $params = [
-            'company_id' => $companyId,
-            'email' => $email,
-        ];
+            INNER JOIN roles r
+                ON r.id = u.role_id
+                AND r.company_id = u.company_id
 
-        if ($ignoreId !== null) {
-            $sql .= " AND id != :ignore_id";
-            $params['ignore_id'] = $ignoreId;
+            LEFT JOIN companies c
+                ON c.id = u.company_id
+
+            WHERE u.email = ?
+            AND u.status = 'active'
+
+            LIMIT 1
+        ");
+
+        $stmt->execute([$email]);
+
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $user ?: null;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Check duplicate employee email in same company
+    |--------------------------------------------------------------------------
+    */
+    public function emailExists(
+        string $email,
+        int $companyId,
+        ?int $excludeId = null
+    ): bool {
+
+        if ($excludeId !== null) {
+
+            $stmt = $this->db->prepare("
+                SELECT id
+                FROM users
+                WHERE email = ?
+                AND company_id = ?
+                AND id != ?
+                LIMIT 1
+            ");
+
+            $stmt->execute([
+                $email,
+                $companyId,
+                $excludeId
+            ]);
+
+        } else {
+
+            $stmt = $this->db->prepare("
+                SELECT id
+                FROM users
+                WHERE email = ?
+                AND company_id = ?
+                LIMIT 1
+            ");
+
+            $stmt->execute([
+                $email,
+                $companyId
+            ]);
         }
 
-        $sql .= " LIMIT 1";
-
-        return (bool) $this->query($sql, $params)->fetch();
+        return (bool) $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
-    public function create(array $data): int
+    /*
+    |--------------------------------------------------------------------------
+    | Create employee
+    |--------------------------------------------------------------------------
+    */
+    public function create(array $data): bool
     {
-        $sql = "INSERT INTO users
-                    (company_id, role_id, name, email, password_hash, status)
-                VALUES
-                    (:company_id, :role_id, :name, :email, :password_hash, :status)";
+        $stmt = $this->db->prepare("
+            INSERT INTO users (
+                company_id,
+                role_id,
+                name,
+                email,
+                password_hash,
+                status
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+        ");
 
-        $this->query($sql, [
-            'company_id' => $data['company_id'],
-            'role_id' => $data['role_id'],
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'password_hash' => $data['password_hash'],
-            'status' => $data['status'],
+        return $stmt->execute([
+            $data['company_id'],
+            $data['role_id'],
+            $data['name'],
+            $data['email'],
+            $data['password_hash'],
+            $data['status']
         ]);
-
-        return (int) $this->db->lastInsertId();
     }
 
-    public function updateEmployee(int $id, int $companyId, array $data): bool
-    {
-        $params = [
-            'id' => $id,
-            'company_id' => $companyId,
-            'role_id' => $data['role_id'],
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'status' => $data['status'],
-        ];
-
-        $passwordSql = '';
+    /*
+    |--------------------------------------------------------------------------
+    | Update employee
+    |--------------------------------------------------------------------------
+    */
+    public function updateEmployee(
+        int $id,
+        int $companyId,
+        array $data
+    ): bool {
 
         if (!empty($data['password_hash'])) {
-            $passwordSql = ', password_hash = :password_hash';
-            $params['password_hash'] = $data['password_hash'];
+
+            $stmt = $this->db->prepare("
+                UPDATE users
+                SET
+                    role_id = ?,
+                    name = ?,
+                    email = ?,
+                    password_hash = ?,
+                    status = ?
+                WHERE id = ?
+                AND company_id = ?
+            ");
+
+            return $stmt->execute([
+                $data['role_id'],
+                $data['name'],
+                $data['email'],
+                $data['password_hash'],
+                $data['status'],
+                $id,
+                $companyId
+            ]);
         }
 
-        $sql = "UPDATE users
-                SET role_id = :role_id,
-                    name = :name,
-                    email = :email,
-                    status = :status
-                    {$passwordSql}
-                WHERE id = :id AND company_id = :company_id";
+        $stmt = $this->db->prepare("
+            UPDATE users
+            SET
+                role_id = ?,
+                name = ?,
+                email = ?,
+                status = ?
+            WHERE id = ?
+            AND company_id = ?
+        ");
 
-        return $this->query($sql, $params)->rowCount() >= 0;
+        return $stmt->execute([
+            $data['role_id'],
+            $data['name'],
+            $data['email'],
+            $data['status'],
+            $id,
+            $companyId
+        ]);
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Delete employee
+    |--------------------------------------------------------------------------
+    */
     public function deleteEmployee(int $id, int $companyId): bool
     {
-        $stmt = $this->query(
-            "DELETE FROM users WHERE id = :id AND company_id = :company_id",
-            [
-                'id' => $id,
-                'company_id' => $companyId,
-            ]
-        );
+        $stmt = $this->db->prepare("
+            DELETE FROM users
+            WHERE id = ?
+            AND company_id = ?
+        ");
+
+        $stmt->execute([
+            $id,
+            $companyId
+        ]);
 
         return $stmt->rowCount() > 0;
     }
