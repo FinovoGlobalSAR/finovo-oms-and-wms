@@ -1,7 +1,4 @@
 <?php
-$currentPage = 'orders';
-include __DIR__ . '/../partials/layout_start.php';
-
 $avatarColors = [
     ['bg' => '#dbeafe', 'text' => '#1d4ed8'],
     ['bg' => '#dcfce7', 'text' => '#15803d'],
@@ -141,5 +138,3 @@ $sourceColors = [
 function openModal(id) { document.getElementById(id).classList.add('show'); }
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
 </script>
-
-<?php include __DIR__ . '/../partials/layout_end.php'; ?>
