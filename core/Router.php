@@ -33,6 +33,7 @@
 //     }
 // }
 
+
 class Router
 {
     private array $routes = [];
@@ -71,20 +72,32 @@ class Router
 
         $route = $this->routes[$method][$uri];
 
-        // Run Middleware
+        // Run middleware
         foreach ($route['middleware'] as $middleware) {
 
             $middlewareFile =
                 __DIR__ . "/../app/Middleware/{$middleware}.php";
 
+            if (!file_exists($middlewareFile)) {
+                http_response_code(500);
+                echo "Middleware file not found.";
+                exit;
+            }
+
             require_once $middlewareFile;
 
             $middlewareClass = $middleware;
 
+            if (!class_exists($middlewareClass)) {
+                http_response_code(500);
+                echo "Middleware class not found.";
+                exit;
+            }
+
             $middlewareClass::handle();
         }
 
-        // Controller
+        // Run controller
         [$controllerClass, $methodName] = $route['handler'];
 
         $controllerFile =
