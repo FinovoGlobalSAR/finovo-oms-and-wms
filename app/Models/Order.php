@@ -1,5 +1,5 @@
 <?php
-
+// app/Models/Order.php
 require_once __DIR__ . '/../../core/Model.php';
 
 class Order extends Model
@@ -7,6 +7,12 @@ class Order extends Model
     public function all(): array
     {
         $stmt = $this->query("SELECT * FROM orders ORDER BY id DESC");
+        return $stmt->fetchAll();
+    }
+
+    public function filterBySource(string $source): array
+    {
+        $stmt = $this->query("SELECT * FROM orders WHERE source = ? ORDER BY id DESC", [$source]);
         return $stmt->fetchAll();
     }
 

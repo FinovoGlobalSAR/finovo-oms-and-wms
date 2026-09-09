@@ -19,3 +19,28 @@ $router->get('/orders/create', ['OrderController', 'showCreateForm']);
 $router->post('/orders/create', ['OrderController', 'handleCreate']);
 
 $router->post('/api/orders', ['OrderController', 'apiCreate']);
+
+
+/*
+|--------------------------------------------------------------------------
+| Authentication Routes
+|--------------------------------------------------------------------------
+*//*
+|--------------------------------------------------------------------------
+| Authentication Routes
+|--------------------------------------------------------------------------
+*/
+
+$router->get('/login', ['AuthController', 'showLogin']);
+$router->post('/login', ['AuthController', 'login']);
+
+$router->get('/otp', ['AuthController', 'showOtp']);
+$router->post('/otp', ['AuthController', 'verifyOtp']);
+
+$router->get('/logout', ['AuthController', 'logout']);
+
+$router->get(
+    '/dashboard',
+    ['DashboardController', 'index'],
+    ['AuthMiddleware']
+);

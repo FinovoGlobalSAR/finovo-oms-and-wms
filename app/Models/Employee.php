@@ -4,9 +4,6 @@ require_once __DIR__ . '/../../core/Model.php';
 
 class Employee extends Model
 {
-    /**
-     * Get all employees for a company
-     */
     public function all(int $companyId): array
     {
         $stmt = $this->query(
@@ -16,10 +13,12 @@ class Employee extends Model
                 users.email,
                 users.status,
                 users.created_at,
+                users.role_id,
                 roles.name AS role
             FROM users
             INNER JOIN roles
                 ON roles.id = users.role_id
+                AND roles.company_id = users.company_id
             WHERE users.company_id = ?
             ORDER BY users.id DESC",
             [$companyId]
@@ -28,9 +27,6 @@ class Employee extends Model
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    /**
-     * Find one employee
-     */
     public function find(
         int $id,
         int $companyId
@@ -42,10 +38,12 @@ class Employee extends Model
                 users.email,
                 users.status,
                 users.role_id,
+                users.created_at,
                 roles.name AS role
             FROM users
             INNER JOIN roles
                 ON roles.id = users.role_id
+                AND roles.company_id = users.company_id
             WHERE users.id = ?
             AND users.company_id = ?
             LIMIT 1",
@@ -60,9 +58,6 @@ class Employee extends Model
         return $employee ?: null;
     }
 
-    /**
-     * Create employee
-     */
     public function create(
         int $companyId,
         string $name,
@@ -78,12 +73,11 @@ class Employee extends Model
                     role_id,
                     name,
                     email,
-                    password,
-                    status,
-                    created_at
+                    password_hash,
+                    status
                 )
              VALUES
-                (?, ?, ?, ?, ?, ?, NOW())",
+                (?, ?, ?, ?, ?, ?)",
             [
                 $companyId,
                 $roleId,
@@ -100,9 +94,6 @@ class Employee extends Model
         return $stmt->rowCount() > 0;
     }
 
-    /**
-     * Update employee
-     */
     public function update(
         int $id,
         int $companyId,
@@ -130,12 +121,9 @@ class Employee extends Model
             ]
         );
 
-        return $stmt->rowCount() >= 0;
+        return $stmt->execute();
     }
 
-    /**
-     * Delete employee
-     */
     public function delete(
         int $id,
         int $companyId
@@ -153,9 +141,6 @@ class Employee extends Model
         return $stmt->rowCount() > 0;
     }
 
-    /**
-     * Get role ID by role name for a company
-     */
     public function getRoleId(
         string $roleName,
         int $companyId
@@ -179,9 +164,6 @@ class Employee extends Model
             : null;
     }
 
-    /**
-     * Check whether email already exists
-     */
     public function emailExists(
         string $email,
         int $companyId,
@@ -218,9 +200,6 @@ class Employee extends Model
         return (bool) $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
-    /**
-     * Update employee password
-     */
     public function updatePassword(
         int $id,
         int $companyId,
@@ -228,7 +207,7 @@ class Employee extends Model
     ): bool {
         $stmt = $this->query(
             "UPDATE users
-             SET password = ?
+             SET password_hash = ?
              WHERE id = ?
              AND company_id = ?",
             [
@@ -241,6 +220,6 @@ class Employee extends Model
             ]
         );
 
-        return $stmt->rowCount() >= 0;
+        return $stmt->execute();
     }
 }

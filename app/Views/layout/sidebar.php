@@ -1,5 +1,6 @@
 <?php
 
+$baseUrl = '';
 $baseUrl = '/finovo-oms-and-wms/public/index.php';
 
 $currentPath = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
@@ -16,14 +17,29 @@ $navigation = [
 
     ],
 
-    'Management' => [
+    'General' => [
+
+        [
+            'label' => 'Orders',
+            'url'   => '/orders',
+            'icon'  => 'orders',
+        ],
+
+        [
+            'label' => 'Products',
+            'url'   => '/products',
+            'icon'  => 'inventory',
+        ],
+
+    ],
+
+     'Management' => [
 
         [
             'label' => 'Employees',
             'url'   => '/employees',
             'icon'  => 'users',
         ],
-
     ],
 
 ];
@@ -39,9 +55,15 @@ $navigation = [
            transition-transform duration-300"
 >
 
+
+    <!-- ==========================================
+         BRAND
+    =========================================== -->
+
     <div class="h-[72px] px-5 border-b border-gray-100 flex items-center">
 
         <div class="flex items-center justify-between w-full">
+
 
             <div class="flex items-center gap-3">
 
@@ -58,6 +80,7 @@ $navigation = [
                 </div>
 
 
+                <!-- Brand Details -->
                 <div>
 
                     <div class="flex items-center gap-1.5">
@@ -90,6 +113,7 @@ $navigation = [
             </div>
 
 
+            <!-- Edit button -->
             <button
                 type="button"
                 class="w-8 h-8 rounded-lg
@@ -106,7 +130,6 @@ $navigation = [
                     stroke="currentColor"
                     viewBox="0 0 24 24"
                 >
-
                     <path
                         stroke-linecap="round"
                         stroke-linejoin="round"
@@ -120,7 +143,6 @@ $navigation = [
                         stroke-width="1.8"
                         d="M16.5 3.5a2.1 2.1 0 013 3L8 18l-4 1 1-4L16.5 3.5z"
                     />
-
                 </svg>
 
             </button>
@@ -129,6 +151,11 @@ $navigation = [
 
     </div>
 
+
+
+    <!-- ==========================================
+         QUICK ACTIONS
+    =========================================== -->
 
     <div class="px-3 pt-4">
 
@@ -156,6 +183,7 @@ $navigation = [
         >
 
 
+            <!-- New -->
             <button
                 type="button"
                 class="flex-1
@@ -191,6 +219,7 @@ $navigation = [
             </button>
 
 
+            <!-- Search -->
             <button
                 type="button"
                 class="w-9 h-9
@@ -218,6 +247,9 @@ $navigation = [
                 </svg>
 
             </button>
+
+
+            <!-- Notification -->
             <button
                 type="button"
                 class="relative
@@ -251,8 +283,10 @@ $navigation = [
                     />
                 </svg>
 
+
                 <span
-                    class="absolute top-2 right-2
+                    class="absolute
+                           top-2 right-2
                            w-1.5 h-1.5
                            bg-red-500
                            rounded-full
@@ -261,10 +295,16 @@ $navigation = [
 
             </button>
 
+
         </div>
 
     </div>
 
+
+
+    <!-- ==========================================
+         NAVIGATION
+    =========================================== -->
 
     <nav
         class="px-3 py-5
@@ -290,7 +330,6 @@ $navigation = [
                 >
                     <?= htmlspecialchars($section) ?>
                 </p>
-
 
 
                 <div class="space-y-1">
@@ -337,6 +376,7 @@ $navigation = [
                         >
 
 
+                            <!-- Active left bar -->
                             <?php if ($isActive): ?>
 
                                 <span
@@ -357,32 +397,32 @@ $navigation = [
                             <div class="flex items-center gap-3">
 
 
-                                <!-- DASHBOARD ICON -->
-                                <?php if ($item['icon'] === 'dashboard'): ?>
+                                <!-- ICON CONTAINER -->
+                                <div
+                                    class="
+                                        w-7 h-7
+                                        rounded-lg
+                                        flex items-center
+                                        justify-center
+                                        transition
 
-                                    <div
-                                        class="
-                                            w-7 h-7
-                                            rounded-lg
-                                            flex items-center justify-center
-                                            transition
+                                        <?= $isActive
+                                            ? 'bg-blue-100'
+                                            : 'bg-gray-50 group-hover:bg-gray-100'
+                                        ?>
+                                    "
+                                >
 
-                                            <?= $isActive
-                                                ? 'bg-blue-100'
-                                                : 'bg-gray-50 group-hover:bg-gray-100'
-                                            ?>
-                                        "
-                                    >
+
+                                    <!-- Dashboard -->
+                                    <?php if ($item['icon'] === 'dashboard'): ?>
 
                                         <svg
-                                            class="
-                                                w-[16px] h-[16px]
-
+                                            class="w-[16px] h-[16px]
                                                 <?= $isActive
                                                     ? 'text-blue-600'
                                                     : 'text-gray-600'
-                                                ?>
-                                            "
+                                                ?>"
                                             fill="none"
                                             stroke="currentColor"
                                             viewBox="0 0 24 24"
@@ -426,36 +466,16 @@ $navigation = [
 
                                         </svg>
 
-                                    </div>
 
-
-
-                                <!-- EMPLOYEE ICON -->
-                                <?php elseif ($item['icon'] === 'users'): ?>
-
-                                    <div
-                                        class="
-                                            w-7 h-7
-                                            rounded-lg
-                                            flex items-center justify-center
-                                            transition
-
-                                            <?= $isActive
-                                                ? 'bg-blue-100'
-                                                : 'bg-gray-50 group-hover:bg-gray-100'
-                                            ?>
-                                        "
-                                    >
+                                    <!-- Employees -->
+                                    <?php elseif ($item['icon'] === 'users'): ?>
 
                                         <svg
-                                            class="
-                                                w-[16px] h-[16px]
-
+                                            class="w-[16px] h-[16px]
                                                 <?= $isActive
                                                     ? 'text-blue-600'
                                                     : 'text-gray-600'
-                                                ?>
-                                            "
+                                                ?>"
                                             fill="none"
                                             stroke="currentColor"
                                             viewBox="0 0 24 24"
@@ -491,16 +511,91 @@ $navigation = [
 
                                         </svg>
 
-                                    </div>
+
+                                    <!-- Orders -->
+                                    <?php elseif ($item['icon'] === 'orders'): ?>
+
+                                        <svg
+                                            class="w-[16px] h-[16px]
+                                                <?= $isActive
+                                                    ? 'text-blue-600'
+                                                    : 'text-gray-600'
+                                                ?>"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+
+                                            <path
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                stroke-width="1.8"
+                                                d="M4 6h16v14H4z"
+                                            />
+
+                                            <path
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                stroke-width="1.8"
+                                                d="M8 6V4h8v2"
+                                            />
+
+                                            <path
+                                                stroke-linecap="round"
+                                                stroke-width="1.8"
+                                                d="M8 10h8M8 14h5"
+                                            />
+
+                                        </svg>
 
 
-                                <?php endif; ?>
+                                    <!-- Products / Inventory -->
+                                    <?php elseif ($item['icon'] === 'inventory'): ?>
 
+                                        <svg
+                                            class="w-[16px] h-[16px]
+                                                <?= $isActive
+                                                    ? 'text-blue-600'
+                                                    : 'text-gray-600'
+                                                ?>"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+
+                                            <path
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                stroke-width="1.8"
+                                                d="M4 7h16v13H4z"
+                                            />
+
+                                            <path
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                stroke-width="1.8"
+                                                d="M8 7V4h8v3"
+                                            />
+
+                                            <path
+                                                stroke-linecap="round"
+                                                stroke-width="1.8"
+                                                d="M8 11h8M8 15h5"
+                                            />
+
+                                        </svg>
+
+
+                                    <?php endif; ?>
+
+
+                                </div>
 
 
                                 <span>
                                     <?= htmlspecialchars($item['label']) ?>
                                 </span>
+
 
                             </div>
 
@@ -532,6 +627,12 @@ $navigation = [
 
         <?php endforeach; ?>
 
+
+
+        <!-- ==========================================
+             ACCOUNT
+        =========================================== -->
+
         <div class="pt-1">
 
 
@@ -545,6 +646,8 @@ $navigation = [
             >
                 Account
             </p>
+
+
             <a
                 href="#"
                 class="group
@@ -599,6 +702,7 @@ $navigation = [
 
                 Logout
 
+
             </a>
 
 
@@ -607,6 +711,11 @@ $navigation = [
 
     </nav>
 
+
+
+    <!-- ==========================================
+         FOOTER
+    =========================================== -->
 
     <div
         class="absolute

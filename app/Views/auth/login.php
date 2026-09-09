@@ -55,7 +55,7 @@
 
             <form
                 method="POST"
-                action="/finovo-oms-and-wms/login"
+                action="/finovo-oms-and-wms/public/login"
                 class="space-y-4"
             >
 
@@ -123,37 +123,7 @@
 </div>
 
 
-                <!-- Role -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">
-                        Role
-                    </label>
-
-                    <select
-                        name="role"
-                        required
-                        class="w-full border border-gray-300 rounded-lg
-                               px-3 py-2 text-sm bg-white
-                               focus:outline-none focus:ring-2
-                               focus:ring-black"
-                    >
-                        <option value="">
-                            Select your role
-                        </option>
-
-                        <option value="admin">
-                            Admin
-                        </option>
-
-                        <option value="manager">
-                            Manager
-                        </option>
-
-                        <option value="warehouse">
-                            Warehouse
-                        </option>
-                    </select>
-                </div>
+              
 
                 <!-- Login Button -->
                 <button

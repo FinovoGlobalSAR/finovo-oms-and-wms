@@ -1,73 +1,140 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Orders — Finovo OMS/WMS</title>
-    <?php require __DIR__ . '/../partials/theme_header.php'; ?>
-</head>
-<body class="bg-canvas min-h-screen p-8 text-ink">
-    <div class="max-w-4xl mx-auto">
-        <div class="flex items-center justify-between mb-6">
-            <div>
-                <h1 class="text-2xl font-bold">Orders</h1>
-                <p class="text-sm text-ink/60">All orders</p>
-            </div>
-            <a href="/orders/create" class="bg-ink text-canvas px-4 py-2 rounded hover:opacity-80">
-                + Add New Order
-            </a>
-        </div>
+<?php
+$avatarColors = [
+    ['bg' => '#dbeafe', 'text' => '#1d4ed8'],
+    ['bg' => '#dcfce7', 'text' => '#15803d'],
+    ['bg' => '#fce7f3', 'text' => '#be185d'],
+    ['bg' => '#fef3c7', 'text' => '#b45309'],
+    ['bg' => '#e0e7ff', 'text' => '#4338ca'],
+    ['bg' => '#cffafe', 'text' => '#0e7490'],
+];
 
-        <div class="bg-canvas border border-ink rounded-lg p-4 mb-6">
-            <p class="text-sm font-medium mb-1">API Key</p>
-            <code class="text-xs bg-canvas px-2 py-1 rounded border border-ink/20 break-all">
-                <?= htmlspecialchars($apiKey) ?>
-            </code>
-        </div>
+$sourceColors = [
+    'shopify_pull'     => ['bg' => '#ede9fe', 'text' => '#6d28d9'],
+    'manual'           => ['bg' => '#ffedd5', 'text' => '#c2410c'],
+    'api_push'         => ['bg' => '#cffafe', 'text' => '#0e7490'],
+    'csv_import'       => ['bg' => '#fce7f3', 'text' => '#be185d'],
+    'woocommerce_pull' => ['bg' => '#dcfce7', 'text' => '#15803d'],
+];
+?>
 
-        <div class="bg-canvas border border-ink rounded-lg overflow-hidden">
-            <table class="w-full text-left">
-                <thead class="border-b border-ink">
-                    <tr>
-                        <th class="p-3">Order ID</th>
-                        <th class="p-3">Customer</th>
-                        <th class="p-3">Product</th>
-                        <th class="p-3">Qty</th>
-                        <th class="p-3">Price</th>
-                        <th class="p-3">Source</th>
-                        <th class="p-3">Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($orders)): ?>
-                        <tr><td colspan="7" class="p-4 text-center text-ink/60">No orders yet.</td></tr>
-                    <?php endif; ?>
-                    <?php foreach ($orders as $order): ?>
-                        <tr class="border-b border-ink/20">
-                            <td class="p-3">#<?= $order['id'] ?></td>
-                            <td class="p-3"><?= htmlspecialchars($order['customer_name']) ?></td>
-                            <td class="p-3"><?= htmlspecialchars($order['product_name']) ?></td>
-                            <td class="p-3"><?= $order['quantity'] ?></td>
-                            <td class="p-3">Rs. <?= number_format($order['price'], 2) ?></td>
-                            <td class="p-3">
-                                <?php
-                                $src = $order['source'] ?? 'manual';
-                                $label = $src === 'api_push' ? 'Pushed' : 'Manual';
-                                $classes = $src === 'api_push'
-                                    ? 'bg-ink text-canvas'
-                                    : 'bg-canvas text-ink border border-ink/40';
-                                ?>
-                                <span class="<?= $classes ?> px-2 py-1 rounded text-xs"><?= $label ?></span>
-                            </td>
-                            <td class="p-3">
-                                <span class="bg-canvas text-ink border border-ink/40 px-2 py-1 rounded text-xs">
-                                    <?= htmlspecialchars($order['status']) ?>
-                                </span>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+<div class="breadcrumb">Finovo <i class="bi bi-chevron-right"></i> Orders</div>
+
+<div class="page-header-row">
+    <h1>Orders <span class="count-badge"><?= count($orders) ?></span></h1>
+</div>
+<p class="page-subtitle">Manage your orders and track fulfillment across all sources.</p>
+
+<?php if (!empty($synced)): ?>
+    <div class="banner banner-success"><?= (int)$synced ?> new order(s) imported from Shopify.</div>
+<?php endif; ?>
+<?php if (!empty($exported)): ?>
+    <div class="banner banner-success">Order exported to Shopify.</div>
+<?php endif; ?>
+<?php if (!empty($imported)): ?>
+    <div class="banner banner-success"><?= (int)$imported ?> order(s) imported from CSV.</div>
+<?php endif; ?>
+<?php if (!empty($error)): ?>
+    <div class="banner banner-error"><?= htmlspecialchars($error) ?></div>
+<?php endif; ?>
+
+<div class="card">
+    <div class="filter-row">
+        <form method="GET" action="/orders">
+            <select name="platform" class="filter-btn" onchange="this.form.submit()">
+                <option value="all" <?= $selectedPlatform === 'all' ? 'selected' : '' ?>>All platforms</option>
+                <option value="manual" <?= $selectedPlatform === 'manual' ? 'selected' : '' ?>>Manual</option>
+                <option value="custom" <?= $selectedPlatform === 'custom' ? 'selected' : '' ?>>API push</option>
+                <option value="shopify" <?= $selectedPlatform === 'shopify' ? 'selected' : '' ?>>Shopify</option>
+                <option value="woocommerce" <?= $selectedPlatform === 'woocommerce' ? 'selected' : '' ?>>WooCommerce</option>
+                <option value="csv" <?= $selectedPlatform === 'csv' ? 'selected' : '' ?>>CSV import</option>
+            </select>
+        </form>
+        <div class="push-right">
+            <button type="button" class="toolbar-btn" onclick="openModal('importOrderModal')"><i class="bi bi-upload"></i> Import CSV</button>
+            <a href="/orders/export-csv" class="toolbar-btn"><i class="bi bi-download"></i> Export CSV</a>
+            <a href="/orders/sync-shopify" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync Shopify</a>
+            <a href="/orders/create" class="toolbar-btn btn-dark"><i class="bi bi-plus-lg"></i> Add order</a>
         </div>
     </div>
-</body>
-</html>
+
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th class="checkbox-col"><input type="checkbox"></th>
+                <th>Order</th>
+                <th>Customer</th>
+                <th>Product</th>
+                <th>Price</th>
+                <th>Source</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php if (empty($orders)): ?>
+                <tr><td colspan="7" style="text-align:center; color:#6b7280; padding:30px;">No orders found.</td></tr>
+            <?php else: ?>
+                <?php foreach ($orders as $i => $order):
+                    $avColor = $avatarColors[$i % count($avatarColors)];
+                    $srcKey = $order['source'] ?? 'manual';
+                    $srcColor = $sourceColors[$srcKey] ?? ['bg' => '#f3f4f6', 'text' => '#374151'];
+                    $currencySymbol = ($srcKey === 'shopify_pull') ? '$' : 'Rs.';
+                ?>
+                    <tr>
+                        <td class="checkbox-col"><input type="checkbox"></td>
+                        <td>
+                            <div class="name-cell">
+                                <span class="avatar-circle" style="background:<?= $avColor['bg'] ?>; color:<?= $avColor['text'] ?>;"><?= strtoupper(substr($order['customer_name'] ?? 'O', 0, 1)) ?></span>
+                                #<?= htmlspecialchars($order['id']) ?>
+                            </div>
+                        </td>
+                        <td><a href="#" class="link-blue"><?= htmlspecialchars($order['customer_name'] ?? '-') ?></a></td>
+                        <td><?= htmlspecialchars($order['product_name'] ?? '-') ?></td>
+                        <td><?= $currencySymbol ?> <?= htmlspecialchars(number_format((float)($order['price'] ?? 0), 2)) ?></td>
+                        <td>
+                            <span class="source-badge" style="background:<?= $srcColor['bg'] ?>; color:<?= $srcColor['text'] ?>;">
+                                <?= htmlspecialchars(ucfirst(str_replace('_', ' ', $srcKey))) ?>
+                            </span>
+                        </td>
+                        <td>
+                            <a href="/orders/export-shopify?id=<?= $order['id'] ?>" class="action-link"><i class="bi bi-box-arrow-up-right"></i> Push</a>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </tbody>
+    </table>
+
+    <div class="pagination-bar">
+        <span>Rows per page 15 &nbsp;&nbsp; 1-<?= count($orders) ?> of <?= count($orders) ?> rows</span>
+        <div class="pagination-controls">
+            <button><i class="bi bi-chevron-left"></i></button>
+            <span class="page-num active">1</span>
+            <button><i class="bi bi-chevron-right"></i></button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="importOrderModal">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h2>Import Orders (CSV)</h2>
+            <button class="modal-close" onclick="closeModal('importOrderModal')">&times;</button>
+        </div>
+        <p class="modal-help">CSV columns must be in this order: <strong>customer_name, product_name, quantity, price</strong> (first row is treated as the header and skipped).</p>
+        <form action="/orders/import" method="POST" enctype="multipart/form-data">
+            <div class="form-group">
+                <label>CSV File</label>
+                <input type="file" name="csv_file" accept=".csv" required>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-secondary" onclick="closeModal('importOrderModal')">Cancel</button>
+                <button type="submit" class="btn-primary">Import</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openModal(id) { document.getElementById(id).classList.add('show'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+</script>

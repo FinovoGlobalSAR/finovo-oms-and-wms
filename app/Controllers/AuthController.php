@@ -13,12 +13,11 @@ class AuthController
     {
         $email = trim($_POST['email'] ?? '');
         $password = $_POST['password'] ?? '';
-        $role = $_POST['role'] ?? '';
 
         // Validate input
-        if (empty($email) || empty($password) || empty($role)) {
-            $_SESSION['error'] = 'All fields are required.';
-            header('Location: /finovo-oms-and-wms/login');
+        if (empty($email) || empty($password)) {
+            $_SESSION['error'] = 'Email and password are required.';
+            header('Location: /finovo-oms-and-wms/public/login');
             exit;
         }
 
@@ -26,36 +25,54 @@ class AuthController
         $userModel = new User();
         $user = $userModel->findByEmail($email);
 
-        // Check credentials and role
+        // Check user and password
         if (
             !$user ||
-            !password_verify($password, $user['password']) ||
-            $user['role'] !== $role
+            !password_verify($password, $user['password'])
         ) {
-            $_SESSION['error'] = 'Invalid email, password or role.';
-            header('Location: /finovo-oms-and-wms/login');
+            $_SESSION['error'] = 'Invalid email or password.';
+            header('Location: /finovo-oms-and-wms/public/login');
             exit;
         }
+
+        // Check account status
+        if ($user['status'] !== 'active') {
+            $_SESSION['error'] = 'Your account is inactive.';
+            header('Location: /finovo-oms-and-wms/public/login');
+            exit;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Role automatically comes from database
+        |--------------------------------------------------------------------------
+        |
+        | User.php already joins:
+        | users -> roles
+        |
+        | So $user['role'] contains the user's role.
+        |
+        */
 
         // Generate OTP
         $otp = random_int(100000, 999999);
 
-        // Store OTP and user temporarily
+        // Store temporary authentication data
         $_SESSION['otp'] = (string) $otp;
         $_SESSION['otp_user'] = $user;
 
-        // Temporary for testing
+        // Temporary testing
         $_SESSION['success'] = "Your OTP is: $otp";
 
         // Go to OTP page
-        header('Location: /finovo-oms-and-wms/otp');
+        header('Location: /finovo-oms-and-wms/public/otp');
         exit;
     }
 
     // Show OTP Page
     public function showOtp()
     {
-       require __DIR__ . '/../Views/auth/otp.php';
+        require __DIR__ . '/../Views/auth/otp.php';
     }
 
     // Verify OTP
@@ -63,37 +80,53 @@ class AuthController
     {
         $enteredOtp = trim($_POST['otp'] ?? '');
 
-        if (!isset($_SESSION['otp'], $_SESSION['otp_user'])) {
+        // Check temporary login session
+        if (
+            !isset($_SESSION['otp']) ||
+            !isset($_SESSION['otp_user'])
+        ) {
             $_SESSION['error'] = 'Please login again.';
-            header('Location: /finovo-oms-and-wms/login');
+            header('Location: /finovo-oms-and-wms/public/login');
             exit;
         }
 
-        // Check OTP
+        // Verify OTP
         if (!hash_equals($_SESSION['otp'], $enteredOtp)) {
             $_SESSION['error'] = 'Invalid OTP.';
-            header('Location: /finovo-oms-and-wms/otp');
+            header('Location: /finovo-oms-and-wms/public/otp');
             exit;
         }
 
         $user = $_SESSION['otp_user'];
 
-        // Create authenticated session
+        // Regenerate session ID after successful authentication
         session_regenerate_id(true);
 
+        // Create authenticated user session
         $_SESSION['user'] = [
-            'id' => $user['id'],
+            'id'         => $user['id'],
             'company_id' => $user['company_id'],
-            'name' => $user['name'],
-            'email' => $user['email'],
-            'role' => $user['role']
+            'role_id'    => $user['role_id'],
+            'name'       => $user['name'],
+            'email'      => $user['email'],
+            'role'       => strtolower($user['role'])
         ];
 
-        // Remove temporary OTP data
-        unset($_SESSION['otp'], $_SESSION['otp_user']);
+        // Remove temporary authentication data
+        unset(
+            $_SESSION['otp'],
+            $_SESSION['otp_user']
+        );
 
-        // Redirect according to role
-        switch ($user['role']) {
+        /*
+        |--------------------------------------------------------------------------
+        | Redirect according to database role
+        |--------------------------------------------------------------------------
+        */
+
+        $role = strtolower($user['role']);
+
+        switch ($role) {
 
             case 'admin':
                 header('Location: /finovo-oms-and-wms/admin/dashboard');
@@ -108,8 +141,13 @@ class AuthController
                 break;
 
             default:
-                $_SESSION['error'] = 'Invalid role.';
-                header('Location: /finovo-oms-and-wms/login');
+                // Unknown/unconfigured role
+                $_SESSION = [];
+                session_destroy();
+
+                session_start();
+                $_SESSION['error'] = 'Your account has an invalid role.';
+                header('Location: /finovo-oms-and-wms/public/login');
                 break;
         }
 
@@ -120,9 +158,24 @@ class AuthController
     public function logout()
     {
         $_SESSION = [];
+
+        if (ini_get('session.use_cookies')) {
+            $params = session_get_cookie_params();
+
+            setcookie(
+                session_name(),
+                '',
+                time() - 42000,
+                $params['path'],
+                $params['domain'],
+                $params['secure'],
+                $params['httponly']
+            );
+        }
+
         session_destroy();
 
-        header('Location: /finovo-oms-and-wms/login');
+        header('Location: /finovo-oms-and-wms/public/login');
         exit;
     }
 }

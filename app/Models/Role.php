@@ -4,11 +4,7 @@ require_once __DIR__ . '/../../core/Model.php';
 
 class Role extends Model
 {
-    /*
-    |--------------------------------------------------------------------------
-    | Get company roles
-    |--------------------------------------------------------------------------
-    */
+   
     public function allByCompany(int $companyId): array
     {
         return $this->query(
@@ -28,11 +24,6 @@ class Role extends Model
         )->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Check role belongs to current company
-    |--------------------------------------------------------------------------
-    */
     public function belongsToCompany(
         int $roleId,
         int $companyId
@@ -55,16 +46,10 @@ class Role extends Model
         return (bool) $role;
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Temporary default company + roles
-    |--------------------------------------------------------------------------
-    */
+
     public function ensureDefaultSetup(int $companyId): void
     {
-        /*
-         * Check company exists.
-         */
+    
         $company = $this->query(
             "
             SELECT id
@@ -77,9 +62,6 @@ class Role extends Model
             ]
         )->fetch(PDO::FETCH_ASSOC);
 
-        /*
-         * Temporary company until proper auth/company creation exists.
-         */
         if (!$company) {
 
             $this->query(
@@ -102,13 +84,9 @@ class Role extends Model
             );
         }
 
-        /*
-         * Default roles.
-         */
         $defaultRoles = [
             'Admin',
             'Manager',
-            'Sales',
             'Warehouse'
         ];
 

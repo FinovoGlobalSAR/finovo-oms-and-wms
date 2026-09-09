@@ -17,18 +17,10 @@ class EmployeeController extends Controller
         $this->roleModel = new Role();
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Employee List
-    |--------------------------------------------------------------------------
-    */
     public function index(): void
     {
         $companyId = $this->currentCompanyId();
 
-        /*
-         * Temporary setup until proper company login is connected.
-         */
         $this->roleModel->ensureDefaultSetup($companyId);
 
         $employees = $this->userModel->allByCompany($companyId);
@@ -53,11 +45,6 @@ class EmployeeController extends Controller
         ]);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Create Employee
-    |--------------------------------------------------------------------------
-    */
     public function store(): void
     {
         $companyId = $this->currentCompanyId();
@@ -154,11 +141,6 @@ class EmployeeController extends Controller
         $this->redirect($this->employeesUrl());
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Update Employee
-    |--------------------------------------------------------------------------
-    */
     public function update(): void
     {
         $companyId = $this->currentCompanyId();
@@ -259,11 +241,6 @@ class EmployeeController extends Controller
         $this->redirect($this->employeesUrl());
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Delete Employee
-    |--------------------------------------------------------------------------
-    */
     public function delete(): void
     {
         $companyId = $this->currentCompanyId();
@@ -306,17 +283,9 @@ class EmployeeController extends Controller
         $this->redirect($this->employeesUrl());
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Current Company
-    |--------------------------------------------------------------------------
-    */
     private function currentCompanyId(): int
     {
-        /*
-         * Once login is complete, session company_id will be used.
-         * For now fallback company is 1.
-         */
+    
 
         if ($this->companyId > 0) {
             return $this->companyId;
@@ -325,21 +294,11 @@ class EmployeeController extends Controller
         return 1;
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Employee Page URL
-    |--------------------------------------------------------------------------
-    */
     private function employeesUrl(): string
     {
         return '/finovo-oms-and-wms/public/index.php/employees';
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Error Redirect
-    |--------------------------------------------------------------------------
-    */
     private function backWithError(string $message): void
     {
         $_SESSION['employee_error'] = $message;

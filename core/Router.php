@@ -1,16 +1,62 @@
 <?php
+// class Router
+// {
+//     private array $routes = [];
+
+//     public function get(string $path, array $handler): void
+//     {
+//         $this->routes['GET'][$path] = $handler;
+//     }
+
+//     public function post(string $path, array $handler): void
+//     {
+//         $this->routes['POST'][$path] = $handler;
+//     }
+
+//     public function dispatch(string $uri, string $method): void
+//     {
+//         $uri = parse_url($uri, PHP_URL_PATH);
+
+//         if (!isset($this->routes[$method][$uri])) {
+//             http_response_code(404);
+//             echo "404 - Page not found";
+//             return;
+//         }
+
+//         [$controllerClass, $methodName] = $this->routes[$method][$uri];
+
+//         $controllerFile = __DIR__ . "/../app/Controllers/{$controllerClass}.php";
+//         require_once $controllerFile;
+
+//         $controller = new $controllerClass();
+//         $controller->$methodName();
+//     }
+// }
+
 class Router
 {
     private array $routes = [];
 
-    public function get(string $path, array $handler): void
-    {
-        $this->routes['GET'][$path] = $handler;
+    public function get(
+        string $path,
+        array $handler,
+        array $middleware = []
+    ): void {
+        $this->routes['GET'][$path] = [
+            'handler' => $handler,
+            'middleware' => $middleware
+        ];
     }
 
-    public function post(string $path, array $handler): void
-    {
-        $this->routes['POST'][$path] = $handler;
+    public function post(
+        string $path,
+        array $handler,
+        array $middleware = []
+    ): void {
+        $this->routes['POST'][$path] = [
+            'handler' => $handler,
+            'middleware' => $middleware
+        ];
     }
 
     public function dispatch(string $uri, string $method): void
@@ -23,12 +69,31 @@ class Router
             return;
         }
 
-        [$controllerClass, $methodName] = $this->routes[$method][$uri];
+        $route = $this->routes[$method][$uri];
 
-        $controllerFile = __DIR__ . "/../app/Controllers/{$controllerClass}.php";
+        // Run Middleware
+        foreach ($route['middleware'] as $middleware) {
+
+            $middlewareFile =
+                __DIR__ . "/../app/Middleware/{$middleware}.php";
+
+            require_once $middlewareFile;
+
+            $middlewareClass = $middleware;
+
+            $middlewareClass::handle();
+        }
+
+        // Controller
+        [$controllerClass, $methodName] = $route['handler'];
+
+        $controllerFile =
+            __DIR__ . "/../app/Controllers/{$controllerClass}.php";
+
         require_once $controllerFile;
 
         $controller = new $controllerClass();
+
         $controller->$methodName();
     }
 }
