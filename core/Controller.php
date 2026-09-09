@@ -20,7 +20,7 @@ abstract class Controller
     {
         $validUser = env('SUPER_ADMIN_USER', 'superadmin');
         $validPass = env('SUPER_ADMIN_PASSWORD', '');
-
+        
         $providedUser = $_SERVER['PHP_AUTH_USER'] ?? '';
         $providedPass = $_SERVER['PHP_AUTH_PW'] ?? '';
 
