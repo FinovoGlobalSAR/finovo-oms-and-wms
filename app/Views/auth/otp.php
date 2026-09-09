@@ -60,7 +60,7 @@
         <?php endif; ?>
 
 
-        <form method="POST" action="/finovo-oms-and-wms/otp">
+        <form method="POST" action="/finovo-oms-and-wms/public/otp">
 
             <div class="mb-5">
 

@@ -8,7 +8,10 @@ class AuthMiddleware
 
             $_SESSION['error'] = 'Please login first.';
 
-            header('Location: /finovo-oms-and-wms/public/login');
+            header(
+                'Location: /finovo-oms-and-wms/public/login'
+            );
+
             exit;
         }
     }
