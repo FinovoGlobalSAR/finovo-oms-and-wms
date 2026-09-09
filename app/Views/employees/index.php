@@ -33,7 +33,6 @@ function employeeInitials(string $name): string
 
 <div class="space-y-6">
 
-    <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 
         <div>
@@ -73,7 +72,6 @@ function employeeInitials(string $name): string
     </div>
 
 
-    <!-- Success Message -->
 
     <?php if ($success): ?>
 
@@ -87,7 +85,6 @@ function employeeInitials(string $name): string
     <?php endif; ?>
 
 
-    <!-- Error Message -->
 
     <?php if ($error): ?>
 
@@ -101,11 +98,9 @@ function employeeInitials(string $name): string
     <?php endif; ?>
 
 
-    <!-- Employee Table -->
 
     <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
 
-        <!-- Search + Filters -->
 
         <div class="p-4 border-b border-gray-200">
 
@@ -183,7 +178,6 @@ function employeeInitials(string $name): string
         </div>
 
 
-        <!-- Table -->
 
         <div class="overflow-x-auto">
 
@@ -276,7 +270,6 @@ function employeeInitials(string $name): string
                             data-status="<?= htmlspecialchars($status) ?>">
 
 
-                            <!-- Employee -->
 
                             <td class="px-5 py-4">
 
@@ -315,7 +308,6 @@ function employeeInitials(string $name): string
                             </td>
 
 
-                            <!-- Email -->
 
                             <td class="px-5 py-4 text-gray-500">
 
@@ -326,7 +318,6 @@ function employeeInitials(string $name): string
                             </td>
 
 
-                            <!-- Role -->
 
                             <td class="px-5 py-4">
 
@@ -343,7 +334,6 @@ function employeeInitials(string $name): string
                             </td>
 
 
-                            <!-- Status -->
 
                             <td class="px-5 py-4">
 
@@ -364,7 +354,6 @@ function employeeInitials(string $name): string
                             </td>
 
 
-                            <!-- Created At -->
 
                             <td class="px-5 py-4 text-gray-500">
 
@@ -383,14 +372,12 @@ function employeeInitials(string $name): string
                             </td>
 
 
-                            <!-- Actions -->
 
                             <td class="px-5 py-4">
 
                                 <div class="flex justify-end gap-2">
 
 
-                                    <!-- Edit -->
 
                                     <button
                                         type="button"
@@ -428,7 +415,6 @@ function employeeInitials(string $name): string
                                     </button>
 
 
-                                    <!-- Delete -->
 
                                     <form
                                         method="POST"
@@ -483,11 +469,6 @@ function employeeInitials(string $name): string
 </div>
 
 
-
-<!-- ============================================ -->
-<!-- ADD EMPLOYEE MODAL -->
-<!-- ============================================ -->
-
 <div
     id="employeeModal"
     class="fixed inset-0 z-50
@@ -510,7 +491,6 @@ function employeeInitials(string $name): string
                max-w-lg">
 
 
-        <!-- Modal Header -->
 
         <div class="flex items-center justify-between
                     px-6 py-5
@@ -541,7 +521,6 @@ function employeeInitials(string $name): string
         </div>
 
 
-        <!-- Add Form -->
 
         <form
             method="POST"
@@ -549,7 +528,6 @@ function employeeInitials(string $name): string
             class="p-6 space-y-5">
 
 
-            <!-- Name -->
 
             <div>
 
@@ -573,7 +551,6 @@ function employeeInitials(string $name): string
             </div>
 
 
-            <!-- Email -->
 
             <div>
 
@@ -597,7 +574,6 @@ function employeeInitials(string $name): string
             </div>
 
 
-            <!-- Password -->
 
             <div>
 
@@ -618,7 +594,6 @@ function employeeInitials(string $name): string
             </div>
 
 
-            <!-- Role -->
 
             <div>
 
@@ -667,7 +642,6 @@ function employeeInitials(string $name): string
             </div>
 
 
-            <!-- Status -->
 
             <div>
 
@@ -724,7 +698,6 @@ function employeeInitials(string $name): string
             </div>
 
 
-            <!-- Buttons -->
 
             <div
                 class="flex justify-end gap-3
@@ -761,11 +734,6 @@ function employeeInitials(string $name): string
 
 </div>
 
-
-
-<!-- ============================================ -->
-<!-- EDIT EMPLOYEE MODAL -->
-<!-- ============================================ -->
 
 <div
     id="editEmployeeModal"
@@ -823,7 +791,6 @@ function employeeInitials(string $name): string
                 name="id">
 
 
-            <!-- Name -->
 
             <div>
 
@@ -843,7 +810,6 @@ function employeeInitials(string $name): string
             </div>
 
 
-            <!-- Email -->
 
             <div>
 
@@ -863,7 +829,6 @@ function employeeInitials(string $name): string
             </div>
 
 
-            <!-- Password -->
 
             <div>
 
@@ -884,7 +849,6 @@ function employeeInitials(string $name): string
             </div>
 
 
-            <!-- Role -->
 
             <div>
 
@@ -919,7 +883,6 @@ function employeeInitials(string $name): string
             </div>
 
 
-            <!-- Status -->
 
             <div>
 
@@ -960,7 +923,6 @@ function employeeInitials(string $name): string
             </div>
 
 
-            <!-- Buttons -->
 
             <div
                 class="flex justify-end gap-3
@@ -1000,12 +962,6 @@ function employeeInitials(string $name): string
 
 <script>
 
-/*
-|--------------------------------------------------------------------------
-| Add Employee Modal
-|--------------------------------------------------------------------------
-*/
-
 function openEmployeeModal()
 {
     const modal =
@@ -1028,14 +984,6 @@ function closeEmployeeModal()
 
     document.body.classList.remove('overflow-hidden');
 }
-
-
-
-/*
-|--------------------------------------------------------------------------
-| Edit Employee Modal
-|--------------------------------------------------------------------------
-*/
 
 function openEditModal(employee)
 {
@@ -1096,14 +1044,6 @@ function closeEditModal()
         'overflow-hidden'
     );
 }
-
-
-
-/*
-|--------------------------------------------------------------------------
-| Employee Search / Filters
-|--------------------------------------------------------------------------
-*/
 
 function filterEmployees()
 {

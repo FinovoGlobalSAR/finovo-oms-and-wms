@@ -11,11 +11,6 @@ class User
         $this->db = Database::getConnection();
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Get all employees of a company
-    |--------------------------------------------------------------------------
-    */
     public function allByCompany(int $companyId): array
     {
         $stmt = $this->db->prepare("
@@ -41,11 +36,6 @@ class User
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Find employee by ID and company
-    |--------------------------------------------------------------------------
-    */
     public function findByIdAndCompany(int $id, int $companyId): ?array
     {
         $stmt = $this->db->prepare("
@@ -77,11 +67,6 @@ class User
         return $user ?: null;
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Find user by email - used for login
-    |--------------------------------------------------------------------------
-    */
     public function findByEmail(string $email): ?array
     {
         $stmt = $this->db->prepare("
@@ -117,11 +102,7 @@ class User
         return $user ?: null;
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Check duplicate employee email in same company
-    |--------------------------------------------------------------------------
-    */
+
     public function emailExists(
         string $email,
         int $companyId,
@@ -164,11 +145,6 @@ class User
         return (bool) $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Create employee
-    |--------------------------------------------------------------------------
-    */
     public function create(array $data): bool
     {
         $stmt = $this->db->prepare("
@@ -193,11 +169,7 @@ class User
         ]);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Update employee
-    |--------------------------------------------------------------------------
-    */
+ 
     public function updateEmployee(
         int $id,
         int $companyId,
@@ -250,11 +222,7 @@ class User
         ]);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Delete employee
-    |--------------------------------------------------------------------------
-    */
+ 
     public function deleteEmployee(int $id, int $companyId): bool
     {
         $stmt = $this->db->prepare("

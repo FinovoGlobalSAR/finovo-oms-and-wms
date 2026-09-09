@@ -4,11 +4,9 @@ $baseUrl = '/finovo-oms-and-wms/public/index.php';
 
 $currentPath = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
-
 $navigation = [
 
     'Design' => [
-
 
         [
             'label' => 'Dashboard',
@@ -18,7 +16,6 @@ $navigation = [
 
     ],
 
-
     'Management' => [
 
         [
@@ -27,12 +24,12 @@ $navigation = [
             'icon'  => 'users',
         ],
 
-
     ],
 
 ];
 
 ?>
+
 
 <aside
     id="sidebar"
@@ -42,15 +39,17 @@ $navigation = [
            transition-transform duration-300"
 >
 
-
-    <div class="h-16 px-5 border-b border-gray-100 flex items-center">
+    <div class="h-[72px] px-5 border-b border-gray-100 flex items-center">
 
         <div class="flex items-center justify-between w-full">
 
             <div class="flex items-center gap-3">
 
+                <!-- Logo -->
                 <div
-                    class="w-8 h-8 rounded-lg bg-blue-600
+                    class="w-9 h-9 rounded-xl
+                           bg-blue-600
+                           shadow-sm shadow-blue-200
                            flex items-center justify-center"
                 >
                     <span class="text-white font-bold text-sm">
@@ -58,30 +57,31 @@ $navigation = [
                     </span>
                 </div>
 
-                <div>
-                    <div class="flex items-center gap-1">
 
-                        <span class="text-sm font-semibold text-gray-900">
+                <div>
+
+                    <div class="flex items-center gap-1.5">
+
+                        <span class="text-[15px] font-bold text-gray-900">
                             Finovo
                         </span>
 
-                        <svg
-                            class="w-3.5 h-3.5 text-gray-400"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                        <span
+                            class="px-1.5 py-0.5
+                                   rounded-md
+                                   bg-blue-50
+                                   text-[8px]
+                                   uppercase
+                                   tracking-wide
+                                   font-bold
+                                   text-blue-600"
                         >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M6 9l6 6 6-6"
-                            />
-                        </svg>
+                            ERP
+                        </span>
 
                     </div>
 
-                    <p class="text-[11px] text-gray-400">
+                    <p class="text-[10px] font-medium text-gray-500 mt-0.5">
                         OMS / WMS
                     </p>
 
@@ -89,11 +89,15 @@ $navigation = [
 
             </div>
 
+
             <button
-                class="w-7 h-7 rounded-md
+                type="button"
+                class="w-8 h-8 rounded-lg
                        flex items-center justify-center
-                       text-gray-400 hover:bg-gray-100
-                       hover:text-gray-600"
+                       text-gray-400
+                       hover:bg-gray-100
+                       hover:text-gray-700
+                       transition"
             >
 
                 <svg
@@ -102,6 +106,7 @@ $navigation = [
                     stroke="currentColor"
                     viewBox="0 0 24 24"
                 >
+
                     <path
                         stroke-linecap="round"
                         stroke-linejoin="round"
@@ -115,6 +120,7 @@ $navigation = [
                         stroke-width="1.8"
                         d="M16.5 3.5a2.1 2.1 0 013 3L8 18l-4 1 1-4L16.5 3.5z"
                     />
+
                 </svg>
 
             </button>
@@ -126,15 +132,14 @@ $navigation = [
 
     <div class="px-3 pt-4">
 
-        <div
-            class="flex items-center justify-between
-                   px-2 mb-2"
-        >
+        <div class="flex items-center justify-between px-2 mb-2">
 
             <span
-                class="text-[11px] font-semibold
-                       uppercase tracking-wider
-                       text-gray-400"
+                class="text-[10px]
+                       font-bold
+                       uppercase
+                       tracking-[0.12em]
+                       text-gray-500"
             >
                 Quick actions
             </span>
@@ -142,17 +147,33 @@ $navigation = [
         </div>
 
 
-        <div class="flex items-center gap-1">
+        <div
+            class="flex items-center gap-1
+                   p-1
+                   bg-gray-50
+                   border border-gray-100
+                   rounded-xl"
+        >
+
 
             <button
-                class="flex-1 flex items-center gap-2
-                       px-2.5 py-2 rounded-md
-                       text-xs text-gray-600
-                       hover:bg-gray-100"
+                type="button"
+                class="flex-1
+                       h-9
+                       flex items-center gap-2
+                       px-2.5
+                       rounded-lg
+                       text-xs
+                       font-medium
+                       text-gray-700
+                       hover:bg-white
+                       hover:text-blue-600
+                       hover:shadow-sm
+                       transition-all"
             >
 
                 <svg
-                    class="w-4 h-4 text-gray-400"
+                    class="w-4 h-4"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -161,7 +182,7 @@ $navigation = [
                         stroke-linecap="round"
                         stroke-linejoin="round"
                         stroke-width="1.8"
-                        d="M3 12h18M12 3v18"
+                        d="M12 5v14M5 12h14"
                     />
                 </svg>
 
@@ -171,9 +192,15 @@ $navigation = [
 
 
             <button
-                class="w-8 h-8 flex items-center justify-center
-                       rounded-md text-gray-400
-                       hover:bg-gray-100"
+                type="button"
+                class="w-9 h-9
+                       flex items-center justify-center
+                       rounded-lg
+                       text-gray-500
+                       hover:bg-white
+                       hover:text-blue-600
+                       hover:shadow-sm
+                       transition-all"
             >
 
                 <svg
@@ -186,17 +213,22 @@ $navigation = [
                         stroke-linecap="round"
                         stroke-linejoin="round"
                         stroke-width="1.8"
-                        d="M21 21l-4.35-4.35m2.35-5.65a8 8 0 11-16 0 8 8 0 0116 0z"
+                        d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"
                     />
                 </svg>
 
             </button>
-
-
             <button
-                class="w-8 h-8 flex items-center justify-center
-                       rounded-md text-gray-400
-                       hover:bg-gray-100"
+                type="button"
+                class="relative
+                       w-9 h-9
+                       flex items-center justify-center
+                       rounded-lg
+                       text-gray-500
+                       hover:bg-white
+                       hover:text-blue-600
+                       hover:shadow-sm
+                       transition-all"
             >
 
                 <svg
@@ -209,16 +241,23 @@ $navigation = [
                         stroke-linecap="round"
                         stroke-linejoin="round"
                         stroke-width="1.8"
-                        d="M15 17h5l-1.5-1.5A2 2 0 0118 14v-3a6 6 0 00-12 0v3a2 2 0 01-.5 1.5L4 17h5"
+                        d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"
                     />
 
                     <path
                         stroke-linecap="round"
-                        stroke-linejoin="round"
                         stroke-width="1.8"
                         d="M10 21h4"
                     />
                 </svg>
+
+                <span
+                    class="absolute top-2 right-2
+                           w-1.5 h-1.5
+                           bg-red-500
+                           rounded-full
+                           ring-2 ring-gray-50"
+                ></span>
 
             </button>
 
@@ -230,28 +269,35 @@ $navigation = [
     <nav
         class="px-3 py-5
                overflow-y-auto
-               h-[calc(100vh-145px)]"
+               h-[calc(100vh-220px)]"
     >
+
 
         <?php foreach ($navigation as $section => $items): ?>
 
+
             <div class="mb-6">
 
+
+                <!-- Section Heading -->
                 <p
-                    class="px-2 mb-2
-                           text-[11px]
-                           font-semibold
+                    class="px-2.5 mb-2
+                           text-[10px]
+                           font-bold
                            uppercase
-                           tracking-wider
-                           text-gray-400"
+                           tracking-[0.12em]
+                           text-gray-500"
                 >
                     <?= htmlspecialchars($section) ?>
                 </p>
 
 
-                <div class="space-y-0.5">
+
+                <div class="space-y-1">
+
 
                     <?php foreach ($items as $item): ?>
+
 
                         <?php
 
@@ -261,198 +307,195 @@ $navigation = [
                             ? '#'
                             : $baseUrl . $url;
 
+
                         $isActive =
-                            $url !== '#' &&
-                            str_ends_with($currentPath, $url);
+                            $url !== '#'
+                            && str_ends_with($currentPath, $url);
 
                         ?>
 
+
                         <a
                             href="<?= htmlspecialchars($fullUrl) ?>"
+
                             class="
-                                flex items-center justify-between
-                                px-2.5 py-2
-                                rounded-md
+                                group
+                                relative
+                                flex items-center
+                                justify-between
+                                px-3 py-2.5
+                                rounded-xl
                                 text-[13px]
-                                transition
+                                transition-all
+                                duration-200
 
                                 <?= $isActive
-                                    ? 'bg-gray-100 text-gray-900 font-medium'
-                                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                    ? 'bg-blue-50 text-blue-700 font-semibold'
+                                    : 'text-gray-700 font-medium hover:bg-gray-50 hover:text-gray-900'
                                 ?>
                             "
                         >
 
-                            <div class="flex items-center gap-2.5">
 
-                                <?php if ($item['icon'] === 'home'): ?>
+                            <?php if ($isActive): ?>
 
-                                    <svg
-                                        class="w-4 h-4 <?= $isActive ? 'text-gray-700' : 'text-gray-400' ?>"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
+                                <span
+                                    class="absolute
+                                           left-0
+                                           top-1/2
+                                           -translate-y-1/2
+                                           w-[3px]
+                                           h-5
+                                           bg-blue-600
+                                           rounded-r-full"
+                                ></span>
+
+                            <?php endif; ?>
+
+
+
+                            <div class="flex items-center gap-3">
+
+
+                                <!-- DASHBOARD ICON -->
+                                <?php if ($item['icon'] === 'dashboard'): ?>
+
+                                    <div
+                                        class="
+                                            w-7 h-7
+                                            rounded-lg
+                                            flex items-center justify-center
+                                            transition
+
+                                            <?= $isActive
+                                                ? 'bg-blue-100'
+                                                : 'bg-gray-50 group-hover:bg-gray-100'
+                                            ?>
+                                        "
                                     >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="1.8"
-                                            d="M3 12l9-9 9 9M5 10v10h14V10"
-                                        />
-                                    </svg>
 
+                                        <svg
+                                            class="
+                                                w-[16px] h-[16px]
 
-                                <?php elseif ($item['icon'] === 'dashboard'): ?>
-
-                                    <svg
-                                        class="w-4 h-4 <?= $isActive ? 'text-gray-700' : 'text-gray-400' ?>"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="1.8"
-                                            d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"
-                                        />
-                                    </svg>
-
-                                <?php elseif ($item['icon'] === 'notification'): ?>
-
-                                    <svg
-                                        class="w-4 h-4 text-gray-400"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="1.8"
-                                            d="M15 17h5l-1.5-1.5A2 2 0 0118 14v-3a6 6 0 00-12 0v3a2 2 0 01-.5 1.5L4 17h5"
-                                        />
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="1.8"
-                                            d="M10 21h4"
-                                        />
-                                    </svg>
-
-
-                                <?php elseif ($item['icon'] === 'settings'): ?>
-
-                                    <svg
-                                        class="w-4 h-4 text-gray-400"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="1.8"
-                                            d="M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z"
-                                        />
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="1.8"
-                                            d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1-1.8 1.8-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V20h-2.5v-.1a1.7 1.7 0 00-1-1.5 1.7 1.7 0 00-1.9.3l-.1.1-1.8-1.8.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H6v-2.5h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1L9 6.7l.1.1a1.7 1.7 0 001.9.3 1.7 1.7 0 001-1.5V5h2.5v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1 1.8 1.8-.1.1a1.7 1.7 0 00-.3 1.9 1.7 1.7 0 001.5 1h.1v2.5h-.1a1.7 1.7 0 00-1.5 1z"
-                                        />
-                                    </svg>
-
-
-                                <?php elseif ($item['icon'] === 'users'): ?>
-
-                                    <svg
-                                        class="w-4 h-4 text-gray-400"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="1.8"
-                                            d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"
-                                        />
-                                        <circle
-                                            cx="9"
-                                            cy="7"
-                                            r="4"
+                                                <?= $isActive
+                                                    ? 'text-blue-600'
+                                                    : 'text-gray-600'
+                                                ?>
+                                            "
                                             fill="none"
                                             stroke="currentColor"
-                                            stroke-width="1.8"
-                                        />
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="1.8"
-                                            d="M22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"
-                                        />
-                                    </svg>
+                                            viewBox="0 0 24 24"
+                                        >
+
+                                            <rect
+                                                x="3"
+                                                y="3"
+                                                width="7"
+                                                height="7"
+                                                rx="1.5"
+                                                stroke-width="1.8"
+                                            />
+
+                                            <rect
+                                                x="14"
+                                                y="3"
+                                                width="7"
+                                                height="7"
+                                                rx="1.5"
+                                                stroke-width="1.8"
+                                            />
+
+                                            <rect
+                                                x="3"
+                                                y="14"
+                                                width="7"
+                                                height="7"
+                                                rx="1.5"
+                                                stroke-width="1.8"
+                                            />
+
+                                            <rect
+                                                x="14"
+                                                y="14"
+                                                width="7"
+                                                height="7"
+                                                rx="1.5"
+                                                stroke-width="1.8"
+                                            />
+
+                                        </svg>
+
+                                    </div>
 
 
-                                <?php elseif ($item['icon'] === 'orders'): ?>
 
-                                    <svg
-                                        class="w-4 h-4 text-gray-400"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
+                                <!-- EMPLOYEE ICON -->
+                                <?php elseif ($item['icon'] === 'users'): ?>
+
+                                    <div
+                                        class="
+                                            w-7 h-7
+                                            rounded-lg
+                                            flex items-center justify-center
+                                            transition
+
+                                            <?= $isActive
+                                                ? 'bg-blue-100'
+                                                : 'bg-gray-50 group-hover:bg-gray-100'
+                                            ?>
+                                        "
                                     >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="1.8"
-                                            d="M4 6h16v14H4zM8 6V4h8v2M8 10h8M8 14h5"
-                                        />
-                                    </svg>
 
+                                        <svg
+                                            class="
+                                                w-[16px] h-[16px]
 
-                                <?php elseif ($item['icon'] === 'inventory'): ?>
+                                                <?= $isActive
+                                                    ? 'text-blue-600'
+                                                    : 'text-gray-600'
+                                                ?>
+                                            "
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
 
-                                    <svg
-                                        class="w-4 h-4 text-gray-400"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="1.8"
-                                            d="M4 7h16v13H4zM8 7V4h8v3M8 11h8M8 15h5"
-                                        />
-                                    </svg>
+                                            <path
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                stroke-width="1.8"
+                                                d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"
+                                            />
 
+                                            <circle
+                                                cx="9"
+                                                cy="7"
+                                                r="4"
+                                                stroke-width="1.8"
+                                            />
 
-                                <?php elseif ($item['icon'] === 'reports'): ?>
+                                            <path
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                stroke-width="1.8"
+                                                d="M22 21v-2a4 4 0 00-3-3.87"
+                                            />
 
-                                    <svg
-                                        class="w-4 h-4 text-gray-400"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="1.8"
-                                            d="M4 19V5M4 19h16"
-                                        />
+                                            <path
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                stroke-width="1.8"
+                                                d="M16 3.13a4 4 0 010 7.75"
+                                            />
 
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="1.8"
-                                            d="M8 16v-5M12 16V8M16 16v-7"
-                                        />
-                                    </svg>
+                                        </svg>
+
+                                    </div>
+
 
                                 <?php endif; ?>
+
 
 
                                 <span>
@@ -462,84 +505,138 @@ $navigation = [
                             </div>
 
 
-                            <?php if (isset($item['badge'])): ?>
+
+                            <!-- Active dot -->
+                            <?php if ($isActive): ?>
 
                                 <span
-                                    class="min-w-5 h-5 px-1.5
-                                           flex items-center justify-center
+                                    class="w-1.5 h-1.5
                                            rounded-full
-                                           bg-gray-100
-                                           text-[10px]
-                                           font-medium
-                                           text-gray-500"
-                                >
-                                    <?= htmlspecialchars($item['badge']) ?>
-                                </span>
+                                           bg-blue-600"
+                                ></span>
 
                             <?php endif; ?>
 
+
                         </a>
+
 
                     <?php endforeach; ?>
 
+
                 </div>
+
 
             </div>
 
+
         <?php endforeach; ?>
 
-        <div class="pt-2">
+        <div class="pt-1">
+
 
             <p
-                class="px-2 mb-2
-                       text-[11px]
-                       font-semibold
+                class="px-2.5 mb-2
+                       text-[10px]
+                       font-bold
                        uppercase
-                       tracking-wider
-                       text-gray-400"
+                       tracking-[0.12em]
+                       text-gray-500"
             >
                 Account
             </p>
-
-
             <a
                 href="#"
-                class="flex items-center gap-2.5
-                       px-2.5 py-2
-                       rounded-md
+                class="group
+                       flex items-center gap-3
+                       px-3 py-2.5
+                       rounded-xl
                        text-[13px]
-                       text-gray-600
-                       hover:bg-gray-50
-                       hover:text-gray-900"
+                       font-medium
+                       text-gray-700
+                       hover:bg-red-50
+                       hover:text-red-600
+                       transition-all"
             >
 
-                <svg
-                    class="w-4 h-4 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="1.8"
-                        d="M17 16l4-4m0 0l-4-4m4 4H7"
-                    />
 
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="1.8"
-                        d="M13 5H5a2 2 0 00-2 2v10a2 2 0 002 2h8"
-                    />
-                </svg>
+                <div
+                    class="w-7 h-7
+                           rounded-lg
+                           bg-gray-50
+                           flex items-center justify-center
+                           group-hover:bg-red-100
+                           transition"
+                >
+
+                    <svg
+                        class="w-[16px] h-[16px]
+                               text-gray-600
+                               group-hover:text-red-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="1.8"
+                            d="M17 16l4-4m0 0l-4-4m4 4H7"
+                        />
+
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="1.8"
+                            d="M13 5H5a2 2 0 00-2 2v10a2 2 0 002 2h8"
+                        />
+
+                    </svg>
+
+                </div>
+
 
                 Logout
 
             </a>
 
+
         </div>
 
+
     </nav>
+
+
+    <div
+        class="absolute
+               bottom-0
+               left-0 right-0
+               px-5 py-3
+               bg-white
+               border-t border-gray-100"
+    >
+
+        <div class="flex items-center justify-between">
+
+            <span class="text-[10px] font-medium text-gray-400">
+                Finovo OMS/WMS
+            </span>
+
+            <span
+                class="px-1.5 py-0.5
+                       rounded
+                       bg-gray-100
+                       text-[9px]
+                       font-semibold
+                       text-gray-500"
+            >
+                v1.0
+            </span>
+
+        </div>
+
+    </div>
+
 
 </aside>
