@@ -1,26 +1,22 @@
 <?php
 
-
-/*
-|--------------------------------------------------------------------------
-| Authentication
-|--------------------------------------------------------------------------
-*/
-
 $router->get(
     '/login',
     ['AuthController', 'showLogin']
 );
+
 
 $router->post(
     '/login',
     ['AuthController', 'login']
 );
 
+
 $router->get(
     '/otp',
     ['AuthController', 'showOtp']
 );
+
 
 $router->post(
     '/otp',
@@ -35,75 +31,65 @@ $router->get(
 
 
 
-/*
-|--------------------------------------------------------------------------
-| Dashboard
-|--------------------------------------------------------------------------
-*/
-
 $router->get(
     '/dashboard',
-    ['DashboardController', 'index']
+    ['DashboardController', 'index'],
+    ['AuthMiddleware']
 );
 
-
-
-/*
-|--------------------------------------------------------------------------
-| Employees
-|--------------------------------------------------------------------------
-*/
-
-/*
-|--------------------------------------------------------------------------
-| Employees
-|--------------------------------------------------------------------------
-*/
 
 $router->get(
     '/employees',
-    ['EmployeeController', 'index']
+    ['EmployeeController', 'index'],
+    ['AuthMiddleware']
 );
+
 
 $router->post(
     '/employees/store',
-    ['EmployeeController', 'store']
+    ['EmployeeController', 'store'],
+    ['AuthMiddleware']
 );
+
 
 $router->post(
     '/employees/update',
-    ['EmployeeController', 'update']
+    ['EmployeeController', 'update'],
+    ['AuthMiddleware']
 );
+
 
 $router->post(
     '/employees/delete',
-    ['EmployeeController', 'delete']
+    ['EmployeeController', 'delete'],
+    ['AuthMiddleware']
 );
 
 
-
-/*
-|--------------------------------------------------------------------------
-| Orders
-|--------------------------------------------------------------------------
-*/
 
 $router->get(
     '/orders',
-    ['OrderController', 'index']
+    ['OrderController', 'index'],
+    ['AuthMiddleware']
 );
+
 
 $router->get(
     '/orders/create',
-    ['OrderController', 'showCreateForm']
+    ['OrderController', 'showCreateForm'],
+    ['AuthMiddleware']
 );
+
 
 $router->post(
     '/orders/create',
-    ['OrderController', 'handleCreate']
+    ['OrderController', 'handleCreate'],
+    ['AuthMiddleware']
 );
+
 
 $router->post(
     '/api/orders',
-    ['OrderController', 'apiCreate']
+    ['OrderController', 'apiCreate'],
+    ['AuthMiddleware']
 );

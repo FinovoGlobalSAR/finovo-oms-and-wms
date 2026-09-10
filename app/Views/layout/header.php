@@ -28,13 +28,10 @@ $userInitial = strtoupper(
         px-4 sm:px-5 lg:px-7
         sticky top-0
         z-30
-    "
->
+    ">
 
-    <!-- LEFT SIDE -->
     <div class="flex items-center gap-4">
 
-        <!-- Mobile menu -->
         <button
             id="mobileMenuButton"
             type="button"
@@ -50,25 +47,21 @@ $userInitial = strtoupper(
                 hover:bg-blue-50
                 hover:border-blue-100
                 transition-all
-            "
-        >
+            ">
             <svg
                 class="w-5 h-5"
                 fill="none"
                 stroke="currentColor"
-                viewBox="0 0 24 24"
-            >
+                viewBox="0 0 24 24">
                 <path
                     stroke-linecap="round"
                     stroke-linejoin="round"
                     stroke-width="2"
-                    d="M4 6h16M4 12h16M4 18h16"
-                />
+                    d="M4 6h16M4 12h16M4 18h16" />
             </svg>
         </button>
 
 
-        <!-- Search -->
         <div class="hidden sm:flex items-center">
 
             <div class="relative w-[270px] lg:w-[360px]">
@@ -84,14 +77,12 @@ $userInitial = strtoupper(
                     "
                     fill="none"
                     stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
+                    viewBox="0 0 24 24">
                     <path
                         stroke-linecap="round"
                         stroke-linejoin="round"
                         stroke-width="1.8"
-                        d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"
-                    />
+                        d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z" />
                 </svg>
 
                 <input
@@ -113,8 +104,7 @@ $userInitial = strtoupper(
                         focus:border-blue-300
                         focus:ring-4
                         focus:ring-blue-50
-                    "
-                >
+                    ">
 
                 <span
                     class="
@@ -132,8 +122,7 @@ $userInitial = strtoupper(
                         text-[10px]
                         font-semibold
                         text-slate-400
-                    "
-                >
+                    ">
                     ⌘ K
                 </span>
 
@@ -144,11 +133,9 @@ $userInitial = strtoupper(
     </div>
 
 
-    <!-- RIGHT SIDE -->
     <div class="flex items-center gap-1.5">
 
 
-        <!-- Help -->
         <button
             type="button"
             title="Help & Support"
@@ -161,41 +148,35 @@ $userInitial = strtoupper(
                 hover:text-blue-600
                 hover:bg-blue-50
                 transition-all
-            "
-        >
+            ">
 
             <svg
                 class="w-[19px] h-[19px]"
                 fill="none"
                 stroke="currentColor"
-                viewBox="0 0 24 24"
-            >
+                viewBox="0 0 24 24">
                 <circle
                     cx="12"
                     cy="12"
                     r="9"
-                    stroke-width="1.8"
-                />
+                    stroke-width="1.8" />
 
                 <path
                     stroke-linecap="round"
                     stroke-width="1.8"
-                    d="M9.8 9a2.2 2.2 0 1 1 3.8 1.5c-.9.8-1.6 1.2-1.6 2.5"
-                />
+                    d="M9.8 9a2.2 2.2 0 1 1 3.8 1.5c-.9.8-1.6 1.2-1.6 2.5" />
 
                 <circle
                     cx="12"
                     cy="16.5"
                     r=".8"
                     fill="currentColor"
-                    stroke="none"
-                />
+                    stroke="none" />
             </svg>
 
         </button>
 
 
-        <!-- Notifications -->
         <button
             type="button"
             title="Notifications"
@@ -208,27 +189,23 @@ $userInitial = strtoupper(
                 hover:text-blue-600
                 hover:bg-blue-50
                 transition-all
-            "
-        >
+            ">
 
             <svg
                 class="w-[19px] h-[19px]"
                 fill="none"
                 stroke="currentColor"
-                viewBox="0 0 24 24"
-            >
+                viewBox="0 0 24 24">
                 <path
                     stroke-linecap="round"
                     stroke-linejoin="round"
                     stroke-width="1.7"
-                    d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"
-                />
+                    d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
 
                 <path
                     stroke-linecap="round"
                     stroke-width="1.7"
-                    d="M10 21h4"
-                />
+                    d="M10 21h4" />
             </svg>
 
             <span
@@ -240,8 +217,7 @@ $userInitial = strtoupper(
                     bg-red-500
                     rounded-full
                     ring-2 ring-white
-                "
-            ></span>
+                "></span>
 
         </button>
 
@@ -253,11 +229,9 @@ $userInitial = strtoupper(
                 w-px
                 bg-slate-200
                 mx-2
-            "
-        ></div>
+            "></div>
 
 
-        <!-- Profile -->
         <button
             id="profileButton"
             type="button"
@@ -271,10 +245,8 @@ $userInitial = strtoupper(
                 hover:bg-slate-50
                 transition-all
                 group
-            "
-        >
+            ">
 
-            <!-- Avatar -->
             <div
                 class="
                     relative
@@ -285,8 +257,7 @@ $userInitial = strtoupper(
                     to-indigo-600
                     flex items-center justify-center
                     shadow-sm
-                "
-            >
+                ">
 
                 <span class="text-sm font-bold text-white">
                     <?= htmlspecialchars($userInitial) ?>
@@ -301,13 +272,11 @@ $userInitial = strtoupper(
                         rounded-full
                         bg-emerald-500
                         border-2 border-white
-                    "
-                ></span>
+                    "></span>
 
             </div>
 
 
-            <!-- User Info -->
             <div class="hidden sm:block text-left leading-tight max-w-[145px]">
 
                 <p
@@ -316,8 +285,7 @@ $userInitial = strtoupper(
                         font-semibold
                         text-slate-800
                         truncate
-                    "
-                >
+                    ">
                     <?= htmlspecialchars($userName) ?>
                 </p>
 
@@ -327,15 +295,13 @@ $userInitial = strtoupper(
                         text-slate-400
                         mt-0.5
                         truncate
-                    "
-                >
+                    ">
                     <?= htmlspecialchars($userRole) ?>
                 </p>
 
             </div>
 
 
-            <!-- Arrow -->
             <svg
                 class="
                     hidden sm:block
@@ -346,14 +312,12 @@ $userInitial = strtoupper(
                 "
                 fill="none"
                 stroke="currentColor"
-                viewBox="0 0 24 24"
-            >
+                viewBox="0 0 24 24">
                 <path
                     stroke-linecap="round"
                     stroke-linejoin="round"
                     stroke-width="1.8"
-                    d="m6 9 6 6 6-6"
-                />
+                    d="m6 9 6 6 6-6" />
             </svg>
 
         </button>
@@ -364,7 +328,6 @@ $userInitial = strtoupper(
 
 
 <script>
-
     const mobileMenuButton =
         document.getElementById('mobileMenuButton');
 
@@ -395,5 +358,4 @@ $userInitial = strtoupper(
         });
 
     }
-
 </script>

@@ -1,13 +1,9 @@
-```php
+
 <?php
 
 class Middleware
 {
-    /*
-    |--------------------------------------------------------------------------
-    | Check Authentication
-    |--------------------------------------------------------------------------
-    */
+
     public static function auth(): void
     {
         if (!isset($_SESSION['user'])) {
@@ -16,11 +12,6 @@ class Middleware
         }
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Check Role
-    |--------------------------------------------------------------------------
-    */
     public static function role(array $allowedRoles): void
     {
         self::auth();
@@ -43,4 +34,4 @@ class Middleware
         }
     }
 }
-```
+

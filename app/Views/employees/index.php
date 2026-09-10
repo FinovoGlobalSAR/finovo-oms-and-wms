@@ -8,27 +8,30 @@ $success = $success ?? null;
 $error = $error ?? null;
 $old = $old ?? [];
 
-$baseUrl = '/finovo-oms-and-wms/public/index.php';
-
 $totalEmployees = count($employees);
+
+$baseUrl =
+    '/finovo-oms-and-wms/public/index.php';
 
 
 function employeeInitials(string $name): string
 {
-    $parts = preg_split('/\s+/', trim($name));
+    $parts = preg_split(
+        '/\s+/',
+        trim($name)
+    );
 
     $initials = '';
 
-    foreach (array_slice($parts, 0, 2) as $part) {
-
+    foreach (
+        array_slice($parts, 0, 2)
+        as $part
+    ) {
         if ($part !== '') {
-
             $initials .= strtoupper(
                 substr($part, 0, 1)
             );
-
         }
-
     }
 
     return $initials ?: 'U';
@@ -37,37 +40,151 @@ function employeeInitials(string $name): string
 ?>
 
 
-<div class="w-full bg-white min-h-screen overflow-hidden">
+<style>
+    .user-management-page {
+        font-family:
+            Inter,
+            ui-sans-serif,
+            system-ui,
+            -apple-system,
+            BlinkMacSystemFont,
+            "Segoe UI",
+            sans-serif;
+
+        color: #24262d;
+    }
 
 
-    <!-- PAGE HEADING -->
+    .um-checkbox {
+        appearance: none;
+        -webkit-appearance: none;
 
-    <div class="px-5 pt-5 pb-4">
+        width: 16px;
+        height: 16px;
 
-        <div class="flex items-center gap-2">
+        background: white;
 
-            <h1 class="text-[21px] font-semibold text-gray-900">
+        border: 1px solid #c9cbd1;
+        border-radius: 4px;
+
+        cursor: pointer;
+
+        position: relative;
+
+        flex-shrink: 0;
+    }
+
+
+    .um-checkbox:checked {
+        background: #1f2937;
+        border-color: #1f2937;
+    }
+
+
+    .um-checkbox:checked::after {
+        content: "";
+
+        position: absolute;
+
+        width: 7px;
+        height: 4px;
+
+        left: 4px;
+        top: 4px;
+
+        border-left: 1.5px solid white;
+        border-bottom: 1.5px solid white;
+
+        transform: rotate(-45deg);
+    }
+
+    .um-select {
+        appearance: none;
+        -webkit-appearance: none;
+    }
+
+
+
+    .um-table {
+        border-collapse: collapse;
+    }
+
+
+    .um-table th,
+    .um-table td {
+        vertical-align: middle;
+    }
+
+    .um-scrollbar::-webkit-scrollbar {
+        height: 6px;
+    }
+
+
+    .um-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+
+    .um-scrollbar::-webkit-scrollbar-thumb {
+        background: #d7d8dc;
+        border-radius: 20px;
+    }
+
+    .um-action-button {
+        transition:
+            background-color .15s ease,
+            border-color .15s ease;
+    }
+
+
+    .um-action-button:hover {
+        background: #f8f8f9;
+        border-color: #d2d3d7;
+    }
+</style>
+
+
+
+<div class="user-management-page w-full min-w-0">
+
+    <div>
+
+        <div class="flex items-center gap-[12px]">
+
+            <h1
+                class="
+                    text-[28px]
+                    leading-[34px]
+                    font-semibold
+                    tracking-[-0.6px]
+                    text-[#191b20]
+                ">
                 User management
             </h1>
 
+
             <span
-                class="inline-flex
-                       items-center justify-center
-                       min-w-5 h-5
-                       px-1.5
-                       rounded-full
-                       bg-gray-100
-                       text-[11px]
-                       font-medium
-                       text-gray-500"
-            >
+                class="
+                    text-[15px]
+                    leading-[20px]
+                    font-medium
+                    text-[#767981]
+                    mt-[3px]
+                ">
                 <?= $totalEmployees ?>
             </span>
 
         </div>
 
 
-        <p class="mt-1.5 text-[13px] text-gray-500">
+        <p
+            class="
+                mt-[5px]
+                text-[15px]
+                leading-[22px]
+                font-normal
+                text-[#68717f]
+            ">
             Manage your team members and their account permissions here.
         </p>
 
@@ -75,54 +192,67 @@ function employeeInitials(string $name): string
 
 
 
-    <!-- TOP TOOLBAR -->
+
+    <div class="h-[48px]"></div>
+
 
     <div
-        class="min-h-[52px]
-               px-5
-               border-y border-gray-200
-               flex items-center
-               justify-between
-               gap-3"
-    >
+        class="
+            h-[48px]
+            flex
+            items-center
+            border-b
+            border-[#e8e9ec]
+        ">
 
+        <div
+            class="
+                flex
+                items-center
+                gap-[18px]
+            ">
 
-        <div class="flex items-center gap-1">
 
 
             <button
                 type="button"
-                class="h-8
-                       px-3
-                       inline-flex
-                       items-center
-                       gap-2
-                       rounded-md
-                       bg-gray-100
-                       text-[13px]
-                       font-medium
-                       text-gray-800"
-            >
+
+                class="
+                    h-[36px]
+
+                    inline-flex
+                    items-center
+                    gap-[8px]
+
+                    px-[10px]
+
+                    text-[14px]
+                    font-medium
+                    text-[#444851]
+
+                    rounded-[7px]
+
+                    bg-[#fafafa]
+                ">
 
                 <svg
-                    class="w-4 h-4 text-gray-500"
-                    fill="none"
-                    stroke="currentColor"
+                    width="17"
+                    height="17"
                     viewBox="0 0 24 24"
-                >
-                    <rect
-                        x="4"
-                        y="4"
-                        width="16"
-                        height="16"
-                        rx="2"
-                        stroke-width="1.7"
-                    />
+                    fill="none"
+                    stroke="#68707e"
+                    stroke-width="1.7">
 
-                    <path
-                        d="M4 10h16M10 4v16"
-                        stroke-width="1.7"
-                    />
+                    <rect
+                        x="3.5"
+                        y="3.5"
+                        width="17"
+                        height="17"
+                        rx="1.5" />
+
+                    <path d="M3.5 10h17" />
+                    <path d="M10 3.5v17" />
+
                 </svg>
 
                 Table
@@ -131,42 +261,46 @@ function employeeInitials(string $name): string
 
 
 
+
             <button
                 type="button"
-                class="h-8
-                       px-3
-                       inline-flex
-                       items-center
-                       gap-2
-                       rounded-md
-                       text-[13px]
-                       text-gray-500
-                       hover:bg-gray-50"
-            >
+
+                class="
+                    h-[36px]
+
+                    inline-flex
+                    items-center
+                    gap-[8px]
+
+                    px-[7px]
+
+                    text-[14px]
+                    font-normal
+                    text-[#626976]
+                ">
 
                 <svg
-                    class="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
+                    width="17"
+                    height="17"
                     viewBox="0 0 24 24"
-                >
+                    fill="none"
+                    stroke="#68707e"
+                    stroke-width="1.7">
+
                     <rect
                         x="4"
-                        y="4"
+                        y="3.5"
                         width="6"
-                        height="16"
-                        rx="1.5"
-                        stroke-width="1.7"
-                    />
+                        height="17"
+                        rx="1.3" />
 
                     <rect
                         x="14"
-                        y="4"
+                        y="3.5"
                         width="6"
-                        height="16"
-                        rx="1.5"
-                        stroke-width="1.7"
-                    />
+                        height="17"
+                        rx="1.3" />
+
                 </svg>
 
                 Board
@@ -175,34 +309,57 @@ function employeeInitials(string $name): string
 
 
 
+
             <button
                 type="button"
-                class="h-8
-                       px-3
-                       inline-flex
-                       items-center
-                       gap-2
-                       rounded-md
-                       text-[13px]
-                       text-gray-500
-                       hover:bg-gray-50"
-            >
+
+                class="
+                    h-[36px]
+
+                    inline-flex
+                    items-center
+                    gap-[8px]
+
+                    px-[7px]
+
+                    text-[14px]
+                    font-normal
+                    text-[#626976]
+                ">
 
                 <svg
-                    class="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
+                    width="17"
+                    height="17"
                     viewBox="0 0 24 24"
-                >
-                    <path
-                        stroke-linecap="round"
-                        stroke-width="1.7"
-                        d="M8 6h12M8 12h12M8 18h12"
-                    />
+                    fill="none"
+                    stroke="#68707e"
+                    stroke-width="1.7">
 
-                    <circle cx="4" cy="6" r="1" fill="currentColor"/>
-                    <circle cx="4" cy="12" r="1" fill="currentColor"/>
-                    <circle cx="4" cy="18" r="1" fill="currentColor"/>
+                    <circle
+                        cx="5"
+                        cy="6"
+                        r="1"
+                        fill="#68707e"
+                        stroke="none" />
+
+                    <circle
+                        cx="5"
+                        cy="12"
+                        r="1"
+                        fill="#68707e"
+                        stroke="none" />
+
+                    <circle
+                        cx="5"
+                        cy="18"
+                        r="1"
+                        fill="#68707e"
+                        stroke="none" />
+
+                    <path d="M9 6h11" />
+                    <path d="M9 12h11" />
+                    <path d="M9 18h11" />
+
                 </svg>
 
                 List
@@ -211,257 +368,108 @@ function employeeInitials(string $name): string
 
         </div>
 
-
-
-        <div class="flex items-center gap-1">
-
-
-            <!-- SEARCH -->
-
-            <div class="relative">
-
-                <svg
-                    class="absolute
-                           left-2.5
-                           top-1/2
-                           -translate-y-1/2
-                           w-4 h-4
-                           text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <circle
-                        cx="11"
-                        cy="11"
-                        r="6.5"
-                        stroke-width="1.7"
-                    />
-
-                    <path
-                        d="m19 19-3.5-3.5"
-                        stroke-width="1.7"
-                        stroke-linecap="round"
-                    />
-                </svg>
-
-
-                <input
-                    id="employeeSearch"
-                    type="text"
-                    placeholder="Search"
-                    class="w-[105px]
-                           h-8
-                           pl-8 pr-2
-                           border-0
-                           outline-none
-                           bg-transparent
-                           text-[13px]
-                           text-gray-600
-                           placeholder-gray-400"
-                >
-
-            </div>
-
-
-
-            <button
-                type="button"
-                class="h-8
-                       px-2
-                       inline-flex
-                       items-center
-                       gap-1.5
-                       rounded-md
-                       text-[13px]
-                       text-gray-500
-                       hover:bg-gray-50"
-            >
-
-                <svg
-                    class="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        stroke-linecap="round"
-                        stroke-width="1.7"
-                        d="M4 7h16M7 12h10M10 17h4"
-                    />
-                </svg>
-
-                Hide
-
-            </button>
-
-
-
-            <button
-                type="button"
-                class="h-8
-                       px-2
-                       inline-flex
-                       items-center
-                       gap-1.5
-                       rounded-md
-                       text-[13px]
-                       text-gray-500
-                       hover:bg-gray-50"
-            >
-
-                <svg
-                    class="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <circle
-                        cx="12"
-                        cy="12"
-                        r="7"
-                        stroke-width="1.7"
-                    />
-
-                    <circle
-                        cx="12"
-                        cy="12"
-                        r="2.3"
-                        stroke-width="1.7"
-                    />
-                </svg>
-
-                Customize
-
-            </button>
-
-
-
-            <button
-                type="button"
-                class="w-8 h-8
-                       rounded-md
-                       text-gray-500
-                       hover:bg-gray-50"
-            >
-                •••
-            </button>
-
-
-
-            <button
-                type="button"
-                class="h-8
-                       px-3
-                       border border-gray-200
-                       rounded-md
-                       bg-white
-                       text-[12px]
-                       font-medium
-                       text-gray-600
-                       hover:bg-gray-50"
-            >
-                Export
-            </button>
-
-
-
-            <button
-                type="button"
-                onclick="openEmployeeModal()"
-                class="h-8
-                       px-3
-                       inline-flex
-                       items-center
-                       gap-2
-                       border border-gray-200
-                       rounded-md
-                       bg-white
-                       shadow-sm
-                       text-[12px]
-                       font-medium
-                       text-gray-700
-                       hover:bg-gray-50"
-            >
-
-                Add User
-
-                <svg
-                    class="w-3 h-3"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="1.8"
-                        d="m7 9 5 5 5-5"
-                    />
-                </svg>
-
-            </button>
-
-
-        </div>
-
     </div>
 
 
-
-    <!-- FILTERS -->
-
     <div
-        class="h-[48px]
-               px-5
-               border-b border-gray-200
-               flex items-center
-               gap-2"
-    >
+        class="
+            min-h-[60px]
+
+            flex
+            flex-wrap
+            items-center
+            gap-[8px]
+
+            border-b
+            border-[#e8e9ec]
+        ">
 
 
-        <div class="relative">
+        <div
+            class="
+                relative
+
+                h-[34px]
+                min-w-[120px]
+
+                border
+                border-[#dedfe3]
+
+                rounded-full
+
+                bg-white
+            ">
+
 
             <svg
-                class="absolute
-                       left-2.5
-                       top-1/2
-                       -translate-y-1/2
-                       w-4 h-4
-                       text-gray-400
-                       pointer-events-none"
-                fill="none"
-                stroke="currentColor"
+                class="
+                    absolute
+                    left-[11px]
+                    top-1/2
+                    -translate-y-1/2
+                    pointer-events-none
+                "
+
+                width="17"
+                height="17"
+
                 viewBox="0 0 24 24"
-            >
+
+                fill="none"
+
+                stroke="#68717f"
+
+                stroke-width="1.5">
+
                 <circle
-                    cx="12"
+                    cx="10"
                     cy="8"
-                    r="3"
-                    stroke-width="1.7"
-                />
+                    r="3" />
 
                 <path
-                    stroke-linecap="round"
-                    stroke-width="1.7"
-                    d="M6 19c.7-3 2.7-5 6-5s5.3 2 6 5"
-                />
+                    d="M4.5 19c.5-3.6 2.5-5.5 5.5-5.5s5 1.9 5.5 5.5" />
+
+                <circle
+                    cx="17"
+                    cy="16"
+                    r="4" />
+
+                <path
+                    d="M17 14.5v3" />
+
+                <path
+                    d="M15.5 16h3" />
+
             </svg>
+
 
 
             <select
                 id="roleFilter"
-                class="appearance-none
-                       h-8
-                       pl-8 pr-8
-                       border border-gray-200
-                       rounded-md
-                       bg-white
-                       outline-none
-                       text-[12px]
-                       font-medium
-                       text-gray-600"
-            >
+
+                class="
+                    um-select
+
+                    w-full
+                    h-full
+
+                    pl-[35px]
+                    pr-[30px]
+
+                    rounded-full
+
+                    border-0
+                    bg-transparent
+
+                    outline-none
+                    focus:ring-0
+
+                    text-[13px]
+                    font-medium
+                    text-[#535a65]
+
+                    cursor-pointer
+                ">
 
                 <option value="">
                     Role
@@ -472,12 +480,13 @@ function employeeInitials(string $name): string
 
                     <option
                         value="<?= htmlspecialchars(
-                            strtolower($role['name'])
-                        ) ?>"
-                    >
-
-                        <?= htmlspecialchars($role['name']) ?>
-
+                                    strtolower(
+                                        $role['name']
+                                    )
+                                ) ?>">
+                        <?= htmlspecialchars(
+                            $role['name']
+                        ) ?>
                     </option>
 
                 <?php endforeach; ?>
@@ -485,91 +494,175 @@ function employeeInitials(string $name): string
             </select>
 
 
+
             <svg
-                class="absolute
-                       right-2.5
-                       top-1/2
-                       -translate-y-1/2
-                       w-3 h-3
-                       text-gray-400
-                       pointer-events-none"
-                fill="none"
-                stroke="currentColor"
+                class="
+                    absolute
+                    right-[11px]
+                    top-1/2
+                    -translate-y-1/2
+                    pointer-events-none
+                "
+
+                width="12"
+                height="12"
+
                 viewBox="0 0 24 24"
-            >
-                <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="1.8"
-                    d="m7 9 5 5 5-5"
-                />
+
+                fill="none"
+
+                stroke="#68717f"
+
+                stroke-width="1.8">
+                <path d="m7 9 5 5 5-5" />
             </svg>
 
         </div>
 
-
-
         <button
             type="button"
-            class="h-8
-                   px-3
-                   inline-flex
-                   items-center
-                   gap-2
-                   border border-gray-200
-                   rounded-md
-                   bg-white
-                   text-[12px]
-                   font-medium
-                   text-gray-600"
-        >
+
+            class="
+                h-[34px]
+                min-w-[142px]
+
+                px-[11px]
+
+                border
+                border-[#dedfe3]
+
+                rounded-full
+
+                bg-white
+
+                inline-flex
+                items-center
+                justify-between
+
+                text-[13px]
+                font-medium
+                text-[#535a65]
+            ">
 
             <span
-                class="w-4 h-4
-                       rounded-full
-                       border border-gray-300
-                       flex items-center
-                       justify-center
-                       text-[9px]"
-            >
-                ◎
+                class="
+                    inline-flex
+                    items-center
+                    gap-[8px]
+                ">
+
+
+                <span
+                    class="
+                        w-[18px]
+                        h-[18px]
+
+                        rounded-full
+
+                        border
+                        border-[#9ca2ad]
+
+                        inline-flex
+                        items-center
+                        justify-center
+                    ">
+
+                    <svg
+                        width="11"
+                        height="11"
+
+                        viewBox="0 0 24 24"
+
+                        fill="none"
+
+                        stroke="#68717f"
+
+                        stroke-width="1.7">
+
+                        <rect
+                            x="6"
+                            y="10"
+                            width="12"
+                            height="9"
+                            rx="2" />
+
+                        <path
+                            d="M8.5 10V7a3.5 3.5 0 017 0v3" />
+
+                    </svg>
+
+                </span>
+
+
+                2F Auth
+
             </span>
 
-            2F Auth
+
 
             <svg
-                class="w-3 h-3"
-                fill="none"
-                stroke="currentColor"
+                width="12"
+                height="12"
+
                 viewBox="0 0 24 24"
-            >
-                <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="1.8"
-                    d="m7 9 5 5 5-5"
-                />
+
+                fill="none"
+
+                stroke="#68717f"
+
+                stroke-width="1.8">
+                <path d="m7 9 5 5 5-5" />
             </svg>
 
         </button>
 
 
 
-        <div class="relative">
+        <!-- =================================================
+             STATUS
+        ================================================== -->
+
+        <div
+            class="
+                relative
+
+                h-[34px]
+                min-w-[106px]
+
+                border
+                border-[#dedfe3]
+
+                rounded-full
+
+                bg-white
+            ">
 
             <select
                 id="statusFilter"
-                class="appearance-none
-                       h-8
-                       pl-3 pr-8
-                       border border-gray-200
-                       rounded-md
-                       bg-white
-                       outline-none
-                       text-[12px]
-                       font-medium
-                       text-gray-600"
-            >
+
+                class="
+                    um-select
+
+                    w-full
+                    h-full
+
+                    pl-[15px]
+                    pr-[29px]
+
+                    rounded-full
+
+                    border-0
+                    bg-transparent
+
+                    outline-none
+                    focus:ring-0
+
+                    text-[13px]
+                    font-medium
+                    text-[#535a65]
+
+                    cursor-pointer
+                ">
 
                 <option value="">
                     Status
@@ -586,172 +679,372 @@ function employeeInitials(string $name): string
             </select>
 
 
+
             <svg
-                class="absolute
-                       right-2.5
-                       top-1/2
-                       -translate-y-1/2
-                       w-3 h-3
-                       text-gray-400
-                       pointer-events-none"
-                fill="none"
-                stroke="currentColor"
+                class="
+                    absolute
+                    right-[11px]
+                    top-1/2
+                    -translate-y-1/2
+                    pointer-events-none
+                "
+
+                width="12"
+                height="12"
+
                 viewBox="0 0 24 24"
-            >
-                <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="1.8"
-                    d="m7 9 5 5 5-5"
-                />
+
+                fill="none"
+
+                stroke="#68717f"
+
+                stroke-width="1.8">
+                <path d="m7 9 5 5 5-5" />
             </svg>
 
         </div>
 
 
 
+        <!-- =================================================
+             ADD FILTER
+        ================================================== -->
+
         <button
             type="button"
-            class="h-8
-                   px-2
-                   inline-flex
-                   items-center
-                   gap-1.5
-                   text-[12px]
-                   text-gray-500
-                   hover:text-gray-700"
-        >
 
-            <span class="text-lg font-light leading-none">
-                +
-            </span>
+            class="
+                h-[34px]
+
+                px-[7px]
+
+                inline-flex
+                items-center
+                gap-[7px]
+
+                text-[13px]
+                font-normal
+                text-[#626976]
+            ">
+
+            <svg
+                width="15"
+                height="15"
+
+                viewBox="0 0 24 24"
+
+                fill="none"
+
+                stroke="#68717f"
+
+                stroke-width="1.5">
+                <path d="M12 5v14M5 12h14" />
+            </svg>
 
             Add filter
 
         </button>
 
+
+
+        <!-- =================================================
+             RIGHT TOOLBAR
+        ================================================== -->
+
+        <div
+            class="
+                ml-auto
+
+                hidden
+                xl:flex
+
+                items-center
+                gap-[5px]
+            ">
+
+
+            <div
+                class="
+                    relative
+
+                    h-[34px]
+                    w-[150px]
+                ">
+
+                <svg
+                    class="
+                        absolute
+                        left-[9px]
+                        top-1/2
+                        -translate-y-1/2
+                    "
+
+                    width="14"
+                    height="14"
+
+                    viewBox="0 0 24 24"
+
+                    fill="none"
+
+                    stroke="#868c96"
+
+                    stroke-width="1.7">
+
+                    <circle
+                        cx="11"
+                        cy="11"
+                        r="7" />
+
+                    <path
+                        d="m20 20-3.5-3.5" />
+
+                </svg>
+
+
+                <input
+                    id="employeeSearch"
+
+                    type="text"
+
+                    placeholder="Search"
+
+                    autocomplete="off"
+
+                    class="
+                        w-full
+                        h-full
+
+                        pl-[30px]
+                        pr-[8px]
+
+                        border-0
+
+                        outline-none
+
+                        focus:ring-0
+
+                        text-[12px]
+                        text-[#50555f]
+
+                        placeholder:text-[#9ca0a8]
+                    ">
+
+            </div>
+
+
+
+            <button
+                type="button"
+
+                class="
+                    h-[34px]
+                    px-[8px]
+
+                    text-[12px]
+                    text-[#666c77]
+                ">
+                Hide
+            </button>
+
+
+
+            <button
+                type="button"
+
+                class="
+                    h-[34px]
+                    px-[8px]
+
+                    text-[12px]
+                    text-[#666c77]
+                ">
+                Customize
+            </button>
+
+
+
+            <button
+                type="button"
+
+                class="
+                    h-[34px]
+                    px-[7px]
+
+                    text-[17px]
+                    leading-none
+                    text-[#777d86]
+                ">
+                ···
+            </button>
+
+
+
+            <button
+                type="button"
+
+                class="
+                    h-[34px]
+
+                    px-[12px]
+
+                    border
+                    border-[#dedfe3]
+
+                    rounded-[6px]
+
+                    bg-white
+
+                    text-[12px]
+                    font-medium
+                    text-[#565c66]
+                ">
+                Export
+            </button>
+
+
+
+            <button
+                type="button"
+
+                onclick="openEmployeeModal()"
+
+                class="
+                    h-[34px]
+
+                    px-[12px]
+
+                    border
+                    border-[#dedfe3]
+
+                    rounded-[6px]
+
+                    bg-white
+
+                    text-[12px]
+                    font-medium
+                    text-[#565c66]
+                ">
+                Add User
+            </button>
+
+        </div>
+
     </div>
 
 
 
-    <!-- ALERTS -->
+    <!-- =====================================================
+         TABLE
+    ====================================================== -->
 
-    <?php if ($success): ?>
-
-        <div
-            class="mx-5 mt-3
-                   px-4 py-2.5
-                   rounded-md
-                   border border-green-200
-                   bg-green-50
-                   text-sm
-                   text-green-700"
-        >
-
-            <?= htmlspecialchars($success) ?>
-
-        </div>
-
-    <?php endif; ?>
-
-
-    <?php if ($error): ?>
-
-        <div
-            class="mx-5 mt-3
-                   px-4 py-2.5
-                   rounded-md
-                   border border-red-200
-                   bg-red-50
-                   text-sm
-                   text-red-700"
-        >
-
-            <?= htmlspecialchars($error) ?>
-
-        </div>
-
-    <?php endif; ?>
-
-
-
-    <!-- TABLE -->
-
-    <div class="w-full overflow-hidden">
+    <div
+        class="
+            w-full
+            overflow-x-auto
+           
+        ">
 
         <table
-            class="w-full
-                   table-fixed
-                   border-collapse
-                   text-[13px]"
-        >
+            class="
+                um-table
+                w-full
+              
+                table-fixed
+            ">
 
 
             <colgroup>
-
-                <col style="width: 4%">
-
-                <col style="width: 15%">
-
-                <col style="width: 18%">
-
-                <col style="width: 12%">
-
-                <col style="width: 10%">
-
-                <col style="width: 16%">
-
-                <col style="width: 9%">
-
-                <col style="width: 16%">
-
+                <col style="width: 4%;">
+                <col style="width: 16%;">
+                <col style="width: 20%;">
+                <col style="width: 11%;">
+                <col style="width: 11%;">
+                <col style="width: 16%;">
+                <col style="width: 10%;">
+                <col style="width: 12%;">
             </colgroup>
 
 
+            <thead
+                class="
+                    bg-[#fafbfc]
 
-            <thead>
+                    border-b
+                    border-[#e6e7ea]
+                ">
 
-                <tr
-                    class="h-[40px]
-                           bg-gray-50
-                           border-b border-gray-200"
-                >
+                <tr class="h-[44px]">
 
 
-                    <th class="px-2 text-center">
+
+                    <th
+                        class="
+                            pl-[16px]
+                            pr-[4px]
+                        ">
 
                         <input
                             id="selectAllEmployees"
+
                             type="checkbox"
-                            class="w-4 h-4
-                                   rounded
-                                   border-gray-300"
-                        >
+
+                            class="um-checkbox">
 
                     </th>
 
 
 
+
                     <th
-                        class="px-2
-                               text-left
-                               text-[12px]
-                               font-medium
-                               text-gray-500"
-                    >
+                        class="
+                            px-[9px]
 
-                        <div class="flex items-center gap-1.5">
+                            text-left
 
-                            <span
-                                class="w-4 h-4
-                                       rounded-full
-                                       border border-gray-300
-                                       flex items-center
-                                       justify-center
-                                       text-[9px]"
-                            >
-                                ◎
-                            </span>
+                            text-[12px]
+                            font-medium
+                            text-[#626975]
+                        ">
+
+                        <div
+                            class="
+                                flex
+                                items-center
+                                gap-[8px]
+                            ">
+
+                            <svg
+                                width="18"
+                                height="18"
+
+                                viewBox="0 0 24 24"
+
+                                fill="none"
+
+                                stroke="#727984"
+
+                                stroke-width="1.5">
+
+                                <circle
+                                    cx="10"
+                                    cy="8"
+                                    r="3" />
+
+                                <path
+                                    d="M5 19c.4-3.3 2.2-5 5-5s4.6 1.7 5 5" />
+
+                                <circle
+                                    cx="17"
+                                    cy="16"
+                                    r="4" />
+
+                                <path
+                                    d="M17 14.5v3" />
+
+                                <path
+                                    d="M15.5 16h3" />
+
+                            </svg>
 
                             Full name
 
@@ -761,17 +1054,32 @@ function employeeInitials(string $name): string
 
 
 
+
                     <th
-                        class="px-2
-                               text-left
-                               text-[12px]
-                               font-medium
-                               text-gray-500"
-                    >
+                        class="
+                            px-[9px]
 
-                        <div class="flex items-center gap-1.5">
+                            text-left
 
-                            <span class="text-sm">
+                            text-[12px]
+                            font-medium
+                            text-[#626975]
+                        ">
+
+                        <div
+                            class="
+                                flex
+                                items-center
+                                gap-[8px]
+                            ">
+
+                            <span
+                                class="
+                                    text-[17px]
+                                    leading-none
+                                    font-medium
+                                    text-[#727984]
+                                ">
                                 @
                             </span>
 
@@ -783,64 +1091,159 @@ function employeeInitials(string $name): string
 
 
 
-                    <th
-                        class="px-2
-                               text-left
-                               text-[12px]
-                               font-medium
-                               text-gray-500"
-                    >
-
-                        Role
-
-                    </th>
-
-
 
                     <th
-                        class="px-2
-                               text-left
-                               text-[12px]
-                               font-medium
-                               text-gray-500"
-                    >
+                        class="
+                            px-[9px]
 
-                        Status
+                            text-left
 
-                    </th>
+                            text-[12px]
+                            font-medium
+                            text-[#626975]
+                        ">
 
-
-
-                    <th
-                        class="px-2
-                               text-left
-                               text-[12px]
-                               font-medium
-                               text-gray-500"
-                    >
-
-                        <div class="flex items-center gap-1.5">
+                        <div
+                            class="
+                                flex
+                                items-center
+                                gap-[7px]
+                            ">
 
                             <svg
-                                class="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
+                                width="18"
+                                height="18"
+
                                 viewBox="0 0 24 24"
-                            >
+
+                                fill="none"
+
+                                stroke="#727984"
+
+                                stroke-width="1.5">
+
+                                <circle
+                                    cx="9"
+                                    cy="8"
+                                    r="3" />
+
+                                <path
+                                    d="M4.5 18.5c.4-3 2-4.5 4.5-4.5" />
+
+                                <circle
+                                    cx="16"
+                                    cy="15"
+                                    r="4" />
+
+                                <path
+                                    d="m14.5 15 1 1 2-2" />
+
+                            </svg>
+
+                            Role
+
+                        </div>
+
+                    </th>
+
+
+
+
+                    <th
+                        class="
+                            px-[9px]
+
+                            text-left
+
+                            text-[12px]
+                            font-medium
+                            text-[#626975]
+                        ">
+
+                        <div
+                            class="
+                                flex
+                                items-center
+                                gap-[7px]
+                            ">
+
+                            <svg
+                                width="18"
+                                height="18"
+
+                                viewBox="0 0 24 24"
+
+                                fill="none"
+
+                                stroke="#727984"
+
+                                stroke-width="1.5">
+
+                                <circle
+                                    cx="12"
+                                    cy="12"
+                                    r="7" />
+
+                                <path
+                                    d="M12 7v3" />
+
+                                <circle
+                                    cx="12"
+                                    cy="14.5"
+                                    r=".8"
+                                    fill="#727984"
+                                    stroke="none" />
+
+                            </svg>
+
+                            Status
+
+                        </div>
+
+                    </th>
+
+
+
+
+                    <th
+                        class="
+                            px-[9px]
+
+                            text-left
+
+                            text-[12px]
+                            font-medium
+                            text-[#626975]
+                        ">
+
+                        <div
+                            class="
+                                flex
+                                items-center
+                                gap-[8px]
+                            ">
+
+                            <svg
+                                width="17"
+                                height="17"
+
+                                viewBox="0 0 24 24"
+
+                                fill="none"
+
+                                stroke="#727984"
+
+                                stroke-width="1.5">
 
                                 <rect
                                     x="4"
                                     y="5"
                                     width="16"
                                     height="15"
-                                    rx="2"
-                                    stroke-width="1.7"
-                                />
+                                    rx="2" />
 
                                 <path
-                                    d="M8 3v4M16 3v4M4 10h16"
-                                    stroke-width="1.7"
-                                />
+                                    d="M8 3v4M16 3v4M4 10h16" />
 
                             </svg>
 
@@ -852,37 +1255,117 @@ function employeeInitials(string $name): string
 
 
 
-                    <th
-                        class="px-2
-                               text-left
-                               text-[12px]
-                               font-medium
-                               text-gray-500"
-                    >
 
-                        2F Auth
+                    <th
+                        class="
+                            px-[9px]
+
+                            text-left
+
+                            text-[12px]
+                            font-medium
+                            text-[#626975]
+                        ">
+
+                        <div
+                            class="
+                                flex
+                                items-center
+                                gap-[7px]
+                            ">
+
+                            <svg
+                                width="18"
+                                height="18"
+
+                                viewBox="0 0 24 24"
+
+                                fill="none"
+
+                                stroke="#727984"
+
+                                stroke-width="1.5">
+
+                                <circle
+                                    cx="12"
+                                    cy="12"
+                                    r="8" />
+
+                                <rect
+                                    x="9"
+                                    y="10"
+                                    width="6"
+                                    height="5"
+                                    rx="1" />
+
+                                <path
+                                    d="M10.5 10V8.5a1.5 1.5 0 013 0V10" />
+
+                            </svg>
+
+                            2F Auth
+
+                        </div>
 
                     </th>
 
 
 
-                    <th
-                        class="px-2
-                               text-left
-                               text-[12px]
-                               font-medium
-                               text-gray-500"
-                    >
 
-                        Actions
+                    <th
+                        class="
+                            px-[9px]
+
+                            text-left
+
+                            text-[12px]
+                            font-medium
+                            text-[#626975]
+                        ">
+
+                        <div
+                            class="
+                                flex
+                                items-center
+                                gap-[7px]
+                            ">
+
+                            <svg
+                                width="18"
+                                height="18"
+
+                                viewBox="0 0 24 24"
+
+                                fill="none"
+
+                                stroke="#727984"
+
+                                stroke-width="1.5">
+
+                                <circle
+                                    cx="12"
+                                    cy="12"
+                                    r="7" />
+
+                                <circle
+                                    cx="12"
+                                    cy="12"
+                                    r="2" />
+
+                                <path
+                                    d="M12 3v2M12 19v2M3 12h2M19 12h2" />
+
+                            </svg>
+
+                            Actions
+
+                        </div>
 
                     </th>
-
 
                 </tr>
 
             </thead>
-
 
 
             <tbody>
@@ -895,14 +1378,16 @@ function employeeInitials(string $name): string
 
                         <td
                             colspan="8"
-                            class="py-16
-                                   text-center
-                                   text-sm
-                                   text-gray-400"
-                        >
 
-                            No users found.
+                            class="
+                            h-[110px]
 
+                            text-center
+
+                            text-[13px]
+                            text-[#878c95]
+                        ">
+                            No users found
                         </td>
 
                     </tr>
@@ -911,144 +1396,165 @@ function employeeInitials(string $name): string
                 <?php else: ?>
 
 
-                    <?php foreach ($employees as $index => $employee): ?>
+                    <?php foreach ($employees as $employee): ?>
 
 
                         <?php
 
-                        $status = strtolower(
-                            $employee['status'] ?? 'inactive'
-                        );
-
-
-                        $roleName =
-                            $employee['role_name']
-                            ?? $employee['role']
-                            ?? 'No Role';
+                        $status =
+                            strtolower(
+                                $employee['status']
+                                    ?? 'inactive'
+                            );
 
 
                         $isActive =
                             $status === 'active';
 
 
-                        $avatarClasses = [
-
-                            'bg-pink-100 text-pink-700',
-
-                            'bg-blue-100 text-blue-700',
-
-                            'bg-violet-100 text-violet-700',
-
-                            'bg-orange-100 text-orange-700',
-
-                            'bg-emerald-100 text-emerald-700',
-
-                            'bg-amber-100 text-amber-700',
-
-                        ];
+                        $roleName =
+                            $employee['role_name']
+                            ??
+                            $employee['role']
+                            ??
+                            'No Role';
 
 
-                        $avatarClass =
-                            $avatarClasses[
-                                $index % count($avatarClasses)
-                            ];
+                        $joinedDate = '-';
+
+
+                        if (
+                            !empty($employee['created_at'])
+                        ) {
+
+                            $joinedDate =
+                                date(
+                                    'd M Y, g:i a',
+
+                                    strtotime(
+                                        $employee['created_at']
+                                    )
+                                );
+                        }
 
                         ?>
 
 
                         <tr
-                            class="employee-row
-                                   h-[46px]
-                                   border-b border-gray-100
-                                   hover:bg-gray-50/70
-                                   transition"
+
+                            class="
+                            employee-row
+
+                            h-[48px]
+
+                            border-b
+                            border-[#eceef0]
+
+                            bg-white
+
+                            hover:bg-[#fafbfc]
+
+                            transition
+                        "
 
                             data-name="<?= htmlspecialchars(
-                                strtolower($employee['name'])
-                            ) ?>"
+                                            strtolower(
+                                                $employee['name']
+                                                    ?? ''
+                                            )
+                                        ) ?>"
 
                             data-email="<?= htmlspecialchars(
-                                strtolower($employee['email'])
-                            ) ?>"
+                                            strtolower(
+                                                $employee['email']
+                                                    ?? ''
+                                            )
+                                        ) ?>"
 
                             data-role="<?= htmlspecialchars(
-                                strtolower($roleName)
-                            ) ?>"
+                                            strtolower(
+                                                $roleName
+                                            )
+                                        ) ?>"
 
                             data-status="<?= htmlspecialchars(
-                                $status
-                            ) ?>"
-                        >
+                                                $status
+                                            ) ?>">
 
 
-                            <!-- ROW CHECKBOX -->
 
-                            <td class="px-2 text-center">
+                            <td
+                                class="
+                                pl-[16px]
+                                pr-[4px]
+                            ">
 
                                 <input
                                     type="checkbox"
-                                    class="employee-checkbox
-                                           w-4 h-4
-                                           rounded
-                                           border-gray-300"
-                                >
+
+                                    class="
+                                    employee-checkbox
+                                    um-checkbox
+                                ">
 
                             </td>
 
 
 
-                            <!-- NAME -->
 
-                            <td class="px-2">
+                            <td class="px-[9px]">
 
                                 <div
-                                    class="flex
-                                           items-center
-                                           gap-2
-                                           min-w-0"
-                                >
-
+                                    class="
+                                    flex
+                                    items-center
+                                    gap-[9px]
+                                    min-w-0
+                                ">
 
                                     <div
-                                        class="w-7 h-7
-                                               shrink-0
-                                               rounded-full
-                                               <?= $avatarClass ?>
-                                               flex items-center
-                                               justify-center"
-                                    >
+                                        class="
+                                        w-[28px]
+                                        h-[28px]
 
-                                        <span
-                                            class="text-[10px]
-                                                   font-semibold"
-                                        >
+                                        shrink-0
 
-                                            <?= htmlspecialchars(
-                                                employeeInitials(
-                                                    $employee['name']
-                                                )
-                                            ) ?>
+                                        rounded-full
 
-                                        </span>
+                                        bg-[#eeeefe]
 
+                                        flex
+                                        items-center
+                                        justify-center
+
+                                        text-[10px]
+                                        font-semibold
+                                        text-[#6565a0]
+                                    ">
+                                        <?= htmlspecialchars(
+                                            employeeInitials(
+                                                $employee['name']
+                                                    ?? ''
+                                            )
+                                        ) ?>
                                     </div>
 
 
                                     <span
-                                        class="block
-                                               min-w-0
-                                               truncate
-                                               text-[13px]
-                                               font-medium
-                                               text-gray-800"
-                                    >
+                                        class="
+                                        truncate
 
+                                        text-[12px]
+                                        leading-[17px]
+
+                                        font-medium
+                                        text-[#444952]
+                                    ">
                                         <?= htmlspecialchars(
                                             $employee['name']
+                                                ?? ''
                                         ) ?>
-
                                     </span>
-
 
                                 </div>
 
@@ -1056,78 +1562,84 @@ function employeeInitials(string $name): string
 
 
 
-                            <!-- EMAIL -->
-
-                            <td class="px-2">
+                            <td class="px-[9px]">
 
                                 <span
-                                    class="block
-                                           truncate
-                                           text-[13px]
-                                           text-gray-600
-                                           underline
-                                           decoration-gray-300
-                                           underline-offset-2"
-                                >
+                                    class="
+                                    block
+                                    truncate
 
+                                    text-[12px]
+                                    leading-[17px]
+
+                                    text-[#626975]
+
+                                    underline
+                                    decoration-[#d1d3d7]
+                                    underline-offset-[2px]
+                                ">
                                     <?= htmlspecialchars(
                                         $employee['email']
+                                            ?? ''
                                     ) ?>
-
                                 </span>
 
                             </td>
 
 
 
-                            <!-- ROLE -->
+                            <td
+                                class="
+                                px-[9px]
 
-                            <td class="px-2">
+                                text-[12px]
+                                leading-[17px]
 
-                                <span
-                                    class="block
-                                           truncate
-                                           text-[13px]
-                                           text-gray-600"
-                                >
-
-                                    <?= htmlspecialchars(
-                                        $roleName
-                                    ) ?>
-
-                                </span>
-
+                                text-[#626975]
+                            ">
+                                <?= htmlspecialchars(
+                                    $roleName
+                                ) ?>
                             </td>
 
-
-
-                            <!-- STATUS -->
-
-                            <td class="px-2">
+                            <td class="px-[9px]">
 
 
                                 <?php if ($isActive): ?>
 
 
                                     <span
-                                        class="inline-flex
-                                               items-center
-                                               gap-1.5
-                                               h-6
-                                               px-2
-                                               rounded-md
-                                               border border-gray-200
-                                               bg-white
-                                               text-[11px]
-                                               font-medium
-                                               text-gray-600"
-                                    >
+                                        class="
+                                        h-[27px]
+
+                                        inline-flex
+                                        items-center
+                                        gap-[7px]
+
+                                        px-[10px]
+
+                                        border
+                                        border-[#dfe6e2]
+
+                                        rounded-full
+
+                                        bg-white
+
+                                        text-[11px]
+                                        leading-none
+                                        font-medium
+                                        text-[#5c636b]
+                                    ">
 
                                         <span
-                                            class="w-1.5 h-1.5
-                                                   rounded-full
-                                                   bg-green-500"
-                                        ></span>
+                                            class="
+                                            w-[6px]
+                                            h-[6px]
+
+                                            rounded-full
+
+                                            bg-[#10b981]
+                                        "></span>
 
                                         Active
 
@@ -1138,24 +1650,37 @@ function employeeInitials(string $name): string
 
 
                                     <span
-                                        class="inline-flex
-                                               items-center
-                                               gap-1.5
-                                               h-6
-                                               px-2
-                                               rounded-md
-                                               border border-gray-200
-                                               bg-white
-                                               text-[11px]
-                                               font-medium
-                                               text-gray-600"
-                                    >
+                                        class="
+                                        h-[27px]
+
+                                        inline-flex
+                                        items-center
+                                        gap-[7px]
+
+                                        px-[10px]
+
+                                        border
+                                        border-[#eadfdf]
+
+                                        rounded-full
+
+                                        bg-white
+
+                                        text-[11px]
+                                        leading-none
+                                        font-medium
+                                        text-[#5c636b]
+                                    ">
 
                                         <span
-                                            class="w-1.5 h-1.5
-                                                   rounded-full
-                                                   bg-red-500"
-                                        ></span>
+                                            class="
+                                            w-[6px]
+                                            h-[6px]
+
+                                            rounded-full
+
+                                            bg-[#ef4444]
+                                        "></span>
 
                                         Inactive
 
@@ -1168,127 +1693,138 @@ function employeeInitials(string $name): string
                             </td>
 
 
-
-                            <!-- JOINED DATE -->
-
                             <td
-                                class="px-2
-                                       text-[12px]
-                                       text-gray-600"
-                            >
+                                class="
+                                px-[9px]
 
-                                <span class="block truncate">
+                                whitespace-nowrap
 
-                                    <?= !empty($employee['created_at'])
-                                        ? htmlspecialchars(
-                                            date(
-                                                'd M Y, g:i a',
-                                                strtotime(
-                                                    $employee['created_at']
-                                                )
-                                            )
-                                        )
-                                        : '-'
-                                    ?>
+                                text-[11px]
+                                leading-[17px]
 
-                                </span>
-
+                                text-[#737983]
+                            ">
+                                <?= htmlspecialchars(
+                                    $joinedDate
+                                ) ?>
                             </td>
 
 
-
-                            <!-- 2FA -->
-
-                            <td class="px-2">
+                            <td class="px-[9px]">
 
                                 <span
-                                    class="inline-flex
-                                           items-center
-                                           px-2
-                                           py-1
-                                           rounded
-                                           bg-amber-50
-                                           border border-amber-100
-                                           text-[11px]
-                                           font-medium
-                                           text-amber-700"
-                                >
+                                    class="
+                                    h-[25px]
+
+                                    inline-flex
+                                    items-center
+
+                                    px-[9px]
+
+                                    rounded-[5px]
+
+                                    bg-[#fff2b8]
+
+                                    text-[11px]
+                                    leading-none
+
+                                    font-medium
+
+                                    text-[#7a6408]
+                                ">
                                     Enabled
                                 </span>
 
                             </td>
 
 
-
-                            <!-- ACTIONS -->
-
-                            <td class="px-2">
+                            <td class="px-[9px]">
 
                                 <div
-                                    class="flex
-                                           items-center
-                                           gap-1.5"
-                                >
+                                    class="
+                                    flex
+                                    items-center
+                                    gap-[6px]
+                                ">
 
 
                                     <button
+
                                         type="button"
 
                                         onclick='openEditModal(
-                                            <?= json_encode(
-                                                [
-                                                    'id' =>
-                                                        (int) $employee['id'],
+                                        <?= json_encode(
+                                            [
+                                                'id' =>
+                                                (int)
+                                                $employee['id'],
 
-                                                    'name' =>
-                                                        $employee['name'],
+                                                'name' =>
+                                                $employee['name'],
 
-                                                    'email' =>
-                                                        $employee['email'],
+                                                'email' =>
+                                                $employee['email'],
 
-                                                    'role_id' =>
-                                                        (int) (
-                                                            $employee['role_id']
-                                                            ?? 0
-                                                        ),
+                                                'role_id' =>
+                                                (int) (
+                                                    $employee['role_id']
+                                                    ?? 0
+                                                ),
 
-                                                    'status' =>
-                                                        $status
-                                                ],
+                                                'status' =>
+                                                $status
+                                            ],
 
-                                                JSON_HEX_APOS |
+                                            JSON_HEX_TAG
+                                                |
+                                                JSON_HEX_APOS
+                                                |
+                                                JSON_HEX_AMP
+                                                |
                                                 JSON_HEX_QUOT
-                                            ) ?>
-                                        )'
+                                        ) ?>
+                                    )'
 
-                                        class="h-7
-                                               px-2
-                                               inline-flex
-                                               items-center
-                                               justify-center
-                                               gap-1
-                                               rounded-md
-                                               border border-gray-200
-                                               bg-white
-                                               text-[11px]
-                                               font-medium
-                                               text-gray-600
-                                               hover:bg-gray-50
-                                               hover:text-blue-600"
-                                    >
+                                        class="
+                                        um-action-button
+
+                                        h-[27px]
+
+                                        px-[8px]
+
+                                        border
+                                        border-[#dedfe3]
+
+                                        rounded-[5px]
+
+                                        bg-white
+
+                                        inline-flex
+                                        items-center
+                                        gap-[5px]
+
+                                        text-[10px]
+                                        font-medium
+                                        text-[#595f68]
+                                    ">
 
                                         <svg
-                                            class="w-3.5 h-3.5"
-                                            fill="none"
-                                            stroke="currentColor"
+                                            width="11"
+                                            height="11"
+
                                             viewBox="0 0 24 24"
-                                        >
+
+                                            fill="none"
+
+                                            stroke="currentColor"
+
+                                            stroke-width="1.7">
+
+                                            <path d="M12 20h9" />
+
                                             <path
-                                                stroke-linecap="round"
-                                                stroke-linejoin="round"
-                                                stroke-width="1.7"
-                                                d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L8 18l-4 1 1-4L16.5 3.5z"
-                                            />
+                                                d="M16.5 3.5a2.1 2.1 0 013 3L8 18l-4 1 1-4z" />
+
                                         </svg>
 
                                         Edit
@@ -1298,54 +1834,69 @@ function employeeInitials(string $name): string
 
 
                                     <form
+
                                         method="POST"
+
                                         action="<?= $baseUrl ?>/employees/delete"
 
                                         onsubmit="
-                                            return confirm(
-                                                'Are you sure you want to delete this employee?'
-                                            );
-                                        "
-                                    >
+                                        return confirm(
+                                            'Are you sure you want to delete this user?'
+                                        );
+                                    ">
 
                                         <input
                                             type="hidden"
                                             name="id"
-                                            value="<?= (int) $employee['id'] ?>"
-                                        >
+                                            value="<?= (int) $employee['id'] ?>">
 
 
                                         <button
                                             type="submit"
 
-                                            class="h-7
-                                                   px-2
-                                                   inline-flex
-                                                   items-center
-                                                   justify-center
-                                                   gap-1
-                                                   rounded-md
-                                                   border border-gray-200
-                                                   bg-white
-                                                   text-[11px]
-                                                   font-medium
-                                                   text-gray-600
-                                                   hover:bg-red-50
-                                                   hover:text-red-600"
-                                        >
+                                            class="
+                                            um-action-button
+
+                                            h-[27px]
+
+                                            px-[8px]
+
+                                            border
+                                            border-[#dedfe3]
+
+                                            rounded-[5px]
+
+                                            bg-white
+
+                                            inline-flex
+                                            items-center
+                                            gap-[5px]
+
+                                            text-[10px]
+                                            font-medium
+                                            text-[#595f68]
+                                        ">
 
                                             <svg
-                                                class="w-3.5 h-3.5"
-                                                fill="none"
-                                                stroke="currentColor"
+                                                width="11"
+                                                height="11"
+
                                                 viewBox="0 0 24 24"
-                                            >
+
+                                                fill="none"
+
+                                                stroke="currentColor"
+
+                                                stroke-width="1.7">
+
+                                                <path d="M3 6h18" />
+
                                                 <path
-                                                    stroke-linecap="round"
-                                                    stroke-linejoin="round"
-                                                    stroke-width="1.7"
-                                                    d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5M14 11v5"
-                                                />
+                                                    d="M8 6V4h8v2" />
+
+                                                <path
+                                                    d="M19 6l-1 14H6L5 6" />
+
                                             </svg>
 
                                             Delete
@@ -1354,11 +1905,9 @@ function employeeInitials(string $name): string
 
                                     </form>
 
-
                                 </div>
 
                             </td>
-
 
                         </tr>
 
@@ -1371,462 +1920,561 @@ function employeeInitials(string $name): string
 
             </tbody>
 
-
         </table>
 
     </div>
 
-
-
-    <!-- PAGINATION -->
-
     <div
-        class="h-[58px]
-               px-5
-               flex items-center
-               justify-between"
-    >
+        class="
+            min-h-[52px]
+
+            px-[16px]
+
+            flex
+            flex-wrap
+            items-center
+            justify-between
+
+            gap-[12px]
+
+            border-b
+            border-[#e8e9ec]
+
+            text-[11px]
+            text-[#707680]
+        ">
 
 
         <div
-            class="flex items-center
-                   gap-4
-                   text-[12px]
-                   text-gray-500"
-        >
+            class="
+                flex
+                items-center
+                gap-[15px]
+            ">
+
+            <span>
+                Rows per page
+            </span>
 
 
-            <div class="flex items-center gap-2">
+            <button
+                type="button"
 
-                <span>
-                    Rows per page
-                </span>
+                class="
+                    inline-flex
+                    items-center
+                    gap-[6px]
+
+                    font-medium
+                    text-[#4e545d]
+                ">
+
+                15
 
 
-                <button
-                    type="button"
-                    class="h-8
-                           px-2.5
-                           inline-flex
-                           items-center
-                           gap-2
-                           rounded-md
-                           border border-gray-200
-                           bg-white
-                           text-[12px]
-                           text-gray-600"
-                >
+                <svg
+                    width="11"
+                    height="11"
 
-                    15
+                    viewBox="0 0 24 24"
 
-                    <svg
-                        class="w-3 h-3"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="1.8"
-                            d="m7 9 5 5 5-5"
-                        />
-                    </svg>
+                    fill="none"
 
-                </button>
+                    stroke="currentColor"
 
-            </div>
+                    stroke-width="1.8">
+                    <path
+                        d="m7 9 5 5 5-5" />
+                </svg>
 
+            </button>
 
 
             <span>
 
-                <?php if ($totalEmployees > 0): ?>
+                <?= $totalEmployees > 0 ? 1 : 0 ?>
 
-                    1-<?= $totalEmployees ?>
-                    of
-                    <?= $totalEmployees ?>
-                    rows
+                -
 
-                <?php else: ?>
+                <?= min(
+                    15,
+                    $totalEmployees
+                ) ?>
 
-                    0 rows
+                of
 
-                <?php endif; ?>
+                <?= $totalEmployees ?>
+
+                rows
 
             </span>
-
 
         </div>
 
 
 
         <div
-            class="flex
-                   items-center
-                   gap-1
-                   text-[12px]"
-        >
-
+            class="
+                flex
+                items-center
+                gap-[5px]
+            ">
 
             <button
                 type="button"
-                class="w-8 h-8
-                       rounded-md
-                       text-gray-400
-                       hover:bg-gray-50"
-            >
+                class="
+                    w-[25px]
+                    h-[25px]
+                    text-[#a5a8ae]
+                ">
                 «
             </button>
 
 
             <button
                 type="button"
-                class="w-8 h-8
-                       rounded-md
-                       text-gray-400
-                       hover:bg-gray-50"
-            >
+                class="
+                    w-[25px]
+                    h-[25px]
+                    text-[#a5a8ae]
+                ">
                 ‹
             </button>
 
 
             <button
                 type="button"
-                class="w-8 h-8
-                       rounded-md
-                       bg-gray-100
-                       font-medium
-                       text-gray-800"
-            >
+                class="
+                    w-[26px]
+                    h-[26px]
+
+                    rounded-[5px]
+
+                    bg-[#f2f2f3]
+
+                    font-medium
+                    text-[#333840]
+                ">
                 1
             </button>
 
 
             <button
                 type="button"
-                class="w-8 h-8
-                       rounded-md
-                       text-gray-600
-                       hover:bg-gray-50"
-            >
+                class="
+                    w-[26px]
+                    h-[26px]
+
+                    text-[#666c75]
+                ">
                 2
             </button>
 
 
-            <span class="px-1 text-gray-400">
+            <span>
                 ...
             </span>
 
 
             <button
                 type="button"
-                class="w-8 h-8
-                       rounded-md
-                       text-gray-600
-                       hover:bg-gray-50"
-            >
+                class="
+                    w-[26px]
+                    h-[26px]
+
+                    text-[#666c75]
+                ">
                 5
             </button>
 
 
             <button
                 type="button"
-                class="w-8 h-8
-                       rounded-md
-                       text-gray-500
-                       hover:bg-gray-50"
-            >
+                class="
+                    w-[25px]
+                    h-[25px]
+
+                    text-[#666c75]
+                ">
                 ›
             </button>
 
 
             <button
                 type="button"
-                class="w-8 h-8
-                       rounded-md
-                       text-gray-500
-                       hover:bg-gray-50"
-            >
+                class="
+                    w-[25px]
+                    h-[25px]
+
+                    text-[#666c75]
+                ">
                 »
             </button>
 
-
         </div>
 
-
     </div>
-
 
 </div>
 
 
 
-<!-- ==========================================================
-     ADD USER MODAL
-=========================================================== -->
 
 <div
     id="employeeModal"
-    class="fixed
-           inset-0
-           z-50
-           hidden
-           items-center
-           justify-center
-           p-4"
->
+
+    class="
+        fixed
+        inset-0
+        z-50
+
+        hidden
+
+        items-center
+        justify-center
+
+        p-4
+    ">
 
 
     <div
         onclick="closeEmployeeModal()"
-        class="absolute inset-0 bg-black/30"
-    ></div>
+
+        class="
+            absolute
+            inset-0
+
+            bg-black/30
+        "></div>
+
 
 
     <div
-        class="relative
-               w-full
-               max-w-md
-               bg-white
-               rounded-xl
-               shadow-xl"
-    >
+        class="
+            relative
+
+            w-full
+            max-w-[500px]
+
+            bg-white
+
+            border
+            border-[#e1e2e5]
+
+            rounded-xl
+
+            shadow-xl
+        ">
 
 
         <div
-            class="px-6 py-5
-                   border-b border-gray-200
-                   flex items-center
-                   justify-between"
-        >
+            class="
+                px-5
+                py-4
+
+                flex
+                items-start
+                justify-between
+
+                border-b
+                border-[#e9eaec]
+            ">
 
 
             <div>
 
-                <h2 class="text-xl font-semibold text-gray-900">
+                <h2
+                    class="
+                        text-[18px]
+                        font-semibold
+                        text-[#22262d]
+                    ">
                     Add User
                 </h2>
 
-                <p class="text-sm text-gray-500 mt-1">
+
+                <p
+                    class="
+                        mt-[2px]
+
+                        text-[13px]
+                        text-[#777d86]
+                    ">
                     Create a new employee account.
                 </p>
 
             </div>
 
 
+
             <button
                 type="button"
-                onclick="closeEmployeeModal()"
-                class="w-9 h-9
-                       rounded-md
-                       text-xl
-                       text-gray-400
-                       hover:bg-gray-100"
-            >
-                ×
-            </button>
 
+                onclick="closeEmployeeModal()"
+
+                class="
+                    text-[22px]
+                    leading-none
+                    text-[#777d86]
+                ">
+                &times;
+            </button>
 
         </div>
 
 
 
         <form
+
+            id="employeeForm"
+
             method="POST"
+
             action="<?= $baseUrl ?>/employees/store"
-            class="p-6 space-y-4"
+
             autocomplete="off"
-        >
+
+            class="
+                px-5
+                py-5
+
+                space-y-4
+            ">
 
 
-            <!-- DUMMY AUTOFILL FIELDS -->
-
-            <input
-                type="text"
-                name="fake_username"
-                autocomplete="username"
-                tabindex="-1"
-                aria-hidden="true"
+            <div
                 style="
                     position:absolute;
                     left:-9999px;
                     width:1px;
                     height:1px;
-                "
-            >
-
-
-            <input
-                type="password"
-                name="fake_password"
-                autocomplete="current-password"
-                tabindex="-1"
-                aria-hidden="true"
-                style="
-                    position:absolute;
-                    left:-9999px;
-                    width:1px;
-                    height:1px;
-                "
-            >
-
-
-
-            <!-- FULL NAME -->
-
-            <div>
-
-                <label
-                    class="block
-                           text-sm
-                           font-medium
-                           text-gray-700
-                           mb-1"
-                >
-                    Full Name
-                </label>
-
+                    overflow:hidden;
+                ">
 
                 <input
-                    id="add_employee_name"
-                    required
                     type="text"
-                    name="name"
-                    autocomplete="off"
-
-                    value="<?= htmlspecialchars(
-                        $old['name'] ?? ''
-                    ) ?>"
-
-                    class="w-full
-                           h-10
-                           px-3
-                           border border-gray-200
-                           rounded-md
-                           outline-none
-                           text-sm
-                           bg-white
-                           focus:border-blue-400
-                           focus:ring-2
-                           focus:ring-blue-100"
-                >
-
-            </div>
-
-
-
-            <!-- EMAIL -->
-
-            <div>
-
-                <label
-                    class="block
-                           text-sm
-                           font-medium
-                           text-gray-700
-                           mb-1"
-                >
-                    Email
-                </label>
+                    name="fake_username"
+                    autocomplete="username">
 
 
                 <input
-                    id="add_employee_email"
-                    required
-                    type="email"
-                    name="email"
-                    autocomplete="off"
-
-                    value="<?= htmlspecialchars(
-                        $old['email'] ?? ''
-                    ) ?>"
-
-                    class="w-full
-                           h-10
-                           px-3
-                           border border-gray-200
-                           rounded-md
-                           outline-none
-                           text-sm
-                           bg-white
-                           focus:border-blue-400
-                           focus:ring-2
-                           focus:ring-blue-100"
-                >
-
-            </div>
-
-
-
-            <!-- PASSWORD -->
-
-            <div>
-
-                <label
-                    class="block
-                           text-sm
-                           font-medium
-                           text-gray-700
-                           mb-1"
-                >
-                    Password
-                </label>
-
-
-                <input
-                    id="add_employee_password"
-                    required
-                    minlength="6"
                     type="password"
+                    name="fake_password"
+                    autocomplete="current-password">
+
+            </div>
+
+
+
+            <div>
+
+                <label
+                    class="
+                        block
+
+                        mb-[6px]
+
+                        text-[13px]
+                        font-medium
+                        text-[#40454e]
+                    ">
+                    Full Name *
+                </label>
+
+
+                <input
+
+                    id="employeeName"
+
+                    type="text"
+
+                    name="name"
+
+                    required
+
+                    autocomplete="off"
+
+                    value="<?= htmlspecialchars(
+                                $old['name']
+                                    ?? ''
+                            ) ?>"
+
+                    class="
+                        w-full
+                        h-[40px]
+
+                        px-3
+
+                        border
+                        border-[#dadce0]
+
+                        rounded-[7px]
+
+                        text-[13px]
+
+                        outline-none
+
+                        focus:ring-0
+                        focus:border-[#9da1a8]
+                    ">
+
+            </div>
+
+
+
+            <div>
+
+                <label
+                    class="
+                        block
+
+                        mb-[6px]
+
+                        text-[13px]
+                        font-medium
+                        text-[#40454e]
+                    ">
+                    Email *
+                </label>
+
+
+                <input
+
+                    id="employeeEmail"
+
+                    type="email"
+
+                    name="email"
+
+                    required
+
+                    autocomplete="off"
+
+                    value="<?= htmlspecialchars(
+                                $old['email']
+                                    ?? ''
+                            ) ?>"
+
+                    class="
+                        w-full
+                        h-[40px]
+
+                        px-3
+
+                        border
+                        border-[#dadce0]
+
+                        rounded-[7px]
+
+                        text-[13px]
+
+                        outline-none
+
+                        focus:ring-0
+                        focus:border-[#9da1a8]
+                    ">
+
+            </div>
+
+
+
+            <div>
+
+                <label
+                    class="
+                        block
+
+                        mb-[6px]
+
+                        text-[13px]
+                        font-medium
+                        text-[#40454e]
+                    ">
+                    Password *
+                </label>
+
+
+                <input
+
+                    id="employeePassword"
+
+                    type="password"
+
                     name="password"
+
+                    required
+
+                    minlength="6"
+
                     autocomplete="new-password"
+
                     value=""
 
-                    class="w-full
-                           h-10
-                           px-3
-                           border border-gray-200
-                           rounded-md
-                           outline-none
-                           text-sm
-                           bg-white
-                           focus:border-blue-400
-                           focus:ring-2
-                           focus:ring-blue-100"
-                >
+                    class="
+                        w-full
+                        h-[40px]
+
+                        px-3
+
+                        border
+                        border-[#dadce0]
+
+                        rounded-[7px]
+
+                        text-[13px]
+
+                        outline-none
+
+                        focus:ring-0
+                        focus:border-[#9da1a8]
+                    ">
 
             </div>
 
 
 
-            <!-- ROLE -->
-
             <div>
 
                 <label
-                    class="block
-                           text-sm
-                           font-medium
-                           text-gray-700
-                           mb-1"
-                >
-                    Role
+                    class="
+                        block
+
+                        mb-[6px]
+
+                        text-[13px]
+                        font-medium
+                        text-[#40454e]
+                    ">
+                    Role *
                 </label>
 
 
                 <select
-                    required
+
                     name="role_id"
 
-                    class="w-full
-                           h-10
-                           px-3
-                           border border-gray-200
-                           rounded-md
-                           bg-white
-                           text-sm"
-                >
+                    required
+
+                    class="
+                        w-full
+                        h-[40px]
+
+                        px-3
+
+                        border
+                        border-[#dadce0]
+
+                        rounded-[7px]
+
+                        bg-white
+
+                        text-[13px]
+
+                        outline-none
+
+                        focus:ring-0
+                        focus:border-[#9da1a8]
+                    ">
 
                     <option value="">
                         Select Role
@@ -1840,20 +2488,19 @@ function employeeInitials(string $name): string
                             value="<?= (int) $role['id'] ?>"
 
                             <?= (
-                                (int) ($old['role_id'] ?? 0)
+                                (int) (
+                                    $old['role_id']
+                                    ?? 0
+                                )
                                 ===
                                 (int) $role['id']
                             )
                                 ? 'selected'
                                 : ''
-                            ?>
-
-                        >
-
+                            ?>>
                             <?= htmlspecialchars(
                                 $role['name']
                             ) ?>
-
                         </option>
 
                     <?php endforeach; ?>
@@ -1864,65 +2511,85 @@ function employeeInitials(string $name): string
 
 
 
-            <!-- STATUS -->
-
             <div>
 
                 <label
-                    class="block
-                           text-sm
-                           font-medium
-                           text-gray-700
-                           mb-2"
-                >
+                    class="
+                        block
+                        mb-[8px]
+
+                        text-[13px]
+                        font-medium
+                        text-[#40454e]
+                    ">
                     Status
                 </label>
 
 
-                <div class="flex items-center gap-5 text-sm">
+                <div
+                    class="
+                        flex
+                        gap-5
+
+                        text-[13px]
+                    ">
 
 
-                    <label class="flex items-center gap-2">
+                    <label
+                        class="
+                            inline-flex
+                            items-center
+                            gap-2
+                        ">
 
                         <input
                             type="radio"
+
                             name="status"
+
                             value="active"
 
                             <?= (
                                 ($old['status'] ?? 'active')
-                                === 'active'
+                                ===
+                                'active'
                             )
                                 ? 'checked'
                                 : ''
-                            ?>
-                        >
+                            ?>>
 
                         Active
 
                     </label>
 
 
-                    <label class="flex items-center gap-2">
+
+                    <label
+                        class="
+                            inline-flex
+                            items-center
+                            gap-2
+                        ">
 
                         <input
                             type="radio"
+
                             name="status"
+
                             value="inactive"
 
                             <?= (
                                 ($old['status'] ?? '')
-                                === 'inactive'
+                                ===
+                                'inactive'
                             )
                                 ? 'checked'
                                 : ''
-                            ?>
-                        >
+                            ?>>
 
                         Inactive
 
                     </label>
-
 
                 </div>
 
@@ -1931,26 +2598,36 @@ function employeeInitials(string $name): string
 
 
             <div
-                class="pt-4
-                       border-t
-                       flex
-                       justify-end
-                       gap-2"
-            >
+                class="
+                    pt-4
 
+                    border-t
+                    border-[#e9eaec]
+
+                    flex
+                    justify-end
+                    gap-2
+                ">
 
                 <button
                     type="button"
+
                     onclick="closeEmployeeModal()"
 
-                    class="h-10
-                           px-4
-                           border border-gray-200
-                           rounded-md
-                           text-sm
-                           text-gray-600
-                           hover:bg-gray-50"
-                >
+                    class="
+                        h-[36px]
+
+                        px-4
+
+                        border
+                        border-[#dadce0]
+
+                        rounded-[6px]
+
+                        text-[12px]
+                        font-medium
+                        text-[#555b65]
+                    ">
                     Cancel
                 </button>
 
@@ -1958,135 +2635,203 @@ function employeeInitials(string $name): string
                 <button
                     type="submit"
 
-                    class="h-10
-                           px-5
-                           rounded-md
-                           bg-gray-900
-                           text-sm
-                           font-medium
-                           text-white
-                           hover:bg-gray-800"
-                >
+                    class="
+                        h-[36px]
+
+                        px-4
+
+                        rounded-[6px]
+
+                        bg-[#1f2024]
+
+                        text-[12px]
+                        font-medium
+                        text-white
+                    ">
                     Add User
                 </button>
 
-
             </div>
-
 
         </form>
 
-
     </div>
-
 
 </div>
 
 
 
-<!-- ==========================================================
-     EDIT USER MODAL
-=========================================================== -->
-
 <div
     id="editEmployeeModal"
-    class="fixed
-           inset-0
-           z-50
-           hidden
-           items-center
-           justify-center
-           p-4"
->
+
+    class="
+        fixed
+        inset-0
+        z-50
+
+        hidden
+
+        items-center
+        justify-center
+
+        p-4
+    ">
 
 
     <div
         onclick="closeEditModal()"
-        class="absolute inset-0 bg-black/30"
-    ></div>
+
+        class="
+            absolute
+            inset-0
+
+            bg-black/30
+        "></div>
+
 
 
     <div
-        class="relative
-               w-full
-               max-w-md
-               bg-white
-               rounded-xl
-               shadow-xl"
-    >
+        class="
+            relative
+
+            w-full
+            max-w-[500px]
+
+            bg-white
+
+            border
+            border-[#e1e2e5]
+
+            rounded-xl
+
+            shadow-xl
+        ">
 
 
         <div
-            class="px-6 py-5
-                   border-b border-gray-200
-                   flex items-center
-                   justify-between"
-        >
+            class="
+                px-5
+                py-4
 
-            <h2 class="text-xl font-semibold text-gray-900">
-                Edit User
-            </h2>
+                flex
+                items-start
+                justify-between
+
+                border-b
+                border-[#e9eaec]
+            ">
+
+
+            <div>
+
+                <h2
+                    class="
+                        text-[18px]
+                        font-semibold
+                        text-[#22262d]
+                    ">
+                    Edit User
+                </h2>
+
+
+                <p
+                    class="
+                        mt-[2px]
+
+                        text-[13px]
+                        text-[#777d86]
+                    ">
+                    Update employee account details.
+                </p>
+
+            </div>
+
 
 
             <button
                 type="button"
-                onclick="closeEditModal()"
-                class="w-9 h-9
-                       rounded-md
-                       text-xl
-                       text-gray-400
-                       hover:bg-gray-100"
-            >
-                ×
-            </button>
 
+                onclick="closeEditModal()"
+
+                class="
+                    text-[22px]
+                    leading-none
+                    text-[#777d86]
+                ">
+                &times;
+            </button>
 
         </div>
 
 
 
         <form
+
             method="POST"
+
             action="<?= $baseUrl ?>/employees/update"
-            class="p-6 space-y-4"
+
             autocomplete="off"
-        >
+
+            class="
+                px-5
+                py-5
+
+                space-y-4
+            ">
 
 
             <input
-                type="hidden"
                 id="edit_id"
-                name="id"
-            >
+
+                type="hidden"
+
+                name="id">
 
 
 
             <div>
 
                 <label
-                    class="block
-                           text-sm
-                           font-medium
-                           text-gray-700
-                           mb-1"
-                >
-                    Full Name
+                    class="
+                        block
+                        mb-[6px]
+
+                        text-[13px]
+                        font-medium
+                        text-[#40454e]
+                    ">
+                    Full Name *
                 </label>
 
+
                 <input
-                    required
                     id="edit_name"
-                    type="text"
-                    name="name"
-                    autocomplete="off"
 
-                    class="w-full
-                           h-10
-                           px-3
-                           border border-gray-200
-                           rounded-md
-                           text-sm"
-                >
+                    type="text"
+
+                    name="name"
+
+                    required
+
+                    class="
+                        w-full
+                        h-[40px]
+
+                        px-3
+
+                        border
+                        border-[#dadce0]
+
+                        rounded-[7px]
+
+                        text-[13px]
+
+                        outline-none
+
+                        focus:ring-0
+                        focus:border-[#9da1a8]
+                    ">
 
             </div>
 
@@ -2095,29 +2840,45 @@ function employeeInitials(string $name): string
             <div>
 
                 <label
-                    class="block
-                           text-sm
-                           font-medium
-                           text-gray-700
-                           mb-1"
-                >
-                    Email
+                    class="
+                        block
+                        mb-[6px]
+
+                        text-[13px]
+                        font-medium
+                        text-[#40454e]
+                    ">
+                    Email *
                 </label>
 
-                <input
-                    required
-                    id="edit_email"
-                    type="email"
-                    name="email"
-                    autocomplete="off"
 
-                    class="w-full
-                           h-10
-                           px-3
-                           border border-gray-200
-                           rounded-md
-                           text-sm"
-                >
+                <input
+                    id="edit_email"
+
+                    type="email"
+
+                    name="email"
+
+                    required
+
+                    class="
+                        w-full
+                        h-[40px]
+
+                        px-3
+
+                        border
+                        border-[#dadce0]
+
+                        rounded-[7px]
+
+                        text-[13px]
+
+                        outline-none
+
+                        focus:ring-0
+                        focus:border-[#9da1a8]
+                    ">
 
             </div>
 
@@ -2126,30 +2887,49 @@ function employeeInitials(string $name): string
             <div>
 
                 <label
-                    class="block
-                           text-sm
-                           font-medium
-                           text-gray-700
-                           mb-1"
-                >
+                    class="
+                        block
+                        mb-[6px]
+
+                        text-[13px]
+                        font-medium
+                        text-[#40454e]
+                    ">
                     New Password
                 </label>
 
+
                 <input
-                    minlength="6"
+                    id="edit_password"
+
                     type="password"
+
                     name="password"
+
+                    minlength="6"
+
                     autocomplete="new-password"
 
-                    placeholder="Leave blank to keep existing password"
+                    placeholder="Leave blank to keep current password"
 
-                    class="w-full
-                           h-10
-                           px-3
-                           border border-gray-200
-                           rounded-md
-                           text-sm"
-                >
+                    class="
+                        w-full
+                        h-[40px]
+
+                        px-3
+
+                        border
+                        border-[#dadce0]
+
+                        rounded-[7px]
+
+                        text-[13px]
+
+                        outline-none
+
+                        focus:ring-0
+                        focus:border-[#9da1a8]
+                    ">
 
             </div>
 
@@ -2158,35 +2938,55 @@ function employeeInitials(string $name): string
             <div>
 
                 <label
-                    class="block
-                           text-sm
-                           font-medium
-                           text-gray-700
-                           mb-1"
-                >
-                    Role
+                    class="
+                        block
+                        mb-[6px]
+
+                        text-[13px]
+                        font-medium
+                        text-[#40454e]
+                    ">
+                    Role *
                 </label>
 
 
                 <select
-                    required
                     id="edit_role_id"
+
                     name="role_id"
 
-                    class="w-full
-                           h-10
-                           px-3
-                           border border-gray-200
-                           rounded-md
-                           bg-white
-                           text-sm"
-                >
+                    required
+
+                    class="
+                        w-full
+                        h-[40px]
+
+                        px-3
+
+                        border
+                        border-[#dadce0]
+
+                        rounded-[7px]
+
+                        bg-white
+
+                        text-[13px]
+
+                        outline-none
+
+                        focus:ring-0
+                        focus:border-[#9da1a8]
+                    ">
+
+                    <option value="">
+                        Select Role
+                    </option>
+
 
                     <?php foreach ($roles as $role): ?>
 
                         <option
-                            value="<?= (int) $role['id'] ?>"
-                        >
+                            value="<?= (int) $role['id'] ?>">
                             <?= htmlspecialchars(
                                 $role['name']
                             ) ?>
@@ -2203,40 +3003,64 @@ function employeeInitials(string $name): string
             <div>
 
                 <label
-                    class="block
-                           text-sm
-                           font-medium
-                           text-gray-700
-                           mb-2"
-                >
+                    class="
+                        block
+                        mb-[8px]
+
+                        text-[13px]
+                        font-medium
+                        text-[#40454e]
+                    ">
                     Status
                 </label>
 
 
-                <div class="flex gap-5 text-sm">
+                <div
+                    class="
+                        flex
+                        gap-5
 
-                    <label class="flex items-center gap-2">
+                        text-[13px]
+                    ">
+
+
+                    <label
+                        class="
+                            inline-flex
+                            items-center
+                            gap-2
+                        ">
 
                         <input
                             id="edit_status_active"
+
                             type="radio"
+
                             name="status"
-                            value="active"
-                        >
+
+                            value="active">
 
                         Active
 
                     </label>
 
 
-                    <label class="flex items-center gap-2">
+
+                    <label
+                        class="
+                            inline-flex
+                            items-center
+                            gap-2
+                        ">
 
                         <input
                             id="edit_status_inactive"
+
                             type="radio"
+
                             name="status"
-                            value="inactive"
-                        >
+
+                            value="inactive">
 
                         Inactive
 
@@ -2249,24 +3073,36 @@ function employeeInitials(string $name): string
 
 
             <div
-                class="pt-4
-                       border-t
-                       flex
-                       justify-end
-                       gap-2"
-            >
+                class="
+                    pt-4
+
+                    border-t
+                    border-[#e9eaec]
+
+                    flex
+                    justify-end
+                    gap-2
+                ">
 
                 <button
                     type="button"
+
                     onclick="closeEditModal()"
 
-                    class="h-10
-                           px-4
-                           border border-gray-200
-                           rounded-md
-                           text-sm
-                           text-gray-600"
-                >
+                    class="
+                        h-[36px]
+
+                        px-4
+
+                        border
+                        border-[#dadce0]
+
+                        rounded-[6px]
+
+                        text-[12px]
+                        font-medium
+                        text-[#555b65]
+                    ">
                     Cancel
                 </button>
 
@@ -2274,402 +3110,471 @@ function employeeInitials(string $name): string
                 <button
                     type="submit"
 
-                    class="h-10
-                           px-5
-                           rounded-md
-                           bg-gray-900
-                           text-sm
-                           font-medium
-                           text-white"
-                >
+                    class="
+                        h-[36px]
+
+                        px-4
+
+                        rounded-[6px]
+
+                        bg-[#1f2024]
+
+                        text-[12px]
+                        font-medium
+                        text-white
+                    ">
                     Save Changes
                 </button>
 
             </div>
 
-
         </form>
 
-
     </div>
-
 
 </div>
 
 
-
 <script>
-
-
-function openEmployeeModal()
-{
-    const modal =
-        document.getElementById('employeeModal');
-
-
-    const nameInput =
-        document.getElementById('add_employee_name');
-
-
-    const emailInput =
-        document.getElementById('add_employee_email');
-
-
-    const passwordInput =
-        document.getElementById('add_employee_password');
-
-
-    <?php if (!$error): ?>
-
-    if (nameInput) {
-        nameInput.value = '';
-    }
-
-    if (emailInput) {
-        emailInput.value = '';
-    }
-
-    if (passwordInput) {
-        passwordInput.value = '';
-    }
-
-    <?php endif; ?>
-
-
-    modal.classList.remove('hidden');
-
-    modal.classList.add('flex');
-
-    document.body.classList.add(
-        'overflow-hidden'
-    );
-
-
-    /*
-     Small delay helps against browser autofill
-    */
-    setTimeout(() => {
-
-        <?php if (!$error): ?>
-
-        if (emailInput) {
-            emailInput.value = '';
-        }
-
-        if (passwordInput) {
-            passwordInput.value = '';
-        }
-
-        <?php endif; ?>
-
-    }, 100);
-}
-
-
-
-function closeEmployeeModal()
-{
-    const modal =
-        document.getElementById('employeeModal');
-
-
-    modal.classList.add('hidden');
-
-    modal.classList.remove('flex');
-
-
-    document.body.classList.remove(
-        'overflow-hidden'
-    );
-}
-
-
-
-function openEditModal(employee)
-{
-    document.getElementById(
-        'edit_id'
-    ).value =
-        employee.id;
-
-
-    document.getElementById(
-        'edit_name'
-    ).value =
-        employee.name;
-
-
-    document.getElementById(
-        'edit_email'
-    ).value =
-        employee.email;
-
-
-    document.getElementById(
-        'edit_role_id'
-    ).value =
-        employee.role_id;
-
-
-    document.getElementById(
-        'edit_status_active'
-    ).checked =
-        employee.status === 'active';
-
-
-    document.getElementById(
-        'edit_status_inactive'
-    ).checked =
-        employee.status === 'inactive';
-
-
-    const modal =
-        document.getElementById(
-            'editEmployeeModal'
-        );
-
-
-    modal.classList.remove('hidden');
-
-    modal.classList.add('flex');
-
-
-    document.body.classList.add(
-        'overflow-hidden'
-    );
-}
-
-
-
-function closeEditModal()
-{
-    const modal =
-        document.getElementById(
-            'editEmployeeModal'
-        );
-
-
-    modal.classList.add('hidden');
-
-    modal.classList.remove('flex');
-
-
-    document.body.classList.remove(
-        'overflow-hidden'
-    );
-}
-
-
-
-/*
-============================================
-SELECT ALL CHECKBOX
-============================================
-*/
-
-/*
-============================================
-SELECT ALL CHECKBOX
-============================================
-*/
-
-const selectAllEmployees =
-    document.getElementById(
-        'selectAllEmployees'
-    );
-
-
-function getEmployeeCheckboxes()
-{
-    return Array.from(
-        document.querySelectorAll(
-            '.employee-checkbox'
-        )
-    );
-}
-
-
-/*
-Master checkbox:
-tick = all visible rows checked
-untick = all visible rows unchecked
-*/
-selectAllEmployees?.addEventListener(
-    'change',
-    function ()
-    {
-        const checkboxes =
-            getEmployeeCheckboxes();
-
-
-        checkboxes.forEach(
-            checkbox =>
-            {
-                const row =
-                    checkbox.closest(
-                        '.employee-row'
-                    );
-
-
-                if (
-                    row &&
-                    row.style.display !== 'none'
-                ) {
-                    checkbox.checked =
-                        selectAllEmployees.checked;
-                }
-            }
-        );
-    }
-);
-
-
-/*
-Individual row checkbox:
-DO NOT change master checkbox
-*/
-getEmployeeCheckboxes().forEach(
-    checkbox =>
-    {
-        checkbox.addEventListener(
-            'change',
-            function ()
-            {
-                // Master checkbox stays unchanged
-            }
-        );
-    }
-);
-
-
-
-/*
-============================================
-FILTER EMPLOYEES
-============================================
-*/
-
-function filterEmployees()
-{
-    const search =
-        document
-            .getElementById(
-                'employeeSearch'
-            )
-            .value
-            .toLowerCase()
-            .trim();
-
-
-    const role =
-        document
-            .getElementById(
-                'roleFilter'
-            )
-            .value
-            .toLowerCase();
-
-
-    const status =
-        document
-            .getElementById(
-                'statusFilter'
-            )
-            .value
-            .toLowerCase();
-
-
-    const rows =
-        document.querySelectorAll(
-            '.employee-row'
-        );
-
-
-    rows.forEach(row => {
-
-
-        const matchesSearch =
-            !search
-            ||
-            row.dataset.name.includes(
-                search
-            )
-            ||
-            row.dataset.email.includes(
-                search
+    function openEmployeeModal() {
+        const modal =
+            document.getElementById(
+                'employeeModal'
             );
 
 
-        const matchesRole =
-            !role
-            ||
-            row.dataset.role === role;
+        const form =
+            document.getElementById(
+                'employeeForm'
+            );
 
 
-        const matchesStatus =
-            !status
-            ||
-            row.dataset.status === status;
+        document
+            .getElementById(
+                'employeeErrorAlert'
+            )
+            ?.remove();
 
 
-        row.style.display =
-            matchesSearch
-            &&
-            matchesRole
-            &&
-            matchesStatus
-
-                ? ''
-
-                : 'none';
-
-    });
-
-
-    /*
-    After filter update master checkbox
-    */
-
-    updateSelectAllState();
-}
+        document
+            .getElementById(
+                'employeeSuccessAlert'
+            )
+            ?.remove();
 
 
 
-document
-    .getElementById(
-        'employeeSearch'
-    )
-    ?.addEventListener(
-        'input',
-        filterEmployees
-    );
+        <?php if (!$error): ?>
+
+            if (form) {
+                form.reset();
+            }
+
+        <?php endif; ?>
 
 
-document
-    .getElementById(
-        'roleFilter'
-    )
-    ?.addEventListener(
-        'change',
-        filterEmployees
-    );
+
+        modal?.classList.remove(
+            'hidden'
+        );
 
 
-document
-    .getElementById(
-        'statusFilter'
-    )
-    ?.addEventListener(
-        'change',
-        filterEmployees
-    );
+        modal?.classList.add(
+            'flex'
+        );
 
 
-<?php if ($error && !empty($old)): ?>
-
-openEmployeeModal();
-
-<?php endif; ?>
+        document.body.classList.add(
+            'overflow-hidden'
+        );
 
 
+
+        <?php if (!$error): ?>
+
+            setTimeout(
+                function() {
+
+                    const name =
+                        document.getElementById(
+                            'employeeName'
+                        );
+
+
+                    const email =
+                        document.getElementById(
+                            'employeeEmail'
+                        );
+
+
+                    const password =
+                        document.getElementById(
+                            'employeePassword'
+                        );
+
+
+                    if (name) {
+                        name.value = '';
+                    }
+
+
+                    if (email) {
+                        email.value = '';
+                    }
+
+
+                    if (password) {
+                        password.value = '';
+                    }
+
+                },
+                100
+            );
+
+        <?php endif; ?>
+
+    }
+
+
+
+    function closeEmployeeModal() {
+        const modal =
+            document.getElementById(
+                'employeeModal'
+            );
+
+
+        modal?.classList.add(
+            'hidden'
+        );
+
+
+        modal?.classList.remove(
+            'flex'
+        );
+
+
+        document.body.classList.remove(
+            'overflow-hidden'
+        );
+    }
+
+
+    function openEditModal(employee) {
+        document
+            .getElementById(
+                'edit_id'
+            )
+            .value =
+            employee.id;
+
+
+        document
+            .getElementById(
+                'edit_name'
+            )
+            .value =
+            employee.name;
+
+
+        document
+            .getElementById(
+                'edit_email'
+            )
+            .value =
+            employee.email;
+
+
+        document
+            .getElementById(
+                'edit_role_id'
+            )
+            .value =
+            employee.role_id;
+
+
+        document
+            .getElementById(
+                'edit_password'
+            )
+            .value =
+            '';
+
+
+        document
+            .getElementById(
+                'edit_status_active'
+            )
+            .checked =
+            employee.status ===
+            'active';
+
+
+        document
+            .getElementById(
+                'edit_status_inactive'
+            )
+            .checked =
+            employee.status ===
+            'inactive';
+
+
+        const modal =
+            document.getElementById(
+                'editEmployeeModal'
+            );
+
+
+        modal.classList.remove(
+            'hidden'
+        );
+
+
+        modal.classList.add(
+            'flex'
+        );
+
+
+        document.body.classList.add(
+            'overflow-hidden'
+        );
+    }
+
+
+
+    function closeEditModal() {
+        const modal =
+            document.getElementById(
+                'editEmployeeModal'
+            );
+
+
+        modal?.classList.add(
+            'hidden'
+        );
+
+
+        modal?.classList.remove(
+            'flex'
+        );
+
+
+        document.body.classList.remove(
+            'overflow-hidden'
+        );
+    }
+
+    function filterEmployees() {
+        const search =
+            document
+            .getElementById(
+                'employeeSearch'
+            )
+            ?.value
+            .toLowerCase()
+            .trim() ??
+            '';
+
+
+        const role =
+            document
+            .getElementById(
+                'roleFilter'
+            )
+            ?.value
+            .toLowerCase() ??
+            '';
+
+
+        const status =
+            document
+            .getElementById(
+                'statusFilter'
+            )
+            ?.value
+            .toLowerCase() ??
+            '';
+
+
+        const rows =
+            document.querySelectorAll(
+                '.employee-row'
+            );
+
+
+        rows.forEach(
+            row => {
+
+                const matchesSearch = !search ||
+                    row.dataset.name.includes(
+                        search
+                    ) ||
+                    row.dataset.email.includes(
+                        search
+                    );
+
+
+                const matchesRole = !role ||
+                    row.dataset.role ===
+                    role;
+
+
+                const matchesStatus = !status ||
+                    row.dataset.status ===
+                    status;
+
+
+                row.style.display =
+                    (
+                        matchesSearch &&
+                        matchesRole &&
+                        matchesStatus
+                    ) ?
+                    '' :
+                    'none';
+
+            }
+        );
+    }
+
+
+
+    document
+        .getElementById(
+            'employeeSearch'
+        )
+        ?.addEventListener(
+            'input',
+            filterEmployees
+        );
+
+
+    document
+        .getElementById(
+            'roleFilter'
+        )
+        ?.addEventListener(
+            'change',
+            filterEmployees
+        );
+
+
+    document
+        .getElementById(
+            'statusFilter'
+        )
+        ?.addEventListener(
+            'change',
+            filterEmployees
+        );
+
+
+    const selectAllEmployees =
+        document.getElementById(
+            'selectAllEmployees'
+        );
+
+
+    function getEmployeeCheckboxes() {
+        return Array.from(
+            document.querySelectorAll(
+                '.employee-checkbox'
+            )
+        );
+    }
+
+
+    selectAllEmployees
+        ?.addEventListener(
+            'change',
+            function() {
+
+                const checkboxes =
+                    getEmployeeCheckboxes();
+
+
+                checkboxes.forEach(
+                    checkbox => {
+
+                        const row =
+                            checkbox.closest(
+                                '.employee-row'
+                            );
+
+
+                        if (
+                            row &&
+                            row.style.display !==
+                            'none'
+                        ) {
+
+                            checkbox.checked =
+                                selectAllEmployees.checked;
+                        }
+
+                    }
+                );
+
+            }
+        );
+
+
+
+    getEmployeeCheckboxes()
+        .forEach(
+            checkbox => {
+
+                checkbox.addEventListener(
+                    'change',
+                    function() {
+
+                        if (
+                            selectAllEmployees &&
+                            selectAllEmployees.checked
+                        ) {
+
+                            selectAllEmployees.checked =
+                                false;
+                        }
+
+
+                        if (selectAllEmployees) {
+
+                            selectAllEmployees.indeterminate =
+                                false;
+                        }
+
+                    }
+                );
+
+            }
+        );
+
+    <?php if ($error && !empty($old)): ?>
+
+            (function() {
+
+                const modal =
+                    document.getElementById(
+                        'employeeModal'
+                    );
+
+
+                modal?.classList.remove(
+                    'hidden'
+                );
+
+
+                modal?.classList.add(
+                    'flex'
+                );
+
+
+                document.body.classList.add(
+                    'overflow-hidden'
+                );
+
+            })();
+
+    <?php endif; ?>
 </script>

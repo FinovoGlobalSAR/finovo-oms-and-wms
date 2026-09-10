@@ -33,7 +33,7 @@ $navigation = [
 
     ],
 
-     'Management' => [
+    'Management' => [
 
         [
             'label' => 'Employees',
@@ -52,13 +52,9 @@ $navigation = [
     class="fixed inset-y-0 left-0 z-40 w-[250px]
            bg-white border-r border-gray-200
            transform -translate-x-full lg:translate-x-0
-           transition-transform duration-300"
->
+           transition-transform duration-300">
 
 
-    <!-- ==========================================
-         BRAND
-    =========================================== -->
 
     <div class="h-[72px] px-5 border-b border-gray-100 flex items-center">
 
@@ -72,15 +68,13 @@ $navigation = [
                     class="w-9 h-9 rounded-xl
                            bg-blue-600
                            shadow-sm shadow-blue-200
-                           flex items-center justify-center"
-                >
+                           flex items-center justify-center">
                     <span class="text-white font-bold text-sm">
                         F
                     </span>
                 </div>
 
 
-                <!-- Brand Details -->
                 <div>
 
                     <div class="flex items-center gap-1.5">
@@ -97,8 +91,7 @@ $navigation = [
                                    uppercase
                                    tracking-wide
                                    font-bold
-                                   text-blue-600"
-                        >
+                                   text-blue-600">
                             ERP
                         </span>
 
@@ -113,7 +106,6 @@ $navigation = [
             </div>
 
 
-            <!-- Edit button -->
             <button
                 type="button"
                 class="w-8 h-8 rounded-lg
@@ -121,28 +113,24 @@ $navigation = [
                        text-gray-400
                        hover:bg-gray-100
                        hover:text-gray-700
-                       transition"
-            >
+                       transition">
 
                 <svg
                     class="w-4 h-4"
                     fill="none"
                     stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
+                    viewBox="0 0 24 24">
                     <path
                         stroke-linecap="round"
                         stroke-linejoin="round"
                         stroke-width="1.8"
-                        d="M12 20h9"
-                    />
+                        d="M12 20h9" />
 
                     <path
                         stroke-linecap="round"
                         stroke-linejoin="round"
                         stroke-width="1.8"
-                        d="M16.5 3.5a2.1 2.1 0 013 3L8 18l-4 1 1-4L16.5 3.5z"
-                    />
+                        d="M16.5 3.5a2.1 2.1 0 013 3L8 18l-4 1 1-4L16.5 3.5z" />
                 </svg>
 
             </button>
@@ -151,11 +139,6 @@ $navigation = [
 
     </div>
 
-
-
-    <!-- ==========================================
-         QUICK ACTIONS
-    =========================================== -->
 
     <div class="px-3 pt-4">
 
@@ -166,8 +149,7 @@ $navigation = [
                        font-bold
                        uppercase
                        tracking-[0.12em]
-                       text-gray-500"
-            >
+                       text-gray-500">
                 Quick actions
             </span>
 
@@ -179,11 +161,9 @@ $navigation = [
                    p-1
                    bg-gray-50
                    border border-gray-100
-                   rounded-xl"
-        >
+                   rounded-xl">
 
 
-            <!-- New -->
             <button
                 type="button"
                 class="flex-1
@@ -197,21 +177,18 @@ $navigation = [
                        hover:bg-white
                        hover:text-blue-600
                        hover:shadow-sm
-                       transition-all"
-            >
+                       transition-all">
 
                 <svg
                     class="w-4 h-4"
                     fill="none"
                     stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
+                    viewBox="0 0 24 24">
                     <path
                         stroke-linecap="round"
                         stroke-linejoin="round"
                         stroke-width="1.8"
-                        d="M12 5v14M5 12h14"
-                    />
+                        d="M12 5v14M5 12h14" />
                 </svg>
 
                 New
@@ -219,7 +196,6 @@ $navigation = [
             </button>
 
 
-            <!-- Search -->
             <button
                 type="button"
                 class="w-9 h-9
@@ -229,27 +205,23 @@ $navigation = [
                        hover:bg-white
                        hover:text-blue-600
                        hover:shadow-sm
-                       transition-all"
-            >
+                       transition-all">
 
                 <svg
                     class="w-4 h-4"
                     fill="none"
                     stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
+                    viewBox="0 0 24 24">
                     <path
                         stroke-linecap="round"
                         stroke-linejoin="round"
                         stroke-width="1.8"
-                        d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"
-                    />
+                        d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z" />
                 </svg>
 
             </button>
 
 
-            <!-- Notification -->
             <button
                 type="button"
                 class="relative
@@ -260,27 +232,23 @@ $navigation = [
                        hover:bg-white
                        hover:text-blue-600
                        hover:shadow-sm
-                       transition-all"
-            >
+                       transition-all">
 
                 <svg
                     class="w-4 h-4"
                     fill="none"
                     stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
+                    viewBox="0 0 24 24">
                     <path
                         stroke-linecap="round"
                         stroke-linejoin="round"
                         stroke-width="1.8"
-                        d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"
-                    />
+                        d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
 
                     <path
                         stroke-linecap="round"
                         stroke-width="1.8"
-                        d="M10 21h4"
-                    />
+                        d="M10 21h4" />
                 </svg>
 
 
@@ -290,8 +258,7 @@ $navigation = [
                            w-1.5 h-1.5
                            bg-red-500
                            rounded-full
-                           ring-2 ring-gray-50"
-                ></span>
+                           ring-2 ring-gray-50"></span>
 
             </button>
 
@@ -300,17 +267,10 @@ $navigation = [
 
     </div>
 
-
-
-    <!-- ==========================================
-         NAVIGATION
-    =========================================== -->
-
     <nav
         class="px-3 py-5
                overflow-y-auto
-               h-[calc(100vh-220px)]"
-    >
+               h-[calc(100vh-220px)]">
 
 
         <?php foreach ($navigation as $section => $items): ?>
@@ -319,15 +279,13 @@ $navigation = [
             <div class="mb-6">
 
 
-                <!-- Section Heading -->
                 <p
                     class="px-2.5 mb-2
                            text-[10px]
                            font-bold
                            uppercase
                            tracking-[0.12em]
-                           text-gray-500"
-                >
+                           text-gray-500">
                     <?= htmlspecialchars($section) ?>
                 </p>
 
@@ -372,11 +330,9 @@ $navigation = [
                                     ? 'bg-blue-50 text-blue-700 font-semibold'
                                     : 'text-gray-700 font-medium hover:bg-gray-50 hover:text-gray-900'
                                 ?>
-                            "
-                        >
+                            ">
 
 
-                            <!-- Active left bar -->
                             <?php if ($isActive): ?>
 
                                 <span
@@ -387,8 +343,7 @@ $navigation = [
                                            w-[3px]
                                            h-5
                                            bg-blue-600
-                                           rounded-r-full"
-                                ></span>
+                                           rounded-r-full"></span>
 
                             <?php endif; ?>
 
@@ -397,7 +352,6 @@ $navigation = [
                             <div class="flex items-center gap-3">
 
 
-                                <!-- ICON CONTAINER -->
                                 <div
                                     class="
                                         w-7 h-7
@@ -410,11 +364,9 @@ $navigation = [
                                             ? 'bg-blue-100'
                                             : 'bg-gray-50 group-hover:bg-gray-100'
                                         ?>
-                                    "
-                                >
+                                    ">
 
 
-                                    <!-- Dashboard -->
                                     <?php if ($item['icon'] === 'dashboard'): ?>
 
                                         <svg
@@ -425,8 +377,7 @@ $navigation = [
                                                 ?>"
                                             fill="none"
                                             stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                        >
+                                            viewBox="0 0 24 24">
 
                                             <rect
                                                 x="3"
@@ -434,8 +385,7 @@ $navigation = [
                                                 width="7"
                                                 height="7"
                                                 rx="1.5"
-                                                stroke-width="1.8"
-                                            />
+                                                stroke-width="1.8" />
 
                                             <rect
                                                 x="14"
@@ -443,8 +393,7 @@ $navigation = [
                                                 width="7"
                                                 height="7"
                                                 rx="1.5"
-                                                stroke-width="1.8"
-                                            />
+                                                stroke-width="1.8" />
 
                                             <rect
                                                 x="3"
@@ -452,8 +401,7 @@ $navigation = [
                                                 width="7"
                                                 height="7"
                                                 rx="1.5"
-                                                stroke-width="1.8"
-                                            />
+                                                stroke-width="1.8" />
 
                                             <rect
                                                 x="14"
@@ -461,13 +409,11 @@ $navigation = [
                                                 width="7"
                                                 height="7"
                                                 rx="1.5"
-                                                stroke-width="1.8"
-                                            />
+                                                stroke-width="1.8" />
 
                                         </svg>
 
 
-                                    <!-- Employees -->
                                     <?php elseif ($item['icon'] === 'users'): ?>
 
                                         <svg
@@ -478,41 +424,35 @@ $navigation = [
                                                 ?>"
                                             fill="none"
                                             stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                        >
+                                            viewBox="0 0 24 24">
 
                                             <path
                                                 stroke-linecap="round"
                                                 stroke-linejoin="round"
                                                 stroke-width="1.8"
-                                                d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"
-                                            />
+                                                d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" />
 
                                             <circle
                                                 cx="9"
                                                 cy="7"
                                                 r="4"
-                                                stroke-width="1.8"
-                                            />
+                                                stroke-width="1.8" />
 
                                             <path
                                                 stroke-linecap="round"
                                                 stroke-linejoin="round"
                                                 stroke-width="1.8"
-                                                d="M22 21v-2a4 4 0 00-3-3.87"
-                                            />
+                                                d="M22 21v-2a4 4 0 00-3-3.87" />
 
                                             <path
                                                 stroke-linecap="round"
                                                 stroke-linejoin="round"
                                                 stroke-width="1.8"
-                                                d="M16 3.13a4 4 0 010 7.75"
-                                            />
+                                                d="M16 3.13a4 4 0 010 7.75" />
 
                                         </svg>
 
 
-                                    <!-- Orders -->
                                     <?php elseif ($item['icon'] === 'orders'): ?>
 
                                         <svg
@@ -523,33 +463,28 @@ $navigation = [
                                                 ?>"
                                             fill="none"
                                             stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                        >
+                                            viewBox="0 0 24 24">
 
                                             <path
                                                 stroke-linecap="round"
                                                 stroke-linejoin="round"
                                                 stroke-width="1.8"
-                                                d="M4 6h16v14H4z"
-                                            />
+                                                d="M4 6h16v14H4z" />
 
                                             <path
                                                 stroke-linecap="round"
                                                 stroke-linejoin="round"
                                                 stroke-width="1.8"
-                                                d="M8 6V4h8v2"
-                                            />
+                                                d="M8 6V4h8v2" />
 
                                             <path
                                                 stroke-linecap="round"
                                                 stroke-width="1.8"
-                                                d="M8 10h8M8 14h5"
-                                            />
+                                                d="M8 10h8M8 14h5" />
 
                                         </svg>
 
 
-                                    <!-- Products / Inventory -->
                                     <?php elseif ($item['icon'] === 'inventory'): ?>
 
                                         <svg
@@ -560,28 +495,24 @@ $navigation = [
                                                 ?>"
                                             fill="none"
                                             stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                        >
+                                            viewBox="0 0 24 24">
 
                                             <path
                                                 stroke-linecap="round"
                                                 stroke-linejoin="round"
                                                 stroke-width="1.8"
-                                                d="M4 7h16v13H4z"
-                                            />
+                                                d="M4 7h16v13H4z" />
 
                                             <path
                                                 stroke-linecap="round"
                                                 stroke-linejoin="round"
                                                 stroke-width="1.8"
-                                                d="M8 7V4h8v3"
-                                            />
+                                                d="M8 7V4h8v3" />
 
                                             <path
                                                 stroke-linecap="round"
                                                 stroke-width="1.8"
-                                                d="M8 11h8M8 15h5"
-                                            />
+                                                d="M8 11h8M8 15h5" />
 
                                         </svg>
 
@@ -601,14 +532,12 @@ $navigation = [
 
 
 
-                            <!-- Active dot -->
                             <?php if ($isActive): ?>
 
                                 <span
                                     class="w-1.5 h-1.5
                                            rounded-full
-                                           bg-blue-600"
-                                ></span>
+                                           bg-blue-600"></span>
 
                             <?php endif; ?>
 
@@ -628,11 +557,6 @@ $navigation = [
         <?php endforeach; ?>
 
 
-
-        <!-- ==========================================
-             ACCOUNT
-        =========================================== -->
-
         <div class="pt-1">
 
 
@@ -642,8 +566,7 @@ $navigation = [
                        font-bold
                        uppercase
                        tracking-[0.12em]
-                       text-gray-500"
-            >
+                       text-gray-500">
                 Account
             </p>
 
@@ -659,8 +582,7 @@ $navigation = [
                        text-gray-700
                        hover:bg-red-50
                        hover:text-red-600
-                       transition-all"
-            >
+                       transition-all">
 
 
                 <div
@@ -669,8 +591,7 @@ $navigation = [
                            bg-gray-50
                            flex items-center justify-center
                            group-hover:bg-red-100
-                           transition"
-                >
+                           transition">
 
                     <svg
                         class="w-[16px] h-[16px]
@@ -678,22 +599,19 @@ $navigation = [
                                group-hover:text-red-600"
                         fill="none"
                         stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
+                        viewBox="0 0 24 24">
 
                         <path
                             stroke-linecap="round"
                             stroke-linejoin="round"
                             stroke-width="1.8"
-                            d="M17 16l4-4m0 0l-4-4m4 4H7"
-                        />
+                            d="M17 16l4-4m0 0l-4-4m4 4H7" />
 
                         <path
                             stroke-linecap="round"
                             stroke-linejoin="round"
                             stroke-width="1.8"
-                            d="M13 5H5a2 2 0 00-2 2v10a2 2 0 002 2h8"
-                        />
+                            d="M13 5H5a2 2 0 00-2 2v10a2 2 0 002 2h8" />
 
                     </svg>
 
@@ -712,19 +630,13 @@ $navigation = [
     </nav>
 
 
-
-    <!-- ==========================================
-         FOOTER
-    =========================================== -->
-
     <div
         class="absolute
                bottom-0
                left-0 right-0
                px-5 py-3
                bg-white
-               border-t border-gray-100"
-    >
+               border-t border-gray-100">
 
         <div class="flex items-center justify-between">
 
@@ -738,8 +650,7 @@ $navigation = [
                        bg-gray-100
                        text-[9px]
                        font-semibold
-                       text-gray-500"
-            >
+                       text-gray-500">
                 v1.0
             </span>
 

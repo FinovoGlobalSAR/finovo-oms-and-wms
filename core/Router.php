@@ -40,13 +40,6 @@ class Router
 
         $route = $this->routes[$method][$uri];
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Run Middleware
-        |--------------------------------------------------------------------------
-        */
-
         foreach ($route['middleware'] as $middleware) {
 
             $middlewareFile =
@@ -90,13 +83,6 @@ class Router
 
             $middleware::handle();
         }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Run Controller
-        |--------------------------------------------------------------------------
-        */
 
         [$controllerClass, $methodName] =
             $route['handler'];

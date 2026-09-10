@@ -1,436 +1,498 @@
-
 <?php
-
-// class AuthController
-// {
-//     // Show Login Page
-//     public function showLogin()
-//     {
-//         require __DIR__ . '/../Views/auth/login.php';
-//     }
-
-//     // Login
-//     public function login()
-//     {
-//         $email = trim($_POST['email'] ?? '');
-//         $password = $_POST['password'] ?? '';
-
-//         // Validate input
-//         if (empty($email) || empty($password)) {
-//             $_SESSION['error'] = 'Email and password are required.';
-//             header('Location: /finovo-oms-and-wms/public/login');
-//             exit;
-//         }
-
-//         // Find user from database
-//         $userModel = new User();
-//         $user = $userModel->findByEmail($email);
-
-//         // Check user and password
-//         if (
-//             !$user ||
-//             !password_verify($password, $user['password'])
-//         ) {
-//             $_SESSION['error'] = 'Invalid email or password.';
-//             header('Location: /finovo-oms-and-wms/public/login');
-//             exit;
-//         }
-
-//         // Check account status
-//         if ($user['status'] !== 'active') {
-//             $_SESSION['error'] = 'Your account is inactive.';
-//             header('Location: /finovo-oms-and-wms/public/login');
-//             exit;
-//         }
-
-//         /*
-//         |--------------------------------------------------------------------------
-//         | Role comes from database
-//         |--------------------------------------------------------------------------
-//         |
-//         | User.php joins:
-//         | users -> roles
-//         |
-//         | So $user['role'] contains:
-//         | Admin / Manager / Sales / Warehouse
-//         |
-//         */
-
-//         // Generate OTP
-//         $otp = random_int(100000, 999999);
-
-//         // Store temporary authentication data
-//         $_SESSION['otp'] = (string) $otp;
-//         $_SESSION['otp_user'] = $user;
-
-//         // Temporary testing
-//         $_SESSION['success'] = "Your OTP is: $otp";
-
-//         // Go to OTP page
-//         header('Location: /finovo-oms-and-wms/public/otp');
-//         exit;
-//     }
-
-//     // Show OTP Page
-//     public function showOtp()
-//     {
-//         require __DIR__ . '/../Views/auth/otp.php';
-//     }
-
-//     // Verify OTP
-//     public function verifyOtp()
-//     {
-//         $enteredOtp = trim($_POST['otp'] ?? '');
-
-//         // Check temporary login session
-//         if (
-//             !isset($_SESSION['otp']) ||
-//             !isset($_SESSION['otp_user'])
-//         ) {
-//             $_SESSION['error'] = 'Please login again.';
-//             header('Location: /finovo-oms-and-wms/public/login');
-//             exit;
-//         }
-
-//         // Verify OTP
-//         if (!hash_equals($_SESSION['otp'], $enteredOtp)) {
-//             $_SESSION['error'] = 'Invalid OTP.';
-//             header('Location: /finovo-oms-and-wms/public/otp');
-//             exit;
-//         }
-
-//         // Get logged-in user
-//         $user = $_SESSION['otp_user'];
-
-//         // Regenerate session ID after successful authentication
-//         session_regenerate_id(true);
-
-//         // Create authenticated user session
-//         $_SESSION['user'] = [
-//             'id'         => $user['id'],
-//             'company_id' => $user['company_id'],
-//             'role_id'    => $user['role_id'],
-//             'name'       => $user['name'],
-//             'email'      => $user['email'],
-//             'role'       => strtolower($user['role'])
-//         ];
-
-//         // Remove temporary authentication data
-//         unset(
-//             $_SESSION['otp'],
-//             $_SESSION['otp_user']
-//         );
-
-//         /*
-//         |--------------------------------------------------------------------------
-//         | Redirect according to database role
-//         |--------------------------------------------------------------------------
-//         */
-
-//         $role = strtolower($user['role']);
-
-//         switch ($role) {
-
-//             case 'admin':
-//                 header('Location: /finovo-oms-and-wms/public/admin/dashboard');
-//                 break;
-
-//             case 'manager':
-//                 header('Location: /finovo-oms-and-wms/public/manager/dashboard');
-//                 break;
-
-//             case 'sales':
-//                 header('Location: /finovo-oms-and-wms/public/sales/dashboard');
-//                 break;
-
-//             case 'warehouse':
-//                 header('Location: /finovo-oms-and-wms/public/warehouse/dashboard');
-//                 break;
-
-//             default:
-//                 // Unknown/unconfigured role
-//                 $_SESSION = [];
-//                 session_destroy();
-
-//                 session_start();
-//                 $_SESSION['error'] = 'Your account has an invalid role.';
-
-//                 header('Location: /finovo-oms-and-wms/public/login');
-//                 break;
-//         }
-
-//         exit;
-//     }
-
-//     // Logout
-//     public function logout()
-//     {
-//         $_SESSION = [];
-
-//         if (ini_get('session.use_cookies')) {
-//             $params = session_get_cookie_params();
-
-//             setcookie(
-//                 session_name(),
-//                 '',
-//                 time() - 42000,
-//                 $params['path'],
-//                 $params['domain'],
-//                 $params['secure'],
-//                 $params['httponly']
-//             );
-//         }
-
-//         session_destroy();
-
-//         header('Location: /finovo-oms-and-wms/public/login');
-//         exit;
-//     }
-// }
-
-
-
-
 
 class AuthController
 {
-    // Show Login Page
-    public function showLogin()
+    private string $baseUrl =
+    '/finovo-oms-and-wms/public';
+
+    public function showLogin(): void
     {
-        require __DIR__ . '/../Views/auth/login.php';
+        if (
+            isset($_SESSION['user'])
+            &&
+            is_array($_SESSION['user'])
+        ) {
+
+            $userId =
+                (int) (
+                    $_SESSION['user']['id']
+                    ?? 0
+                );
+
+            $companyId =
+                (int) (
+                    $_SESSION['user']['company_id']
+                    ?? 0
+                );
+
+
+            if (
+                $userId > 0
+                &&
+                $companyId > 0
+            ) {
+
+                $userModel =
+                    new User();
+
+
+                $validUser =
+                    $userModel
+                    ->findValidLoggedInUser(
+                        $userId,
+                        $companyId
+                    );
+
+
+                if ($validUser) {
+
+                    header(
+                        "Location: {$this->baseUrl}/dashboard"
+                    );
+
+                    exit;
+                }
+            }
+
+
+
+            unset(
+                $_SESSION['user']
+            );
+        }
+
+
+        require __DIR__
+            . '/../Views/auth/login.php';
     }
 
 
-    // Login
-    public function login()
-    {
-        $email = trim($_POST['email'] ?? '');
-        $password = $_POST['password'] ?? '';
 
-        // Validate input
-        if (empty($email) || empty($password)) {
+    public function login(): void
+    {
+
+        unset(
+            $_SESSION['user'],
+            $_SESSION['otp'],
+            $_SESSION['otp_user'],
+            $_SESSION['success'],
+            $_SESSION['error'],
+            $_SESSION['login_alert']
+        );
+
+
+        $email =
+            strtolower(
+                trim(
+                    $_POST['email']
+                        ?? ''
+                )
+            );
+
+
+        $password =
+            $_POST['password']
+            ?? '';
+
+
+
+        if (
+            $email === ''
+            ||
+            $password === ''
+        ) {
 
             $_SESSION['error'] =
                 'Email and password are required.';
 
-            header(
-                'Location: /finovo-oms-and-wms/public/login'
-            );
 
-            exit;
+            $this->redirectToLogin();
         }
 
 
-        // Find user from database
-        $userModel = new User();
 
-        $user = $userModel->findByEmail($email);
-
-
-        // Check user and password
         if (
-            !$user ||
-            !password_verify($password, $user['password'])
+            !filter_var(
+                $email,
+                FILTER_VALIDATE_EMAIL
+            )
         ) {
 
             $_SESSION['error'] =
-                'Invalid email or password.';
+                'Please enter a valid email address.';
 
-            header(
-                'Location: /finovo-oms-and-wms/public/login'
-            );
 
-            exit;
+            $this->redirectToLogin();
         }
 
 
-        // Check account status
-        if ($user['status'] !== 'active') {
+        $userModel =
+            new User();
+
+
+        $user =
+            $userModel
+            ->findByEmail(
+                $email
+            );
+
+
+        if (!$user) {
 
             $_SESSION['error'] =
-                'Your account is inactive.';
+                'User not found.';
 
-            header(
-                'Location: /finovo-oms-and-wms/public/login'
-            );
 
-            exit;
+            $this->redirectToLogin();
         }
 
 
-        // Generate OTP
-        $otp = random_int(100000, 999999);
+        if (
+            !password_verify(
+                $password,
+                $user['password_hash']
+            )
+        ) {
+
+            $_SESSION['error'] =
+                'Invalid password.';
 
 
-        // Store temporary authentication data
-        $_SESSION['otp'] = (string) $otp;
-        $_SESSION['otp_user'] = $user;
+            $this->redirectToLogin();
+        }
 
 
-        // Temporary testing
+        if (
+            strtolower(
+                trim(
+                    $user['status']
+                        ?? ''
+                )
+            )
+            !==
+            'active'
+        ) {
+
+            $_SESSION['login_alert'] =
+                'User not found.';
+
+
+            $this->redirectToLogin();
+        }
+
+
+        $role =
+            strtolower(
+                trim(
+                    $user['role']
+                        ?? ''
+                )
+            );
+
+
+        $allowedRoles = [
+            'admin',
+            'manager',
+            'warehouse'
+        ];
+
+
+        if (
+            !in_array(
+                $role,
+                $allowedRoles,
+                true
+            )
+        ) {
+
+            $_SESSION['error'] =
+                'Your account does not have a valid role.';
+
+
+            $this->redirectToLogin();
+        }
+
+
+        $otp =
+            random_int(
+                100000,
+                999999
+            );
+
+
+        $_SESSION['otp'] =
+            (string) $otp;
+
+        $_SESSION['otp_user'] = [
+
+            'id' =>
+            (int) $user['id'],
+
+            'company_id' =>
+            (int) $user['company_id'],
+
+            'role_id' =>
+            (int) $user['role_id'],
+
+            'name' =>
+            $user['name'],
+
+            'email' =>
+            $user['email'],
+
+            'status' =>
+            $user['status'],
+
+            'role' =>
+            $role
+        ];
+
+
         $_SESSION['success'] =
-            "Your OTP is: $otp";
+            "Your OTP is: {$otp}";
 
 
-        // Go to OTP page
         header(
-            'Location: /finovo-oms-and-wms/public/otp'
+            "Location: {$this->baseUrl}/otp"
         );
 
         exit;
     }
 
 
-    // Show OTP Page
-    public function showOtp()
+    public function showOtp(): void
     {
         if (
-            !isset($_SESSION['otp']) ||
+            !isset($_SESSION['otp'])
+            ||
             !isset($_SESSION['otp_user'])
+            ||
+            !is_array(
+                $_SESSION['otp_user']
+            )
         ) {
+
+            unset(
+                $_SESSION['otp'],
+                $_SESSION['otp_user'],
+                $_SESSION['success']
+            );
+
 
             $_SESSION['error'] =
                 'Please login first.';
 
-            header(
-                'Location: /finovo-oms-and-wms/public/login'
-            );
 
-            exit;
+            $this->redirectToLogin();
         }
 
-        require __DIR__ . '/../Views/auth/otp.php';
+
+        require __DIR__
+            . '/../Views/auth/otp.php';
     }
 
 
-    // Verify OTP
-    public function verifyOtp()
+
+    public function verifyOtp(): void
     {
-        $enteredOtp = trim($_POST['otp'] ?? '');
+        $enteredOtp =
+            trim(
+                $_POST['otp']
+                    ?? ''
+            );
 
 
-        // Check temporary login session
         if (
-            !isset($_SESSION['otp']) ||
+            !isset($_SESSION['otp'])
+            ||
             !isset($_SESSION['otp_user'])
+            ||
+            !is_array(
+                $_SESSION['otp_user']
+            )
         ) {
+
+            unset(
+                $_SESSION['otp'],
+                $_SESSION['otp_user'],
+                $_SESSION['success']
+            );
+
 
             $_SESSION['error'] =
                 'Please login again.';
 
-            header(
-                'Location: /finovo-oms-and-wms/public/login'
-            );
 
-            exit;
+            $this->redirectToLogin();
         }
 
 
-        // Verify OTP
         if (
             !hash_equals(
-                $_SESSION['otp'],
-                $enteredOtp
+                (string) $_SESSION['otp'],
+                (string) $enteredOtp
             )
         ) {
 
             $_SESSION['error'] =
                 'Invalid OTP.';
 
+
             header(
-                'Location: /finovo-oms-and-wms/public/otp'
+                "Location: {$this->baseUrl}/otp"
             );
 
             exit;
         }
 
+        $temporaryUser =
+            $_SESSION['otp_user'];
 
-        // Get logged-in user
-        $user = $_SESSION['otp_user'];
-
-
-        // Regenerate session ID
-        session_regenerate_id(true);
+        $userModel =
+            new User();
 
 
-        // Create authenticated session
-        $_SESSION['user'] = [
-            'id'         => $user['id'],
-            'company_id' => $user['company_id'],
-            'role_id'    => $user['role_id'],
-            'name'       => $user['name'],
-            'email'      => $user['email'],
-            'role'       => strtolower($user['role'])
+        $user =
+            $userModel
+            ->findValidLoggedInUser(
+
+                (int)
+                $temporaryUser['id'],
+
+                (int)
+                $temporaryUser['company_id']
+            );
+
+        if (!$user) {
+
+            $this->clearAuthenticationData();
+
+
+            $_SESSION['error'] =
+                'Your account no longer has access.';
+
+
+            $this->redirectToLogin();
+        }
+
+        $role =
+            strtolower(
+                trim(
+                    $user['role']
+                        ?? ''
+                )
+            );
+
+
+        $allowedRoles = [
+            'admin',
+            'manager',
+            'warehouse'
         ];
 
 
-        // Remove temporary OTP data
+        if (
+            !in_array(
+                $role,
+                $allowedRoles,
+                true
+            )
+        ) {
+
+            $this->clearAuthenticationData();
+
+
+            $_SESSION['error'] =
+                'Your account does not have a valid role.';
+
+
+            $this->redirectToLogin();
+        }
+
+        session_regenerate_id(
+            true
+        );
+
+        $_SESSION['user'] = [
+
+            'id' =>
+            (int) $user['id'],
+
+            'company_id' =>
+            (int) $user['company_id'],
+
+            'role_id' =>
+            (int) $user['role_id'],
+
+            'name' =>
+            $user['name'],
+
+            'email' =>
+            $user['email'],
+
+            'role' =>
+            $role
+        ];
+
         unset(
             $_SESSION['otp'],
             $_SESSION['otp_user'],
-            $_SESSION['success']
+            $_SESSION['success'],
+            $_SESSION['error'],
+            $_SESSION['login_alert']
         );
 
+        header(
+            "Location: {$this->baseUrl}/dashboard"
+        );
 
-        // Get role
-        $role = strtolower($user['role']);
+        exit;
+    }
+    public function logout(): void
+    {
+        $this->destroySession();
 
 
-        // Redirect according to role
-        switch ($role) {
-
-            case 'admin':
-                header(
-                    'Location: /finovo-oms-and-wms/public/admin/dashboard'
-                );
-                break;
-
-            case 'manager':
-                header(
-                    'Location: /finovo-oms-and-wms/public/manager/dashboard'
-                );
-                break;
-
-            case 'sales':
-                header('Location: /finovo-oms-and-wms/sales/dashboard');
-                break;
-
-            case 'warehouse':
-                header(
-                    'Location: /finovo-oms-and-wms/public/warehouse/dashboard'
-                );
-                break;
-
-            default:
-
-                $_SESSION = [];
-
-                session_destroy();
-
-                session_start();
-
-                $_SESSION['error'] =
-                    'Your account has an invalid role.';
-
-                header(
-                    'Location: /finovo-oms-and-wms/public/login'
-                );
-
-                break;
-        }
+        header(
+            "Location: {$this->baseUrl}/login"
+        );
 
         exit;
     }
 
+    private function redirectToLogin(): void
+    {
+        header(
+            "Location: {$this->baseUrl}/login"
+        );
 
-    // Logout
-    public function logout()
+        exit;
+    }
+
+    private function clearAuthenticationData(): void
+    {
+        unset(
+            $_SESSION['user'],
+            $_SESSION['otp'],
+            $_SESSION['otp_user'],
+            $_SESSION['success']
+        );
+    }
+
+    private function destroySession(): void
     {
         $_SESSION = [];
 
-        if (ini_get('session.use_cookies')) {
 
-            $params = session_get_cookie_params();
+        if (
+            ini_get(
+                'session.use_cookies'
+            )
+        ) {
+
+            $params =
+                session_get_cookie_params();
+
 
             setcookie(
                 session_name(),
@@ -443,12 +505,7 @@ class AuthController
             );
         }
 
+
         session_destroy();
-
-        header(
-            'Location: /finovo-oms-and-wms/public/login'
-        );
-
-        exit;
     }
 }
