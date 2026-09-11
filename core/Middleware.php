@@ -26,7 +26,7 @@ class Middleware
         if (!in_array($userRole, $allowedRoles, true)) {
 
             http_response_code(403);
--
+
             echo '<h1>403 Forbidden</h1>';
             echo '<p>You do not have permission to access this page.</p>';
 
