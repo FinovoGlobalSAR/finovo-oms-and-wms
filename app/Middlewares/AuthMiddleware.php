@@ -119,7 +119,8 @@ class AuthMiddleware
         $allowedRoles = [
             'admin',
             'manager',
-            'warehouse'
+            'warehouse',
+            'sales'
         ];
 
 

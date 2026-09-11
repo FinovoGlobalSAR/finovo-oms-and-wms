@@ -1,0 +1,50 @@
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 4px 0;
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #d4d4d4, #a8a8a8);
+    border-radius: 50px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    transition: background 0.25s ease, box-shadow 0.25s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #9a9a9a, #6e6e6e);
+    background-clip: padding-box;
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.15);
+}
+
+::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(180deg, #707070, #4a4a4a);
+    background-clip: padding-box;
+}
+
+::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #b0b0b0 transparent;
+}
+
+@media (prefers-color-scheme: dark) {
+    ::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, #5a5a5a, #3a3a3a);
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(180deg, #7a7a7a, #555555);
+    }
+    * {
+        scrollbar-color: #5a5a5a transparent;
+    }
+}
