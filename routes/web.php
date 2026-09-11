@@ -40,8 +40,7 @@ $router->get(
 
 $router->get(
     '/employees',
-    ['EmployeeController', 'index'],
-    ['AuthMiddleware']
+    ['EmployeeController', 'index']
 );
 
 
@@ -93,3 +92,10 @@ $router->post(
     ['OrderController', 'apiCreate'],
     ['AuthMiddleware']
 );
+
+$router->get(
+    '/orders/invoice',
+    ['InvoiceController', 'download'],
+    ['AuthMiddleware']
+);
+

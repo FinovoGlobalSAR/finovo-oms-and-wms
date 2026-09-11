@@ -46,14 +46,17 @@ class AuthController
 
                 if ($validUser) {
 
-                    header(
-                        "Location: {$this->baseUrl}/dashboard"
-                    );
+                    $role =
+                        strtolower(
+                            trim(
+                                $validUser['role']
+                                ?? ''
+                            )
+                        );
 
-                    exit;
+                    $this->redirectByRole($role);
                 }
             }
-
 
 
             unset(
@@ -85,7 +88,7 @@ class AuthController
             strtolower(
                 trim(
                     $_POST['email']
-                        ?? ''
+                    ?? ''
                 )
             );
 
@@ -93,7 +96,6 @@ class AuthController
         $password =
             $_POST['password']
             ?? '';
-
 
 
         if (
@@ -108,7 +110,6 @@ class AuthController
 
             $this->redirectToLogin();
         }
-
 
 
         if (
@@ -166,7 +167,7 @@ class AuthController
             strtolower(
                 trim(
                     $user['status']
-                        ?? ''
+                    ?? ''
                 )
             )
             !==
@@ -185,7 +186,7 @@ class AuthController
             strtolower(
                 trim(
                     $user['role']
-                        ?? ''
+                    ?? ''
                 )
             );
 
@@ -193,7 +194,8 @@ class AuthController
         $allowedRoles = [
             'admin',
             'manager',
-            'warehouse'
+            'warehouse',
+            'sales'
         ];
 
 
@@ -222,6 +224,7 @@ class AuthController
 
         $_SESSION['otp'] =
             (string) $otp;
+
 
         $_SESSION['otp_user'] = [
 
@@ -258,6 +261,7 @@ class AuthController
 
         exit;
     }
+
 
 
     public function showOtp(): void
@@ -298,7 +302,7 @@ class AuthController
         $enteredOtp =
             trim(
                 $_POST['otp']
-                    ?? ''
+                ?? ''
             );
 
 
@@ -345,8 +349,10 @@ class AuthController
             exit;
         }
 
+
         $temporaryUser =
             $_SESSION['otp_user'];
+
 
         $userModel =
             new User();
@@ -363,6 +369,7 @@ class AuthController
                 $temporaryUser['company_id']
             );
 
+
         if (!$user) {
 
             $this->clearAuthenticationData();
@@ -375,11 +382,12 @@ class AuthController
             $this->redirectToLogin();
         }
 
+
         $role =
             strtolower(
                 trim(
                     $user['role']
-                        ?? ''
+                    ?? ''
                 )
             );
 
@@ -387,7 +395,8 @@ class AuthController
         $allowedRoles = [
             'admin',
             'manager',
-            'warehouse'
+            'warehouse',
+            'sales'
         ];
 
 
@@ -409,9 +418,11 @@ class AuthController
             $this->redirectToLogin();
         }
 
+
         session_regenerate_id(
             true
         );
+
 
         $_SESSION['user'] = [
 
@@ -434,6 +445,7 @@ class AuthController
             $role
         ];
 
+
         unset(
             $_SESSION['otp'],
             $_SESSION['otp_user'],
@@ -442,12 +454,12 @@ class AuthController
             $_SESSION['login_alert']
         );
 
-        header(
-            "Location: {$this->baseUrl}/dashboard"
-        );
 
-        exit;
+        $this->redirectByRole($role);
     }
+
+
+
     public function logout(): void
     {
         $this->destroySession();
@@ -460,6 +472,8 @@ class AuthController
         exit;
     }
 
+
+
     private function redirectToLogin(): void
     {
         header(
@@ -468,6 +482,8 @@ class AuthController
 
         exit;
     }
+
+
 
     private function clearAuthenticationData(): void
     {
@@ -478,6 +494,8 @@ class AuthController
             $_SESSION['success']
         );
     }
+
+
 
     private function destroySession(): void
     {
@@ -507,5 +525,45 @@ class AuthController
 
 
         session_destroy();
+    }
+
+
+
+    private function redirectByRole(string $role): void
+    {
+        switch ($role) {
+
+            case 'admin':
+                header(
+                    "Location: {$this->baseUrl}/dashboard"
+                );
+                break;
+
+            case 'manager':
+                header(
+                    "Location: {$this->baseUrl}/manager/dashboard"
+                );
+                break;
+
+            case 'warehouse':
+                header(
+                    "Location: {$this->baseUrl}/warehouse/dashboard"
+                );
+                break;
+
+            case 'sales':
+                header(
+                    "Location: {$this->baseUrl}/sales/dashboard"
+                );
+                break;
+
+            default:
+                header(
+                    "Location: {$this->baseUrl}/dashboard"
+                );
+                break;
+        }
+
+        exit;
     }
 }

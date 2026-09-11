@@ -1,3 +1,4 @@
+
 <?php
 ?>
 
@@ -13,15 +14,18 @@
         content="width=device-width, initial-scale=1.0"
     >
 
+    <link
+        rel="stylesheet"
+        href="/finovo-oms-and-wms/public/css/style.css"
+    >
+
     <title>
         Finovo - Login
     </title>
 
-
     <script
         src="https://cdn.tailwindcss.com"
     ></script>
-
 
     <script
         src="https://unpkg.com/lucide@latest"
@@ -30,47 +34,89 @@
 </head>
 
 
-<body>
+<body class="min-h-screen bg-gray-50">
 
-<div class="flex items-center justify-center p-6">
+
+<div
+    class="min-h-screen
+           flex
+           items-center
+           justify-center
+           px-4
+           py-8
+           md:px-8"
+>
+
 
     <div
-        class="w-full max-w-5xl
+        class="w-full
+               max-w-5xl
+               grid
+               md:grid-cols-2
                items-center
-               rounded-2xl
-               overflow-hidden
-               grid md:grid-cols-2
-               gap-10"
+               gap-8
+               md:gap-12"
     >
 
+
+        <!-- LEFT IMAGE -->
+
         <div
-            class="hidden md:block
-                   relative
-                   min-h-[500px]"
+            class="hidden
+                   md:flex
+                   items-center
+                   justify-center"
         >
 
-            <img
-                src="/finovo-oms-and-wms/assets/images/LoginImg.png"
-                alt="Finovo"
-                class="w-full object-cover"
+            <div
+                class="w-full
+                       max-w-md
+                       overflow-hidden
+                       rounded-3xl"
             >
+
+                <img
+                    src="/finovo-oms-and-wms/assets/images/LoginImg.png"
+                    alt="Finovo"
+                    class="w-full
+                           h-[520px]
+                           object-cover"
+                >
+
+            </div>
 
         </div>
 
+
+
+        <!-- LOGIN CARD -->
+
         <div
-            class="p-8 md:p-10
+            class="w-full
+                   max-w-md
+                   mx-auto
                    bg-white
                    rounded-2xl
-                   border border-gray-200
-                   shadow-lg"
+                   border
+                   border-gray-200
+                   shadow-xl
+                   p-7
+                   sm:p-9
+                   md:p-10"
         >
 
-            <div class="text-center mb-6">
+
+            <!-- HEADER -->
+
+            <div
+                class="text-center
+                       mb-7"
+            >
 
                 <h2
-                    class="text-2xl
+                    class="text-3xl
                            font-bold
-                           text-gray-800"
+                           text-gray-900"
                 >
                     Welcome Back
                 </h2>
@@ -79,24 +125,29 @@
                 <p
                     class="text-sm
                            text-gray-500
-                           mt-1"
+                           mt-2"
                 >
                     Enter your credentials to login
                 </p>
 
             </div>
 
+
+
+            <!-- ERROR MESSAGE -->
+
             <?php if (isset($_SESSION['error'])): ?>
 
                 <div
                     class="bg-red-50
-                           border border-red-200
+                           border
+                           border-red-200
                            text-red-600
                            text-sm
-                           text-center
                            rounded-lg
-                           px-3 py-2
-                           mb-4"
+                           px-4
+                           py-3
+                           mb-5"
                 >
 
                     <?= htmlspecialchars(
@@ -114,17 +165,25 @@
 
             <?php endif; ?>
 
+
+
+            <!-- LOGIN FORM -->
+
             <form
 
                 method="POST"
 
                 action="/finovo-oms-and-wms/public/login"
 
-                class="space-y-4"
+                class="space-y-5"
 
                 autocomplete="off"
 
             >
+
+
+                <!-- HIDDEN FAKE FIELDS -->
+
                 <div
                     style="
                         position: absolute;
@@ -153,6 +212,10 @@
 
                 </div>
 
+
+
+                <!-- EMAIL -->
+
                 <div>
 
                     <label
@@ -161,43 +224,58 @@
                                text-sm
                                font-medium
                                text-gray-700
-                               mb-1"
+                               mb-2"
                     >
                         Email
                     </label>
 
 
-                    <input
+                    <div class="relative">
 
-                        type="email"
+                        <input
 
-                        name="email"
+                            type="email"
 
-                        id="email"
+                            name="email"
 
-                        value=""
+                            id="email"
 
-                        placeholder="mark@example.com"
+                            value=""
 
-                        required
+                            placeholder="mark@example.com"
 
-                        autocomplete="off"
+                            required
 
-                        autocapitalize="none"
+                            autocomplete="off"
 
-                        spellcheck="false"
+                            autocapitalize="none"
 
-                        class="w-full
-                               border border-gray-300
-                               rounded-lg
-                               px-3 py-2
-                               text-sm
-                               focus:outline-none
-                               focus:ring-2
-                               focus:ring-black"
-                    >
+                            spellcheck="false"
+
+                            class="w-full
+                                   border
+                                   border-gray-300
+                                   rounded-xl
+                                   px-4
+                                   py-3
+                                   text-sm
+                                   text-gray-800
+                                   bg-white
+                                   transition
+                                   focus:outline-none
+                                   focus:border-gray-500
+                                   focus:ring-2
+                                   focus:ring-gray-200"
+
+                        >
+
+                    </div>
 
                 </div>
+
+
+
+                <!-- PASSWORD -->
 
                 <div>
 
@@ -206,7 +284,7 @@
                         class="flex
                                items-center
                                justify-between
-                               mb-1"
+                               mb-2"
                     >
 
                         <label
@@ -225,7 +303,8 @@
                             class="text-sm
                                    text-gray-500
                                    hover:text-black
-                                   font-bold"
+                                   font-medium
+                                   transition"
                         >
                             Forgot Password?
                         </a>
@@ -254,14 +333,21 @@
                             autocomplete="new-password"
 
                             class="w-full
-                                   border border-gray-300
-                                   rounded-lg
-                                   px-3 py-2
-                                   pr-10
+                                   border
+                                   border-gray-300
+                                   rounded-xl
+                                   px-4
+                                   py-3
+                                   pr-12
                                    text-sm
+                                   text-gray-800
+                                   bg-white
+                                   transition
                                    focus:outline-none
+                                   focus:border-gray-500
                                    focus:ring-2
-                                   focus:ring-black"
+                                   focus:ring-gray-200"
+
                         >
 
 
@@ -276,10 +362,12 @@
                                    right-3
                                    top-1/2
                                    -translate-y-1/2
-                                   text-gray-500
-                                   hover:text-black"
+                                   text-gray-400
+                                   hover:text-gray-700
+                                   transition"
 
                             aria-label="Show or hide password"
+
                         >
 
                             <i
@@ -290,9 +378,14 @@
 
                         </button>
 
+
                     </div>
 
                 </div>
+
+
+
+                <!-- LOGIN BUTTON -->
 
                 <button
 
@@ -301,20 +394,30 @@
                     class="w-full
                            bg-black
                            text-white
-                           font-medium
-                           rounded-lg
-                           py-2
+                           font-semibold
+                           rounded-xl
+                           py-3
+                           mt-2
                            hover:bg-gray-800
-                           transition"
+                           active:scale-[0.99]
+                           transition
+                           duration-200"
+
                 >
+
                     Login
+
                 </button>
+
 
             </form>
 
+
         </div>
 
+
     </div>
+
 
 </div>
 
@@ -339,7 +442,10 @@
 
     <?php endif; ?>
 
+
     lucide.createIcons();
+
+
 
     function clearLoginFields()
     {
@@ -403,6 +509,8 @@
         }
     );
 
+
+
     function togglePassword()
     {
         const password =
@@ -446,6 +554,7 @@
 
         lucide.createIcons();
     }
+
 
 </script>
 

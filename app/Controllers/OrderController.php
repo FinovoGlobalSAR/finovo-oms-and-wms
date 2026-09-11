@@ -14,6 +14,7 @@ class OrderController extends Controller
 
     public function __construct()
     {
+        parent::__construct();
         $this->orderModel = new Order();
         $this->storeModel = new Store();
     }
@@ -57,18 +58,64 @@ class OrderController extends Controller
 
     public function handleCreate(): void
     {
-        $customer = trim($_POST['customer_name'] ?? '');
-        $product  = trim($_POST['product_name'] ?? '');
-        $quantity = (int) ($_POST['quantity'] ?? 1);
-        $price    = (float) ($_POST['price'] ?? 0);
+        $customerName = trim($_POST['customer_name'] ?? '');
+        $customerEmail = trim($_POST['customer_email'] ?? '');
+        $customerPhone = trim($_POST['customer_phone'] ?? '');
+        $billingAddress = trim($_POST['billing_address'] ?? '');
+        $shippingAddress = trim($_POST['shipping_address'] ?? '');
 
-        if ($customer === '' || $product === '' || $price <= 0) {
-            $this->view('orders/create', ['error' => 'Please fill in all fields correctly.']);
+        $productName = trim($_POST['product_name'] ?? '');
+        $sku = trim($_POST['sku'] ?? '');
+        $variant = trim($_POST['variant'] ?? '');
+        $quantity = max(1, (int) ($_POST['quantity'] ?? 1));
+        $unitPrice = max(0, (float) ($_POST['unit_price'] ?? 0));
+
+        $discount = max(0, (float) ($_POST['discount'] ?? 0));
+        $shippingCost = max(0, (float) ($_POST['shipping_cost'] ?? 0));
+        $tax = max(0, (float) ($_POST['tax'] ?? 0));
+        $paymentMethod = trim($_POST['payment_method'] ?? '');
+        $paymentStatus = trim($_POST['payment_status'] ?? 'Pending');
+
+        if ($customerName === '' || $productName === '' || $unitPrice <= 0) {
+            $this->view('orders/create', [
+                'error' => 'Customer name, product name and unit price are required.'
+            ]);
             return;
         }
 
-        $this->orderModel->create($customer, $product, $quantity, $price);
-        $this->redirect('/orders');
+        if ($customerEmail !== '' && !filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) {
+            $this->view('orders/create', [
+                'error' => 'Please enter a valid customer email.'
+            ]);
+            return;
+        }
+
+        $lineTotal = $quantity * $unitPrice;
+
+        $this->orderModel->create(
+            $customerName,
+            $productName,
+            $quantity,
+            $lineTotal,
+            'manual',
+            [
+                'customer_email' => $customerEmail ?: null,
+                'customer_phone' => $customerPhone ?: null,
+                'billing_address' => $billingAddress ?: null,
+                'shipping_address' => $shippingAddress ?: null,
+                'sku' => $sku ?: null,
+                'variant' => $variant ?: null,
+                'discount' => $discount,
+                'shipping_cost' => $shippingCost,
+                'tax' => $tax,
+                'payment_method' => $paymentMethod ?: null,
+                'payment_status' => in_array($paymentStatus, ['Pending', 'Paid', 'Failed', 'Refunded'], true)
+                    ? $paymentStatus
+                    : 'Pending',
+            ]
+        );
+
+        $this->redirect('/finovo-oms-and-wms/public/index.php/orders');
     }
 
     public function apiCreate(): void
