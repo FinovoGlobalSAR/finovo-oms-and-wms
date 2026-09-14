@@ -109,7 +109,7 @@
     .modal-help { font-size: 13px; color: var(--text-muted); margin-bottom: 14px; }
     .form-group { margin-bottom: 14px; }
     .form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text-dark); }
-    .form-group input[type="text"], .form-group input[type="file"] {
+    .form-group input[type="text"], .form-group input[type="file"], .form-group input[type="number"] {
       width: 100%; border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 10px; font-size: 14px; font-family: 'Inter', sans-serif;
     }
     .form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }

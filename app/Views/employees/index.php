@@ -10,7 +10,7 @@ $old = $old ?? [];
 
 $totalEmployees = count($employees);
 
-$baseUrl = '/finovo-oms-and-wms/public/index.php';
+$baseUrl = '';
 
 function employeeInitials(string $name): string
 {

@@ -4,49 +4,106 @@ $baseUrl = '';
 
 $currentPath = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
+$currentRole = strtolower(trim($_SESSION['user']['role'] ?? ''));
 
 $navigation = [
 
     'Design' => [
-
-
         [
             'label' => 'Dashboard',
             'url'   => '/dashboard',
             'icon'  => 'dashboard',
         ],
-
     ],
 
     'General' => [
-
         [
             'label' => 'Orders',
             'url'   => '/orders',
             'icon'  => 'orders',
+            'roles' => ['admin', 'manager', 'sales staff'],
         ],
-
         [
             'label' => 'Products',
             'url'   => '/products',
             'icon'  => 'inventory',
+            'roles' => ['admin', 'manager', 'warehouse staff'],
         ],
-
+        [
+            'label' => 'Warehouses',
+            'url'   => '/warehouses',
+            'icon'  => 'warehouse',
+            'roles' => ['admin', 'manager', 'warehouse staff'],
+        ],
+        [
+            'label' => 'Shipments',
+            'url'   => '/shipments',
+            'icon'  => 'truck',
+            'roles' => ['admin', 'manager', 'warehouse staff'],
+        ],
+        [
+            'label' => 'Picking',
+            'url'   => '/picking',
+            'icon'  => 'checklist',
+            'roles' => ['admin', 'manager', 'warehouse staff'],
+        ],
+        [
+            'label' => 'Purchase Orders',
+            'url'   => '/purchase-orders',
+            'icon'  => 'clipboard',
+            'roles' => ['admin', 'manager', 'warehouse staff'],
+        ],
+        [
+            'label' => 'Stock Movements',
+            'url'   => '/stock',
+            'icon'  => 'transfer',
+            'roles' => ['admin', 'manager', 'warehouse staff'],
+        ],
+        [
+            'label' => 'Returns',
+            'url'   => '/returns',
+            'icon'  => 'return',
+            'roles' => ['admin', 'manager', 'sales staff'],
+        ],
+        [
+            'label' => 'Customers',
+            'url'   => '/customers',
+            'icon'  => 'users',
+            'roles' => ['admin', 'manager', 'sales staff'],
+        ],
+        [
+            'label' => 'Stores',
+            'url'   => '/stores',
+            'icon'  => 'store',
+            'roles' => ['admin', 'manager'],
+        ],
     ],
 
-
     'Management' => [
-
         [
             'label' => 'Employees',
             'url'   => '/employees',
-            'icon'  => 'users',
+            'icon'  => 'employees',
+            'roles' => ['admin', 'manager'],
         ],
-
-
     ],
 
 ];
+
+// Har item ke liye check karo current role allowed hai ya nahi.
+// Jis item mein 'roles' key hi nahi hai (jaise Dashboard), wo sabko dikhega.
+foreach ($navigation as $section => &$items) {
+    $items = array_filter($items, function ($item) use ($currentRole) {
+        if (!isset($item['roles'])) {
+            return true;
+        }
+        return in_array($currentRole, $item['roles'], true);
+    });
+}
+unset($items);
+
+// Khali ho chuke sections ko hata do
+$navigation = array_filter($navigation, fn($items) => !empty($items));
 
 ?>
 
@@ -77,32 +134,21 @@ $navigation = [
         </div>
     </div>
 
-    <div class="px-3 pt-4">
-        <div class="flex items-center justify-between px-2 mb-2">
-            <span class="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Quick actions</span>
+    <?php if (!empty($_SESSION['user']['name'])): ?>
+        <div class="px-4 pt-3 pb-1">
+            <div class="flex items-center gap-2 px-2 py-2 rounded-lg bg-gray-50">
+                <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-semibold">
+                    <?= strtoupper(substr($_SESSION['user']['name'], 0, 1)) ?>
+                </div>
+                <div class="min-w-0">
+                    <p class="text-xs font-semibold text-gray-900 truncate"><?= htmlspecialchars($_SESSION['user']['name']) ?></p>
+                    <p class="text-[11px] text-gray-500 truncate"><?= htmlspecialchars(ucwords($currentRole)) ?></p>
+                </div>
+            </div>
         </div>
-        <div class="flex items-center gap-1">
-            <button class="flex-1 flex items-center gap-2 px-2.5 py-2 rounded-md text-xs text-gray-600 hover:bg-gray-100">
-                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 12h18M12 3v18" />
-                </svg>
-                New
-            </button>
-            <button class="w-8 h-8 flex items-center justify-center rounded-md text-gray-400 hover:bg-gray-100">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21 21l-4.35-4.35m2.35-5.65a8 8 0 11-16 0 8 8 0 0116 0z" />
-                </svg>
-            </button>
-            <button class="w-8 h-8 flex items-center justify-center rounded-md text-gray-400 hover:bg-gray-100">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 17h5l-1.5-1.5A2 2 0 0118 14v-3a6 6 0 00-12 0v3a2 2 0 01-.5 1.5L4 17h5" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10 21h4" />
-                </svg>
-            </button>
-        </div>
-    </div>
+    <?php endif; ?>
 
-    <nav class="px-3 py-5 overflow-y-auto h-[calc(100vh-145px)]">
+    <nav class="px-3 py-4 overflow-y-auto h-[calc(100vh-190px)]">
 
         <?php foreach ($navigation as $section => $items): ?>
 
@@ -120,60 +166,85 @@ $navigation = [
                         $url = $item['url'];
                         $fullUrl = $url === '#' ? '#' : $baseUrl . $url;
                         $isActive = $url !== '#' && str_ends_with($currentPath, $url);
+                        $iconColor = $isActive ? 'text-gray-700' : 'text-gray-400';
                         ?>
 
                         <a href="<?= htmlspecialchars($fullUrl) ?>" class="flex items-center justify-between px-2.5 py-2 rounded-md text-[13px] transition <?= $isActive ? 'bg-gray-100 text-gray-900 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' ?>">
 
                             <div class="flex items-center gap-2.5">
 
-                                <?php if ($item['icon'] === 'home'): ?>
-                                    <svg class="w-4 h-4 <?= $isActive ? 'text-gray-700' : 'text-gray-400' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 12l9-9 9 9M5 10v10h14V10" />
-                                    </svg>
-                                <?php elseif ($item['icon'] === 'dashboard'): ?>
-                                    <svg class="w-4 h-4 <?= $isActive ? 'text-gray-700' : 'text-gray-400' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <?php if ($item['icon'] === 'dashboard'): ?>
+                                    <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" />
                                     </svg>
-                                <?php elseif ($item['icon'] === 'notification'): ?>
-                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 17h5l-1.5-1.5A2 2 0 0118 14v-3a6 6 0 00-12 0v3a2 2 0 01-.5 1.5L4 17h5" />
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10 21h4" />
+
+                                <?php elseif ($item['icon'] === 'orders'): ?>
+                                    <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 6h16v14H4zM8 6V4h8v2M8 10h8M8 14h5" />
                                     </svg>
-                                <?php elseif ($item['icon'] === 'settings'): ?>
-                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z" />
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1-1.8 1.8-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V20h-2.5v-.1a1.7 1.7 0 00-1-1.5 1.7 1.7 0 00-1.9.3l-.1.1-1.8-1.8.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H6v-2.5h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1L9 6.7l.1.1a1.7 1.7 0 001.9.3 1.7 1.7 0 001-1.5V5h2.5v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1 1.8 1.8-.1.1a1.7 1.7 0 00-.3 1.9 1.7 1.7 0 001.5 1h.1v2.5h-.1a1.7 1.7 0 00-1.5 1z" />
+
+                                <?php elseif ($item['icon'] === 'inventory'): ?>
+                                    <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 7h16v13H4zM8 7V4h8v3M8 11h8M8 15h5" />
                                     </svg>
+
+                                <?php elseif ($item['icon'] === 'warehouse'): ?>
+                                    <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 21V9l9-6 9 6v12M3 21h18M9 21v-6h6v6" />
+                                    </svg>
+
+                                <?php elseif ($item['icon'] === 'truck'): ?>
+                                    <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" />
+                                        <circle cx="7" cy="18" r="1.6" stroke="currentColor" stroke-width="1.8" fill="none" />
+                                        <circle cx="17.5" cy="18" r="1.6" stroke="currentColor" stroke-width="1.8" fill="none" />
+                                    </svg>
+
+                                <?php elseif ($item['icon'] === 'checklist'): ?>
+                                    <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 11l2 2 4-4M5 5h14v14H5z" />
+                                    </svg>
+
+                                <?php elseif ($item['icon'] === 'clipboard'): ?>
+                                    <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 4h6a1 1 0 011 1v1H8V5a1 1 0 011-1zM6 6h12v14H6z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6M9 16h4" />
+                                    </svg>
+
+                                <?php elseif ($item['icon'] === 'transfer'): ?>
+                                    <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 7h11l-3-3M17 17H6l3 3" />
+                                    </svg>
+
+                                <?php elseif ($item['icon'] === 'return'): ?>
+                                    <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 14l-4-4 4-4M5 10h9a5 5 0 015 5v1" />
+                                    </svg>
+
+                                <?php elseif ($item['icon'] === 'store'): ?>
+                                    <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 9l1-5h14l1 5M4 9v11h16V9M4 9a2 2 0 004 0 2 2 0 004 0 2 2 0 004 0 2 2 0 004 0" />
+                                    </svg>
+
+                                <?php elseif ($item['icon'] === 'employees'): ?>
+                                    <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 20v-2a4 4 0 00-3-3.87M13 3.13a4 4 0 010 7.75" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M11 20v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                                        <circle cx="7" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="1.8" />
+                                    </svg>
+
                                 <?php elseif ($item['icon'] === 'users'): ?>
-                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" />
                                         <circle cx="9" cy="7" r="4" fill="none" stroke="currentColor" stroke-width="1.8" />
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
                                     </svg>
-                                <?php elseif ($item['icon'] === 'orders'): ?>
-                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 6h16v14H4zM8 6V4h8v2M8 10h8M8 14h5" />
-                                    </svg>
-                                <?php elseif ($item['icon'] === 'inventory'): ?>
-                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 7h16v13H4zM8 7V4h8v3M8 11h8M8 15h5" />
-                                    </svg>
-                                <?php elseif ($item['icon'] === 'reports'): ?>
-                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 19V5M4 19h16" />
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 16v-5M12 16V8M16 16v-7" />
-                                    </svg>
+
                                 <?php endif; ?>
 
                                 <span><?= htmlspecialchars($item['label']) ?></span>
 
                             </div>
-
-                            <?php if (isset($item['badge'])): ?>
-                                <span class="min-w-5 h-5 px-1.5 flex items-center justify-center rounded-full bg-gray-100 text-[10px] font-medium text-gray-500">
-                                    <?= htmlspecialchars($item['badge']) ?>
-                                </span>
-                            <?php endif; ?>
 
                         </a>
 
@@ -187,7 +258,7 @@ $navigation = [
 
         <div class="pt-2">
             <p class="px-2 mb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Account</p>
-            <a href="#" class="flex items-center gap-2.5 px-2.5 py-2 rounded-md text-[13px] text-gray-600 hover:bg-gray-50 hover:text-gray-900">
+            <a href="#" onclick="if(confirm('Are you sure you want to logout?')){window.location.href='/logout';} return false;" class="flex items-center gap-2.5 px-2.5 py-2 rounded-md text-[13px] text-gray-600 hover:bg-gray-50 hover:text-gray-900">
                 <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 16l4-4m0 0l-4-4m4 4H7" />
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13 5H5a2 2 0 00-2 2v10a2 2 0 002 2h8" />

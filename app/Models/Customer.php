@@ -10,7 +10,6 @@ class Customer extends Model
         return $stmt->fetchAll();
     }
 
-    // Agar customer pehle se hai (naam se match), wahi use karo — warna naya banao
     public function findOrCreate(int $storeId, string $name, ?string $email = null, ?string $externalId = null): int
     {
         if ($externalId) {

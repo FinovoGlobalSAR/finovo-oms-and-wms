@@ -1,151 +1,42 @@
 <?php
-
 require_once __DIR__ . '/../../core/Model.php';
 
 class Role extends Model
 {
-    /*
-    |--------------------------------------------------------------------------
-    | Get company roles
-    |--------------------------------------------------------------------------
-    */
-    public function allByCompany(int $companyId): array
+    // Employee form ke dropdown mein SIRF ye 4 role dikhenge — kitni bhi junk roles
+    // database mein pehle se hon, unhe ye method ignore kar deta hai.
+    public function all(): array
     {
-        return $this->query(
-            "
-            SELECT
-                id,
-                company_id,
-                name,
-                created_at
-            FROM roles
-            WHERE company_id = :company_id
-            ORDER BY name ASC
-            ",
-            [
-                'company_id' => $companyId
-            ]
-        )->fetchAll(PDO::FETCH_ASSOC);
+        $stmt = $this->query(
+            "SELECT id, name, created_at FROM roles
+             WHERE name IN ('Admin', 'Manager', 'Sales Staff', 'Warehouse Staff')
+             ORDER BY FIELD(name, 'Admin', 'Manager', 'Sales Staff', 'Warehouse Staff')"
+        );
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Check role belongs to current company
-    |--------------------------------------------------------------------------
-    */
-    public function belongsToCompany(
-        int $roleId,
-        int $companyId
-    ): bool {
-
+    public function exists(int $roleId): bool
+    {
         $role = $this->query(
-            "
-            SELECT id
-            FROM roles
-            WHERE id = :id
-            AND company_id = :company_id
-            LIMIT 1
-            ",
-            [
-                'id' => $roleId,
-                'company_id' => $companyId
-            ]
+            "SELECT id FROM roles WHERE id = :id LIMIT 1",
+            ['id' => $roleId]
         )->fetch(PDO::FETCH_ASSOC);
 
         return (bool) $role;
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Temporary default company + roles
-    |--------------------------------------------------------------------------
-    */
-    public function ensureDefaultSetup(int $companyId): void
+    public function ensureDefaultSetup(): void
     {
-        /*
-         * Check company exists.
-         */
-        $company = $this->query(
-            "
-            SELECT id
-            FROM companies
-            WHERE id = :id
-            LIMIT 1
-            ",
-            [
-                'id' => $companyId
-            ]
-        )->fetch(PDO::FETCH_ASSOC);
-
-        /*
-         * Temporary company until proper auth/company creation exists.
-         */
-        if (!$company) {
-
-            $this->query(
-                "
-                INSERT INTO companies (
-                    id,
-                    name,
-                    status
-                )
-                VALUES (
-                    :id,
-                    :name,
-                    'active'
-                )
-                ",
-                [
-                    'id' => $companyId,
-                    'name' => 'Finovo'
-                ]
-            );
-        }
-
-        /*
-         * Default roles.
-         */
-        $defaultRoles = [
-            'Admin',
-            'Manager',
-            'Sales',
-            'Warehouse'
-        ];
+        $defaultRoles = ['Admin', 'Manager', 'Sales Staff', 'Warehouse Staff'];
 
         foreach ($defaultRoles as $roleName) {
-
             $existingRole = $this->query(
-                "
-                SELECT id
-                FROM roles
-                WHERE company_id = :company_id
-                AND name = :name
-                LIMIT 1
-                ",
-                [
-                    'company_id' => $companyId,
-                    'name' => $roleName
-                ]
+                "SELECT id FROM roles WHERE name = :name LIMIT 1",
+                ['name' => $roleName]
             )->fetch(PDO::FETCH_ASSOC);
 
             if (!$existingRole) {
-
-                $this->query(
-                    "
-                    INSERT INTO roles (
-                        company_id,
-                        name
-                    )
-                    VALUES (
-                        :company_id,
-                        :name
-                    )
-                    ",
-                    [
-                        'company_id' => $companyId,
-                        'name' => $roleName
-                    ]
-                );
+                $this->query("INSERT INTO roles (name) VALUES (:name)", ['name' => $roleName]);
             }
         }
     }

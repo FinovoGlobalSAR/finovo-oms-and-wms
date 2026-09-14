@@ -1,11 +1,11 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
 session_start();
 
 require_once __DIR__ . '/../core/Router.php';
 require_once __DIR__ . '/../core/Database.php';
-require_once __DIR__ . '/../app/Models/User.php';
-require_once __DIR__ . '/../app/Controllers/AuthController.php';
 
 $router = new Router();
 require_once __DIR__ . '/../routes/web.php';
@@ -18,7 +18,6 @@ if (str_starts_with($requestUri, $basePath)) {
     $requestUri = substr($requestUri, strlen($basePath));
 }
 
-// Remove index.php from URI
 $requestUri = preg_replace('#^/index\.php#', '', $requestUri);
 
 $requestUri = $requestUri ?: '/';
