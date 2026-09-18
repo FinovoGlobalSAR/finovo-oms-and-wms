@@ -175,7 +175,7 @@ function statCard(string $label, string $value, string $icon, string $color): st
                         <td><?= htmlspecialchars($o['customer_name'] ?? '-') ?></td>
                         <td><?= htmlspecialchars($o['product_name'] ?? '-') ?></td>
                         <td><?= (int) $o['quantity'] ?></td>
-                        <td>Rs. <?= number_format((float) $o['price'], 2) ?></td>
+                        <td><?= $o['currency_symbol'] ?? 'Rs.' ?> <?= number_format((float) $o['price'], 2) ?></td>
                         <td>
                             <span class="source-badge" style="background:<?= $statusColor['bg'] ?>; color:<?= $statusColor['text'] ?>;">
                                 <?= htmlspecialchars(ucfirst($statusKey)) ?>

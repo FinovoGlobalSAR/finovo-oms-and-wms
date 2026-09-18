@@ -11,6 +11,7 @@ class CustomerController extends Controller
     {
         parent::__construct();
         $this->requireRole(['admin', 'manager', 'sales staff']);
+        $this->requireStoreContext();
         $this->productModel = new Product();
     }
 

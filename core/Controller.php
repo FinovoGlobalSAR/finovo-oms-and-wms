@@ -25,7 +25,6 @@ abstract class Controller
         exit;
     }
 
-    // Abhi jo store "active"/selected hai — sab controllers isi ko use karenge
     protected function getCurrentStore(): array
     {
         require_once __DIR__ . '/../app/Models/Store.php';
@@ -43,7 +42,6 @@ abstract class Controller
         return $store;
     }
 
-    // Logged in nahi hai to /login pe bhej do
     protected function requireLogin(): void
     {
         if (empty($_SESSION['user']['id'])) {
@@ -53,8 +51,6 @@ abstract class Controller
         }
     }
 
-    // Login zaroori hai, aur role bhi allowed list mein hona chahiye
-    // Example: $this->requireRole(['admin', 'manager']);
     protected function requireRole(array $allowedRoles): void
     {
         $this->requireLogin();
@@ -65,6 +61,20 @@ abstract class Controller
         if (!in_array($role, $allowed, true)) {
             $_SESSION['error'] = 'You do not have permission to access that page.';
             header('Location: /dashboard');
+            exit;
+        }
+    }
+
+    // Naya: Orders/Products/Shipments waghera pages sirf tabhi khulenge
+    // jab user ne kisi store pe "Manage" dabaya ho. Bina isk, direct URL
+    // se bhi block ho jayega, sirf sidebar chhupana kaafi nahi hai.
+    protected function requireStoreContext(): void
+    {
+        $this->requireLogin();
+
+        if (empty($_SESSION['store_context_active'])) {
+            $_SESSION['error'] = 'Please select a store to manage first.';
+            header('Location: /stores');
             exit;
         }
     }

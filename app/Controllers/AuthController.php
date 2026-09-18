@@ -102,7 +102,7 @@ class AuthController
 
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $_SESSION['error'] = 'Please enter a valid email address.';
-            header('Location: /forgot-password');
+            header('Location: /forgot-password?email=' . urlencode($email));
             exit;
         }
 
@@ -110,8 +110,8 @@ class AuthController
         $user = $userModel->findByEmail($email);
 
         if (!$user) {
-            $_SESSION['success'] = 'If that email exists, a reset code has been sent.';
-            header('Location: /forgot-password');
+            $_SESSION['error'] = 'No account found with this email address.';
+            header('Location: /forgot-password?email=' . urlencode($email));
             exit;
         }
 
@@ -124,7 +124,7 @@ class AuthController
 
         if (!$sent) {
             $_SESSION['error'] = 'Could not send reset email. Please check SMTP settings or try again later.';
-            header('Location: /forgot-password');
+            header('Location: /forgot-password?email=' . urlencode($email));
             exit;
         }
 
@@ -147,8 +147,6 @@ class AuthController
             exit;
         }
 
-        // Agar OTP abhi verify nahi hua, sirf OTP form dikhao.
-        // Verify ho chuka hai to new password form dikhao.
         $otpVerified = !empty($_SESSION['reset_otp_verified']);
 
         require __DIR__ . '/../Views/auth/reset-password.php';
@@ -179,7 +177,6 @@ class AuthController
             exit;
         }
 
-        // OTP sahi hai — ab naya password set karne ka page dikhega.
         $_SESSION['reset_otp_verified'] = true;
         header('Location: /reset-password');
         exit;

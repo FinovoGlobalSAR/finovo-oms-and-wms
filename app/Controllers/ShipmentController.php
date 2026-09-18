@@ -11,6 +11,7 @@ class ShipmentController extends Controller
     {
         parent::__construct();
         $this->requireRole(['admin', 'manager', 'warehouse staff']);
+        $this->requireStoreContext();
         $this->shipmentModel = new Shipment();
     }
 

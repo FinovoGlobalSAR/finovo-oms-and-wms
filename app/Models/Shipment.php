@@ -31,14 +31,23 @@ class Shipment extends Model
 
     public function create(int $storeId, string $courierName, ?string $trackingNumber, ?string $notes): int
     {
+        if (!$trackingNumber) {
+            $trackingNumber = $this->generateTrackingNumber();
+        }
+
         $this->query(
             "INSERT INTO shipments (store_id, courier_name, tracking_number, notes) VALUES (?, ?, ?, ?)",
-            [$storeId, $courierName, $trackingNumber ?: null, $notes ?: null]
+            [$storeId, $courierName, $trackingNumber, $notes ?: null]
         );
         return (int) $this->db->lastInsertId();
     }
 
-    // "Shippable units" — orders/order-groups not yet attached to any shipment
+    public function generateTrackingNumber(): string
+    {
+        return 'FIN-' . date('Ymd') . '-' . strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
+    }
+
+    // Sirf wo orders yahan aayenge jo Picking page se "Packed" mark ho chuke hain.
     public function unassignedOrderUnits(int $storeId): array
     {
         $stmt = $this->query(
@@ -47,7 +56,7 @@ class Shipment extends Model
                     COUNT(*) as item_count,
                     GROUP_CONCAT(product_name SEPARATOR ', ') as products
              FROM orders
-             WHERE store_id = ? AND shipment_id IS NULL
+             WHERE store_id = ? AND shipment_id IS NULL AND picking_status = 'packed'
              GROUP BY unit_key
              ORDER BY first_id DESC",
             [$storeId]

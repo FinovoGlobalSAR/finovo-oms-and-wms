@@ -10,6 +10,7 @@ class SupplierController extends Controller
     {
         parent::__construct();
         $this->requireRole(['admin', 'manager', 'warehouse staff']);
+        $this->requireStoreContext();
         $this->supplierModel = new Supplier();
     }
 

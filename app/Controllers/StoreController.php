@@ -29,6 +29,7 @@ class StoreController extends Controller
             'stores' => $stores,
             'allWarehouses' => $this->warehouseModel->all(),
             'currentStoreId' => $this->getCurrentStore()['id'],
+            'storeContextActive' => !empty($_SESSION['store_context_active']),
             'created' => $_GET['created'] ?? null,
             'updated' => $_GET['updated'] ?? null,
             'deleted' => $_GET['deleted'] ?? null,
@@ -44,6 +45,9 @@ class StoreController extends Controller
         $wcStoreUrl = trim($_POST['woocommerce_store_url'] ?? '');
         $wcConsumerKey = trim($_POST['woocommerce_consumer_key'] ?? '');
         $wcConsumerSecret = trim($_POST['woocommerce_consumer_secret'] ?? '');
+        $bridgeUrl = trim($_POST['bridge_url'] ?? '');
+        $bridgeApiKey = trim($_POST['bridge_api_key'] ?? '');
+        $bridgeSharedSecret = trim($_POST['bridge_shared_secret'] ?? '');
         $warehouseIds = array_map('intval', $_POST['warehouse_ids'] ?? []);
 
         if ($name === '') {
@@ -55,6 +59,10 @@ class StoreController extends Controller
 
         if ($wcStoreUrl !== '' || $wcConsumerKey !== '' || $wcConsumerSecret !== '') {
             $this->storeModel->updateWooCommerceCredentials($storeId, $wcStoreUrl, $wcConsumerKey, $wcConsumerSecret);
+        }
+
+        if ($bridgeUrl !== '') {
+            $this->storeModel->updateBridgeCredentials($storeId, $bridgeUrl, $bridgeApiKey, $bridgeSharedSecret);
         }
 
         foreach ($warehouseIds as $index => $warehouseId) {
@@ -74,6 +82,9 @@ class StoreController extends Controller
         $wcStoreUrl = trim($_POST['woocommerce_store_url'] ?? '');
         $wcConsumerKey = trim($_POST['woocommerce_consumer_key'] ?? '');
         $wcConsumerSecret = trim($_POST['woocommerce_consumer_secret'] ?? '');
+        $bridgeUrl = trim($_POST['bridge_url'] ?? '');
+        $bridgeApiKey = trim($_POST['bridge_api_key'] ?? '');
+        $bridgeSharedSecret = trim($_POST['bridge_shared_secret'] ?? '');
         $warehouseIds = array_map('intval', $_POST['warehouse_ids'] ?? []);
 
         if ($id <= 0 || $name === '' || !$this->storeModel->find($id)) {
@@ -83,6 +94,7 @@ class StoreController extends Controller
 
         $this->storeModel->update($id, $name, $platform, $storeUrl ?: null);
         $this->storeModel->updateWooCommerceCredentials($id, $wcStoreUrl, $wcConsumerKey, $wcConsumerSecret);
+        $this->storeModel->updateBridgeCredentials($id, $bridgeUrl, $bridgeApiKey, $bridgeSharedSecret);
 
         $current = $this->warehouseModel->allByStore($id);
         $currentIds = array_map(fn($w) => (int) $w['id'], $current);
@@ -118,7 +130,7 @@ class StoreController extends Controller
         $this->storeModel->delete($id);
 
         if (($_SESSION['current_store_id'] ?? null) == $id) {
-            unset($_SESSION['current_store_id']);
+            unset($_SESSION['current_store_id'], $_SESSION['store_context_active']);
         }
 
         $this->redirect('/stores?deleted=1');
@@ -131,5 +143,26 @@ class StoreController extends Controller
             $_SESSION['current_store_id'] = $id;
         }
         $this->redirect($_GET['redirect'] ?? '/orders');
+    }
+
+    public function manage(): void
+    {
+        $id = (int) ($_GET['store_id'] ?? 0);
+
+        if ($id <= 0 || !$this->storeModel->find($id)) {
+            $this->redirect('/stores?error=' . urlencode('Store not found.'));
+            return;
+        }
+
+        $_SESSION['current_store_id'] = $id;
+        $_SESSION['store_context_active'] = true;
+
+        $this->redirect('/dashboard');
+    }
+
+    public function exitManagement(): void
+    {
+        unset($_SESSION['store_context_active']);
+        $this->redirect('/dashboard');
     }
 }

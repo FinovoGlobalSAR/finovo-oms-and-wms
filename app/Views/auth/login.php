@@ -11,13 +11,11 @@
 <body class="min-h-screen bg-white">
 <div class="min-h-screen lg:h-screen flex">
 
-    <!-- Left panel: banner image (hidden on small screens) -->
     <div class="hidden lg:block h-full relative bg-black overflow-hidden lg:aspect-[696/1429]">
         <img src="/assets/images/LoginImg.png" alt="Finovo"
              class="absolute inset-0 w-full h-full object-cover">
     </div>
 
-    <!-- Right panel: login form -->
     <div class="w-full lg:flex-1 flex items-center justify-center px-4 py-8 md:px-8">
         <div class="w-full max-w-md mx-auto bg-white rounded-2xl border border-gray-200 shadow-xl p-7 sm:p-9 md:p-10">
             <div class="text-center mb-7">
@@ -44,7 +42,7 @@
                 <div>
                     <div class="flex items-center justify-between mb-2">
                         <label for="password" class="block text-sm font-medium text-gray-800">Password</label>
-                        <a href="/forgot-password" class="text-sm text-gray-500 hover:text-black transition">Forgot password?</a>
+                        <a href="/forgot-password" id="forgotPasswordLink" class="text-sm text-gray-500 hover:text-black transition">Forgot password?</a>
                     </div>
                     <div class="relative">
                         <input type="password" name="password" id="password" placeholder="Password" required autocomplete="new-password"
@@ -81,6 +79,18 @@
             eyeIcon.setAttribute('data-lucide', 'eye-off');
         }
         lucide.createIcons();
+    }
+
+    const forgotPasswordLink = document.getElementById('forgotPasswordLink');
+    const emailInput = document.getElementById('email');
+
+    if (forgotPasswordLink && emailInput) {
+        forgotPasswordLink.addEventListener('click', function (e) {
+            const email = emailInput.value.trim();
+            if (email) {
+                forgotPasswordLink.href = '/forgot-password?email=' + encodeURIComponent(email);
+            }
+        });
     }
 </script>
 </body>

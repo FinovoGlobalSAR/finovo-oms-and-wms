@@ -131,6 +131,14 @@
         </main>
 
     </div>
+    <script>
+      document.querySelectorAll('.breadcrumb').forEach(function (el) {
+      el.innerHTML = el.innerHTML.replace(
+          /^Finovo/,
+          '<a href="/dashboard" style="color:inherit; text-decoration:none;" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">Finovo</a>'
+        );
+      });
+    </script>
 
 </body>
 </html>

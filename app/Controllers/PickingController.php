@@ -8,6 +8,7 @@ class PickingController extends Controller
     {
         parent::__construct();
         $this->requireRole(['admin', 'manager', 'warehouse staff']);
+        $this->requireStoreContext();
     }
 
     public function index(): void

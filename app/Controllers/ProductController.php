@@ -6,6 +6,7 @@ require_once __DIR__ . '/../Models/Product.php';
 require_once __DIR__ . '/../Models/Store.php';
 require_once __DIR__ . '/../Models/Warehouse.php';
 require_once __DIR__ . '/../Models/ProductVariant.php';
+require_once __DIR__ . '/../Services/IntegrationErrorService.php';
 
 class ProductController extends Controller
 {
@@ -13,15 +14,18 @@ class ProductController extends Controller
     private Store $storeModel;
     private Warehouse $warehouseModel;
     private ProductVariant $variantModel;
+    private IntegrationErrorService $errorService;
 
     public function __construct()
     {
         parent::__construct();
         $this->requireRole(['admin', 'manager', 'warehouse staff']);
+        $this->requireStoreContext();
         $this->productModel = new Product();
         $this->storeModel = new Store();
         $this->warehouseModel = new Warehouse();
         $this->variantModel = new ProductVariant();
+        $this->errorService = new IntegrationErrorService();
     }
 
     public function index(): void
@@ -213,6 +217,8 @@ class ProductController extends Controller
         curl_close($ch);
 
         if ($httpCode !== 200) {
+            $this->errorService->logFailure((int) $store['id'], 'shopify', 'sync_products', null, null, $httpCode, $response ?: 'No response');
+            $this->storeModel->markUnhealthy((int) $store['id'], "Shopify API error (HTTP {$httpCode})");
             $this->redirect('/products?error=' . urlencode("Shopify API error (HTTP {$httpCode})."));
             return;
         }
@@ -280,6 +286,7 @@ class ProductController extends Controller
             }
         }
 
+        $this->storeModel->markHealthy((int) $store['id']);
         $this->redirect('/products?synced=' . $importedCount);
     }
 
@@ -330,9 +337,14 @@ class ProductController extends Controller
         curl_close($ch);
 
         if ($httpCode !== 201) {
+            $this->errorService->logFailure((int) $store['id'], 'shopify', 'export_product', null, (string) $id, $httpCode, $response ?: 'No response');
+            $this->storeModel->markUnhealthy((int) $store['id'], "Shopify export failed (HTTP {$httpCode})");
             $this->redirect('/products?error=' . urlencode("Shopify export failed (HTTP {$httpCode})."));
             return;
         }
+
+        $this->errorService->markResolved((int) $store['id'], 'shopify', 'export_product', (string) $id);
+        $this->storeModel->markHealthy((int) $store['id']);
 
         $data = json_decode($response, true);
         $externalId = (string) ($data['product']['id'] ?? '');
@@ -361,6 +373,18 @@ class ProductController extends Controller
         $baseUrl = rtrim($store['woocommerce_store_url'], '/');
         $auth = $store['woocommerce_consumer_key'] . ':' . $store['woocommerce_consumer_secret'];
 
+        $fixImageProtocol = function (?string $url) use ($baseUrl): ?string {
+            if (!$url) {
+                return null;
+            }
+            $baseScheme = parse_url($baseUrl, PHP_URL_SCHEME) ?: 'http';
+            $urlScheme = parse_url($url, PHP_URL_SCHEME);
+            if ($urlScheme && $urlScheme !== $baseScheme) {
+                $url = preg_replace('#^https?://#', $baseScheme . '://', $url);
+            }
+            return $url;
+        };
+
         $apiUrl = $baseUrl . '/wp-json/wc/v3/products?per_page=50';
 
         $ch = curl_init($apiUrl);
@@ -373,6 +397,8 @@ class ProductController extends Controller
         curl_close($ch);
 
         if ($httpCode !== 200) {
+            $this->errorService->logFailure((int) $store['id'], 'woocommerce', 'sync_products', null, null, $httpCode, $response ?: 'No response');
+            $this->storeModel->markUnhealthy((int) $store['id'], "WooCommerce API error (HTTP {$httpCode})");
             $this->redirect('/products?error=' . urlencode("WooCommerce API error (HTTP {$httpCode}): " . $response));
             return;
         }
@@ -382,7 +408,7 @@ class ProductController extends Controller
 
         foreach ($wcProducts as $wp) {
             $externalId = (string) $wp['id'];
-            $imageUrl = $wp['images'][0]['src'] ?? null;
+            $imageUrl = $fixImageProtocol($wp['images'][0]['src'] ?? null);
 
             $check = $db->prepare("SELECT id FROM products WHERE store_id = ? AND external_wc_product_id = ?");
             $check->execute([$store['id'], $externalId]);
@@ -423,7 +449,7 @@ class ProductController extends Controller
                     $labelParts = array_column($attrs, 'option');
                     $label = implode(' / ', $labelParts) ?: 'Variant';
                     $attributeNames = implode(', ', array_column($attrs, 'name'));
-                    $variantImage = $variation['image']['src'] ?? $imageUrl;
+                    $variantImage = $fixImageProtocol($variation['image']['src'] ?? null) ?? $imageUrl;
 
                     $variantId = $this->variantModel->findOrCreate(
                         $productId,
@@ -445,6 +471,64 @@ class ProductController extends Controller
             }
         }
 
+        $this->storeModel->markHealthy((int) $store['id']);
+        $this->redirect('/products?synced=' . $importedCount);
+    }
+
+    // ---------- Custom Bridge: Products Pull ----------
+
+    public function syncCustomBridge(): void
+    {
+        $store = $this->getCurrentStore();
+        $defaultWarehouse = $this->warehouseModel->getDefault($store['id']);
+
+        if (empty($store['bridge_url']) || empty($store['bridge_api_key']) || empty($store['bridge_shared_secret'])) {
+            $this->redirect('/products?error=' . urlencode('Please save this store\'s Custom Bridge credentials first.'));
+            return;
+        }
+
+        require_once __DIR__ . '/../../app/Connectors/BridgeConnector.php';
+        $connector = new BridgeConnector($store['bridge_url'], $store['bridge_api_key'], $store['bridge_shared_secret']);
+
+        // Pehle connection test karo — agar bridge hi reachable nahi hai, to error log karke rok do
+        $testResult = $connector->testConnection();
+
+        if (!$testResult['ok']) {
+            $this->errorService->logFailure((int) $store['id'], 'custom_bridge', 'sync_products', null, null, 0, $testResult['message']);
+            $this->storeModel->markUnhealthy((int) $store['id'], $testResult['message']);
+            $this->redirect('/products?error=' . urlencode($testResult['message']));
+            return;
+        }
+
+        $products = $connector->fetchProducts();
+        $db = Database::getConnection();
+        $importedCount = 0;
+
+        foreach ($products as $p) {
+            $externalId = (string) ($p['id'] ?? '');
+            if ($externalId === '') continue;
+
+            $check = $db->prepare("SELECT id FROM products WHERE store_id = ? AND external_product_id = ?");
+            $check->execute([$store['id'], $externalId]);
+            $existing = $check->fetch();
+
+            if (!$existing) {
+                $name = $p['name'] ?? 'Unknown product';
+                $price = (float) ($p['price'] ?? 0);
+                $sku = $p['sku'] ?? null;
+
+                $stmt = $db->prepare("INSERT INTO products (store_id, name, sku, price, external_product_id) VALUES (?, ?, ?, ?, ?)");
+                $stmt->execute([$store['id'], $name, $sku, $price, $externalId]);
+                $productId = (int) $db->lastInsertId();
+                $importedCount++;
+
+                $stock = (int) ($p['stock_quantity'] ?? 0);
+                $this->productModel->setWarehouseStock($productId, $defaultWarehouse['id'], $stock);
+            }
+        }
+
+        $this->errorService->markResolved((int) $store['id'], 'custom_bridge', 'sync_products', null);
+        $this->storeModel->markHealthy((int) $store['id']);
         $this->redirect('/products?synced=' . $importedCount);
     }
 
@@ -495,9 +579,14 @@ class ProductController extends Controller
         curl_close($ch);
 
         if ($httpCode !== 201) {
+            $this->errorService->logFailure((int) $store['id'], 'woocommerce', 'export_product', null, (string) $id, $httpCode, $response ?: 'No response');
+            $this->storeModel->markUnhealthy((int) $store['id'], "WooCommerce export failed (HTTP {$httpCode})");
             $this->redirect('/products?error=' . urlencode("WooCommerce export failed (HTTP {$httpCode}): " . $response));
             return;
         }
+
+        $this->errorService->markResolved((int) $store['id'], 'woocommerce', 'export_product', (string) $id);
+        $this->storeModel->markHealthy((int) $store['id']);
 
         $data = json_decode($response, true);
         $externalId = (string) ($data['id'] ?? '');

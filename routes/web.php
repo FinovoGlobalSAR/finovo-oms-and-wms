@@ -63,6 +63,8 @@ $router->post('/stores/create', ['StoreController', 'create']);
 $router->post('/stores/update', ['StoreController', 'update']);
 $router->post('/stores/delete', ['StoreController', 'delete']);
 $router->get('/stores/switch', ['StoreController', 'switchStore']);
+$router->get('/stores/manage', ['StoreController', 'manage']);
+$router->get('/stores/exit-management', ['StoreController', 'exitManagement']);
 
 $router->get('/shipments', ['ShipmentController', 'index']);
 $router->post('/shipments/create', ['ShipmentController', 'create']);
@@ -89,3 +91,28 @@ $router->get('/customers/view', ['CustomerController', 'show']);
 
 $router->get('/picking', ['PickingController', 'index']);
 $router->post('/picking/update-status', ['PickingController', 'updateStatus']);
+
+$router->post('/webhooks/shopify', ['WebhookController', 'shopify']);
+$router->post('/webhooks/woocommerce', ['WebhookController', 'woocommerce']);
+
+$router->get('/integration-errors', ['IntegrationErrorController', 'index']);
+$router->post('/integration-errors/resolve', ['IntegrationErrorController', 'resolve']);
+
+$router->get('/sku-mappings', ['SkuMappingController', 'index']);
+$router->post('/sku-mappings/create', ['SkuMappingController', 'create']);
+
+$router->get('/audit-log', ['AuditLogController', 'index']);
+
+$router->post('/orders/test-shopify-connection', ['OrderController', 'testShopifyConnection']);
+$router->post('/orders/test-woocommerce-connection', ['OrderController', 'testWooCommerceConnection']);
+
+$router->get('/products/sync-custom-bridge', ['ProductController', 'syncCustomBridge']);
+
+$router->post('/webhooks/custom-bridge', ['WebhookController', 'customBridge']);
+
+$router->post('/woocommerce-connect/connect', ['WooCommerceConnectController', 'connect']);
+$router->post('/woocommerce-connect/callback', ['WooCommerceConnectController', 'callback']);
+
+$router->get('/shopify-connect/connect', ['ShopifyConnectController', 'connect']);
+$router->post('/shopify-connect/connect', ['ShopifyConnectController', 'connect']);
+$router->get('/shopify-connect/callback', ['ShopifyConnectController', 'callback']);

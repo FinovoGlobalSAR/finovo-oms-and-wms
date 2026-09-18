@@ -20,7 +20,10 @@ class Router
 
         if (!isset($this->routes[$method][$uri])) {
             http_response_code(404);
-            echo "404 - Page not found";
+            echo "404 - Page not found<br><br>Requested: [{$method}] [{$uri}]<br><br>Registered {$method} routes:<br>";
+            foreach (array_keys($this->routes[$method] ?? []) as $registeredPath) {
+                echo "[" . htmlspecialchars($registeredPath) . "]<br>";
+            }
             return;
         }
 

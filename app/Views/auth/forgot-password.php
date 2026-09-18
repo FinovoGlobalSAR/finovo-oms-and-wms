@@ -10,13 +10,11 @@
 <body class="min-h-screen bg-white">
 <div class="min-h-screen lg:h-screen flex">
 
-    <!-- Left panel: banner image (hidden on small screens) -->
     <div class="hidden lg:block h-full relative bg-black overflow-hidden lg:aspect-[696/1429]">
         <img src="/assets/images/LoginImg.png" alt="Finovo"
              class="absolute inset-0 w-full h-full object-cover">
     </div>
 
-    <!-- Right panel: form -->
     <div class="w-full lg:flex-1 flex items-center justify-center px-4 py-8 md:px-8">
         <div class="w-full max-w-md mx-auto bg-white rounded-2xl border border-gray-200 shadow-xl p-7 sm:p-9 md:p-10">
             <div class="text-center mb-7">
@@ -45,6 +43,7 @@
                 <div>
                     <label for="email" class="block text-sm font-medium text-gray-800 mb-2">Email</label>
                     <input type="email" name="email" id="email" placeholder="mark@example.com" required
+                        value="<?= htmlspecialchars($_GET['email'] ?? '') ?>"
                         class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-800 bg-white transition focus:outline-none focus:border-gray-500 focus:ring-2 focus:ring-gray-200">
                 </div>
                 <button type="submit" class="w-full bg-black text-white font-semibold rounded-xl py-3 hover:bg-gray-800 active:scale-[0.99] transition duration-200">

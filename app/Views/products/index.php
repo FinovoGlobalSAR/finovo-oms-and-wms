@@ -9,7 +9,7 @@ $avatarColors = [
 ];
 ?>
 
-<div class="breadcrumb">Finovo <i class="bi bi-chevron-right"></i> Products</div>
+<div class="breadcrumb"><a href="/dashboard" class="breadcrumb-link">Finovo</a> <i class="bi bi-chevron-right"></i> Products</div>
 
 <div class="page-header-row">
     <h1>Products <span class="count-badge"><?= count($products) ?></span></h1>
@@ -44,6 +44,7 @@ $avatarColors = [
             <a href="/warehouses" class="toolbar-btn"><i class="bi bi-building"></i> Warehouses</a>
             <a href="/products/sync-shopify" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Pull from Shopify</a>
             <a href="/products/sync-woocommerce" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Pull from WooCommerce</a>
+            <a href="/products/sync-custom-bridge" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync Custom Store</a>
             <button type="button" class="toolbar-btn" onclick="openModal('importProductModal')"><i class="bi bi-upload"></i> Import CSV</button>
             <a href="/products/export-csv" class="toolbar-btn"><i class="bi bi-download"></i> Export CSV</a>
         </div>

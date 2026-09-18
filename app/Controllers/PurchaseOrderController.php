@@ -17,6 +17,7 @@ class PurchaseOrderController extends Controller
     {
         parent::__construct();
         $this->requireRole(['admin', 'manager', 'warehouse staff']);
+        $this->requireStoreContext();
         $this->poModel = new PurchaseOrder();
         $this->supplierModel = new Supplier();
         $this->warehouseModel = new Warehouse();

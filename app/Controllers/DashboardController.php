@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../core/Controller.php';
 require_once __DIR__ . '/../../core/Database.php';
+require_once __DIR__ . '/../Models/Product.php';
 
 class DashboardController extends Controller
 {
@@ -16,6 +17,7 @@ class DashboardController extends Controller
         $store = $this->getCurrentStore();
         $storeId = (int) $store['id'];
         $role = $this->currentRole();
+        $productModel = new Product();
 
         $data = [
             'role' => $role,
@@ -35,7 +37,19 @@ class DashboardController extends Controller
 
         $recentOrdersStmt = $db->prepare("SELECT * FROM orders WHERE store_id = ? ORDER BY id DESC LIMIT 8");
         $recentOrdersStmt->execute([$storeId]);
-        $data['recentOrders'] = $recentOrdersStmt->fetchAll();
+        $recentOrders = $recentOrdersStmt->fetchAll();
+
+        // Currency: order khud external source se aaya ho, YA order ke andar wala product
+        // khud Shopify/WooCommerce se pull hua ho — dono cases mein $ dikhana hai.
+        $externalSources = ['shopify_pull', 'woocommerce_pull'];
+        foreach ($recentOrders as &$ro) {
+            $isExternalSource = in_array($ro['source'] ?? 'manual', $externalSources, true);
+            $isExternalProduct = !empty($ro['product_id']) && $productModel->isExternal((int) $ro['product_id']);
+            $ro['currency_symbol'] = ($isExternalSource || $isExternalProduct) ? '$' : 'Rs.';
+        }
+        unset($ro);
+
+        $data['recentOrders'] = $recentOrders;
 
         // Orders per day, last 7 days (for line chart)
         $trendStmt = $db->prepare(

@@ -15,6 +15,7 @@ class ReturnController extends Controller
     {
         parent::__construct();
         $this->requireRole(['admin', 'manager', 'sales staff']);
+        $this->requireStoreContext();
         $this->returnModel = new ReturnRequest();
         $this->productModel = new Product();
         $this->variantModel = new ProductVariant();

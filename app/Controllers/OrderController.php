@@ -9,6 +9,9 @@ require_once __DIR__ . '/../Models/Product.php';
 require_once __DIR__ . '/../Models/Warehouse.php';
 require_once __DIR__ . '/../Models/ProductVariant.php';
 require_once __DIR__ . '/../Models/Shipment.php';
+require_once __DIR__ . '/../Services/InventoryService.php';
+require_once __DIR__ . '/../Services/AuditLogService.php';
+require_once __DIR__ . '/../Middlewares/CanonicalMapper.php';
 
 class OrderController extends Controller
 {
@@ -18,6 +21,8 @@ class OrderController extends Controller
     private Warehouse $warehouseModel;
     private ProductVariant $variantModel;
     private Shipment $shipmentModel;
+    private InventoryService $inventoryService;
+    private AuditLogService $auditService;
 
     public static array $paymentMethods = ['COD', 'Bank Transfer', 'JazzCash', 'Easypaisa', 'Card', 'Other'];
 
@@ -25,12 +30,15 @@ class OrderController extends Controller
     {
         parent::__construct();
         $this->requireRole(['admin', 'manager', 'sales staff']);
+        $this->requireStoreContext();
         $this->orderModel = new Order();
         $this->storeModel = new Store();
         $this->productModel = new Product();
         $this->warehouseModel = new Warehouse();
         $this->variantModel = new ProductVariant();
         $this->shipmentModel = new Shipment();
+        $this->inventoryService = new InventoryService();
+        $this->auditService = new AuditLogService();
     }
 
     public function index(): void
@@ -163,6 +171,7 @@ class OrderController extends Controller
         $db = Database::getConnection();
         $store = $this->getCurrentStore();
         $defaultWarehouse = $this->warehouseModel->getDefault($store['id']);
+        $actor = $_SESSION['user']['name'] ?? 'system';
 
         $items = [];
 
@@ -187,22 +196,11 @@ class OrderController extends Controller
                 if (!$variant) {
                     continue;
                 }
-                $availableStock = $this->variantModel->getWarehouseStock($variantId, $defaultWarehouse['id']);
                 $itemPrice = $variant['price'] ?: $product['price'];
                 $itemLabel = $product['name'] . ' — ' . $variant['label'];
             } else {
-                $availableStock = $this->productModel->getWarehouseStock($productId, $defaultWarehouse['id']);
                 $itemPrice = $product['price'];
                 $itemLabel = $product['name'];
-            }
-
-            if ($availableStock < $quantity) {
-                $this->view('orders/create', [
-                    'error' => "\"{$itemLabel}\" is out of stock — only {$availableStock} available.",
-                    'products' => $this->getAvailableProductsForForm(),
-                    'paymentMethods' => self::$paymentMethods,
-                ]);
-                return;
             }
 
             $items[] = [
@@ -210,6 +208,7 @@ class OrderController extends Controller
                 'variant' => $variant,
                 'quantity' => $quantity,
                 'price' => $itemPrice,
+                'label' => $itemLabel,
             ];
         }
 
@@ -223,6 +222,50 @@ class OrderController extends Controller
         }
 
         $orderGroup = 'ORD-' . date('YmdHis') . '-' . random_int(100, 999);
+        $reservedForRollback = [];
+
+        foreach ($items as $item) {
+            $product = $item['product'];
+            $variant = $item['variant'];
+            $quantity = $item['quantity'];
+
+            $result = $this->inventoryService->reserve(
+                (int) $product['id'],
+                $variant ? (int) $variant['id'] : null,
+                (int) $defaultWarehouse['id'],
+                $quantity,
+                'manual_order',
+                "order_group:{$orderGroup}",
+                $actor
+            );
+
+            if (!$result['ok']) {
+                foreach ($reservedForRollback as $done) {
+                    $this->inventoryService->release(
+                        $done['product_id'],
+                        $done['variant_id'],
+                        (int) $defaultWarehouse['id'],
+                        $done['quantity'],
+                        'order_rollback',
+                        "order_group:{$orderGroup}",
+                        $actor
+                    );
+                }
+
+                $this->view('orders/create', [
+                    'error' => "\"{$item['label']}\" is out of stock — requested {$result['requested']}, only {$result['available']} available.",
+                    'products' => $this->getAvailableProductsForForm(),
+                    'paymentMethods' => self::$paymentMethods,
+                ]);
+                return;
+            }
+
+            $reservedForRollback[] = [
+                'product_id' => (int) $product['id'],
+                'variant_id' => $variant ? (int) $variant['id'] : null,
+                'quantity' => $quantity,
+            ];
+        }
 
         foreach ($items as $item) {
             $product = $item['product'];
@@ -246,12 +289,6 @@ class OrderController extends Controller
                 $defaultWarehouse['id'],
                 $paymentMethod,
             ]);
-
-            if ($variant) {
-                $this->variantModel->decreaseWarehouseStock((int) $variant['id'], $defaultWarehouse['id'], $quantity);
-            } else {
-                $this->productModel->decreaseWarehouseStock((int) $product['id'], $defaultWarehouse['id'], $quantity);
-            }
         }
 
         $this->redirect('/orders');
@@ -313,11 +350,20 @@ class OrderController extends Controller
         $defaultWarehouse = $this->warehouseModel->getDefault($store['id']);
         $existingProduct = $this->productModel->findByName($store['id'], $productName);
         $productId = $existingProduct ? (int) $existingProduct['id'] : $this->productModel->findOrCreate($store['id'], $productName, $price);
-        $availableStock = $this->productModel->getWarehouseStock($productId, $defaultWarehouse['id']);
 
-        if ($availableStock < $quantity) {
+        $result = $this->inventoryService->reserve(
+            $productId,
+            null,
+            (int) $defaultWarehouse['id'],
+            $quantity,
+            'api_push',
+            "store:{$storeId}",
+            'api'
+        );
+
+        if (!$result['ok']) {
             http_response_code(409);
-            echo json_encode(['error' => 'Product out of stock.', 'available' => $availableStock]);
+            echo json_encode(['error' => 'Product out of stock.', 'requested' => $result['requested'], 'available' => $result['available']]);
             return;
         }
 
@@ -327,8 +373,6 @@ class OrderController extends Controller
         );
         $stmt->execute([$store['id'], $customerName, $productName, $quantity, $price, $productId, $defaultWarehouse['id'], $paymentMethod]);
         $orderId = $db->lastInsertId();
-
-        $this->productModel->decreaseWarehouseStock($productId, $defaultWarehouse['id'], $quantity);
 
         http_response_code(201);
         echo json_encode([
@@ -369,6 +413,8 @@ class OrderController extends Controller
         $status = trim($_POST['status'] ?? 'pending');
         $paymentStatus = trim($_POST['payment_status'] ?? 'unpaid');
         $paymentMethod = trim($_POST['payment_method'] ?? '');
+        $overrideReason = trim($_POST['override_reason'] ?? '');
+        $actor = $_SESSION['user']['name'] ?? 'system';
 
         if (!in_array($paymentMethod, self::$paymentMethods, true)) {
             $paymentMethod = 'COD';
@@ -398,31 +444,45 @@ class OrderController extends Controller
         }
 
         if ($diff !== 0 && $order['product_id']) {
-            $isVariant = !empty($order['variant_id']);
+            $variantId = !empty($order['variant_id']) ? (int) $order['variant_id'] : null;
 
             if ($diff > 0) {
-                $available = $isVariant
-                    ? $this->variantModel->getWarehouseStock((int) $order['variant_id'], $warehouseId)
-                    : $this->productModel->getWarehouseStock((int) $order['product_id'], $warehouseId);
+                $result = $this->inventoryService->reserve(
+                    (int) $order['product_id'],
+                    $variantId,
+                    $warehouseId,
+                    $diff,
+                    'order_edit',
+                    "order:{$id}",
+                    $actor
+                );
 
-                if ($available < $diff) {
-                    $this->redirect('/orders/edit?id=' . $id . '&error=' . urlencode("Cannot increase quantity — only {$available} more available in stock."));
+                if (!$result['ok']) {
+                    $this->redirect('/orders/edit?id=' . $id . '&error=' . urlencode("Cannot increase quantity — only {$result['available']} more available in stock."));
                     return;
                 }
-
-                if ($isVariant) {
-                    $this->variantModel->decreaseWarehouseStock((int) $order['variant_id'], $warehouseId, $diff);
-                } else {
-                    $this->productModel->decreaseWarehouseStock((int) $order['product_id'], $warehouseId, $diff);
-                }
             } else {
-                $restore = abs($diff);
-                if ($isVariant) {
-                    $this->variantModel->increaseWarehouseStock((int) $order['variant_id'], $warehouseId, $restore);
-                } else {
-                    $this->productModel->increaseWarehouseStock((int) $order['product_id'], $warehouseId, $restore);
-                }
+                $this->inventoryService->release(
+                    (int) $order['product_id'],
+                    $variantId,
+                    $warehouseId,
+                    abs($diff),
+                    'order_edit',
+                    "order:{$id}",
+                    $actor
+                );
             }
+        }
+
+        if ($status !== $order['status']) {
+            $reasonText = $overrideReason !== '' ? $overrideReason : 'No reason provided';
+            $this->auditService->log(
+                (int) $order['store_id'],
+                'manual_override',
+                'order',
+                (string) $id,
+                "Status changed {$order['status']} -> {$status}. Reason: {$reasonText}"
+            );
         }
 
         $update = $db->prepare(
@@ -437,6 +497,7 @@ class OrderController extends Controller
     {
         $db = Database::getConnection();
         $id = (int) ($_POST['id'] ?? 0);
+        $actor = $_SESSION['user']['name'] ?? 'system';
 
         $stmt = $db->prepare("SELECT * FROM orders WHERE id = ?");
         $stmt->execute([$id]);
@@ -450,11 +511,15 @@ class OrderController extends Controller
             }
 
             if ($order['product_id']) {
-                if (!empty($order['variant_id'])) {
-                    $this->variantModel->increaseWarehouseStock((int) $order['variant_id'], $warehouseId, (int) $order['quantity']);
-                } else {
-                    $this->productModel->increaseWarehouseStock((int) $order['product_id'], $warehouseId, (int) $order['quantity']);
-                }
+                $this->inventoryService->release(
+                    (int) $order['product_id'],
+                    !empty($order['variant_id']) ? (int) $order['variant_id'] : null,
+                    $warehouseId,
+                    (int) $order['quantity'],
+                    'order_delete',
+                    "order:{$id}",
+                    $actor
+                );
             }
 
             $delStmt = $db->prepare("DELETE FROM orders WHERE id = ?");
@@ -490,7 +555,81 @@ class OrderController extends Controller
         $wcConsumerSecret = trim($_POST['woocommerce_consumer_secret'] ?? '');
         $this->storeModel->updateWooCommerceCredentials((int) $store['id'], $wcStoreUrl, $wcConsumerKey, $wcConsumerSecret);
 
+        $shopifyWebhookSecret = trim($_POST['shopify_webhook_secret'] ?? '');
+        $wcWebhookSecret = trim($_POST['woocommerce_webhook_secret'] ?? '');
+
+        $db = Database::getConnection();
+        $stmt = $db->prepare("UPDATE stores SET shopify_webhook_secret = ?, woocommerce_webhook_secret = ? WHERE id = ?");
+        $stmt->execute([$shopifyWebhookSecret ?: null, $wcWebhookSecret ?: null, (int) $store['id']]);
+
+        $this->auditService->log((int) $store['id'], 'credential_update', 'store', (string) $store['id'], 'Shopify/WooCommerce credentials updated.');
+
         $this->redirect('/orders/settings?saved=1');
+    }
+
+    // ---------- Connection Test ----------
+
+    public function testShopifyConnection(): void
+    {
+        header('Content-Type: application/json');
+
+        $storeUrl = trim($_POST['store_url'] ?? '');
+        $accessToken = trim($_POST['access_token'] ?? '');
+
+        if ($storeUrl === '' || $accessToken === '') {
+            echo json_encode(['ok' => false, 'message' => 'Please enter both Store URL and Access Token.']);
+            return;
+        }
+
+        $apiUrl = 'https://' . rtrim($storeUrl, '/') . '/admin/api/2026-07/shop.json';
+
+        $ch = curl_init($apiUrl);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['X-Shopify-Access-Token: ' . $accessToken]);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode === 200) {
+            $data = json_decode($response, true);
+            $shopName = $data['shop']['name'] ?? 'Unknown shop';
+            echo json_encode(['ok' => true, 'message' => "Connected successfully to \"{$shopName}\"."]);
+        } else {
+            echo json_encode(['ok' => false, 'message' => "Connection failed (HTTP {$httpCode}). Please check your credentials."]);
+        }
+    }
+
+    public function testWooCommerceConnection(): void
+    {
+        header('Content-Type: application/json');
+
+        $storeUrl = trim($_POST['store_url'] ?? '');
+        $consumerKey = trim($_POST['consumer_key'] ?? '');
+        $consumerSecret = trim($_POST['consumer_secret'] ?? '');
+
+        if ($storeUrl === '' || $consumerKey === '' || $consumerSecret === '') {
+            echo json_encode(['ok' => false, 'message' => 'Please enter Store URL, Consumer Key, and Consumer Secret.']);
+            return;
+        }
+
+        $apiUrl = rtrim($storeUrl, '/') . '/wp-json/wc/v3/system_status';
+        $auth = $consumerKey . ':' . $consumerSecret;
+
+        $ch = curl_init($apiUrl);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_USERPWD, $auth);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode === 200) {
+            echo json_encode(['ok' => true, 'message' => 'Connected successfully to WooCommerce store.']);
+        } else {
+            echo json_encode(['ok' => false, 'message' => "Connection failed (HTTP {$httpCode}). Please check your credentials."]);
+        }
     }
 
     // ---------- Shopify: Orders Pull ----------
@@ -517,6 +656,7 @@ class OrderController extends Controller
         curl_close($ch);
 
         if ($httpCode !== 200) {
+            $this->storeModel->markUnhealthy((int) $store['id'], "Shopify API error (HTTP {$httpCode})");
             $this->redirect('/orders/settings?error=' . urlencode("Shopify API error (HTTP {$httpCode})."));
             return;
         }
@@ -531,8 +671,9 @@ class OrderController extends Controller
 
             $fulfillmentStatus = $order['fulfillment_status'] ?? 'pending';
             $financialStatus = $order['financial_status'] ?? 'pending';
-            $paymentStatus = in_array($financialStatus, ['paid', 'partially_paid']) ? 'paid' : 'unpaid';
-            $orderStatus = $fulfillmentStatus === 'fulfilled' ? 'delivered' : 'processing';
+            $paymentStatus = CanonicalMapper::paymentStatusFromShopify($financialStatus);
+            $canonicalStatus = CanonicalMapper::fromShopify($fulfillmentStatus, $financialStatus);
+            $orderStatus = CanonicalMapper::toInternalOrderStatus($canonicalStatus);
             $gateway = $order['gateway'] ?? 'Card';
 
             $check = $db->prepare("SELECT id FROM orders WHERE external_order_id = ? AND store_id = ?");
@@ -558,8 +699,9 @@ class OrderController extends Controller
             $price = (float) ($order['total_price'] ?? 0);
 
             $productId = $this->productModel->findOrCreate($store['id'], $productName, $price);
-            $availableStock = $this->productModel->getWarehouseStock($productId, $defaultWarehouse['id']);
-            $stockWarning = $availableStock < $quantity ? 1 : 0;
+
+            $result = $this->inventoryService->reserve($productId, null, (int) $defaultWarehouse['id'], $quantity, 'shopify_pull', "external:{$externalId}", 'shopify_sync');
+            $stockWarning = $result['ok'] ? 0 : 1;
             if ($stockWarning) {
                 $warningCount++;
             }
@@ -570,8 +712,6 @@ class OrderController extends Controller
             );
             $stmt->execute([$store['id'], $customerName, $productName, $quantity, $price, $externalId, $orderStatus, $paymentStatus, $productId, $defaultWarehouse['id'], $stockWarning, $gateway]);
 
-            $this->productModel->decreaseWarehouseStock($productId, $defaultWarehouse['id'], $quantity);
-
             $importedCount++;
         }
 
@@ -579,6 +719,7 @@ class OrderController extends Controller
         if ($warningCount > 0) {
             $redirectUrl .= '&stock_warning=' . $warningCount;
         }
+        $this->storeModel->markHealthy((int) $store['id']);
         $this->redirect($redirectUrl);
     }
 
@@ -685,6 +826,7 @@ class OrderController extends Controller
         curl_close($ch);
 
         if ($httpCode !== 200) {
+            $this->storeModel->markUnhealthy((int) $store['id'], "WooCommerce API error (HTTP {$httpCode})");
             $this->redirect('/orders/settings?error=' . urlencode("WooCommerce API error (HTTP {$httpCode}): " . $response));
             return;
         }
@@ -715,12 +857,14 @@ class OrderController extends Controller
             $paymentMethodTitle = $order['payment_method_title'] ?? 'Other';
 
             $wcStatus = $order['status'] ?? 'pending';
-            $paymentStatus = in_array($wcStatus, ['processing', 'completed']) ? 'paid' : 'unpaid';
-            $orderStatus = $wcStatus === 'completed' ? 'delivered' : 'processing';
+            $paymentStatus = CanonicalMapper::paymentStatusFromWooCommerce($wcStatus);
+            $canonicalStatus = CanonicalMapper::fromWooCommerce($wcStatus);
+            $orderStatus = CanonicalMapper::toInternalOrderStatus($canonicalStatus);
 
             $productId = $this->productModel->findOrCreate($store['id'], $productName, $price);
-            $availableStock = $this->productModel->getWarehouseStock($productId, $defaultWarehouse['id']);
-            $stockWarning = $availableStock < $quantity ? 1 : 0;
+
+            $result = $this->inventoryService->reserve($productId, null, (int) $defaultWarehouse['id'], $quantity, 'woocommerce_pull', "external:{$externalId}", 'woocommerce_sync');
+            $stockWarning = $result['ok'] ? 0 : 1;
             if ($stockWarning) {
                 $warningCount++;
             }
@@ -731,8 +875,6 @@ class OrderController extends Controller
             );
             $stmt->execute([$store['id'], $customerName, $productName, $quantity, $price, $externalId, $orderStatus, $paymentStatus, $productId, $defaultWarehouse['id'], $stockWarning, $paymentMethodTitle]);
 
-            $this->productModel->decreaseWarehouseStock($productId, $defaultWarehouse['id'], $quantity);
-
             $importedCount++;
         }
 
@@ -740,6 +882,7 @@ class OrderController extends Controller
         if ($warningCount > 0) {
             $redirectUrl .= '&stock_warning=' . $warningCount;
         }
+        $this->storeModel->markHealthy((int) $store['id']);
         $this->redirect($redirectUrl);
     }
 
@@ -934,9 +1077,10 @@ class OrderController extends Controller
             }
 
             $productId = $this->productModel->findOrCreate($store['id'], $productName, $price);
-            $availableStock = $this->productModel->getWarehouseStock($productId, $defaultWarehouse['id']);
 
-            if ($availableStock < $quantity) {
+            $result = $this->inventoryService->reserve($productId, null, (int) $defaultWarehouse['id'], $quantity, 'csv_import', 'csv_import', $_SESSION['user']['name'] ?? 'system');
+
+            if (!$result['ok']) {
                 $skippedCount++;
                 continue;
             }
@@ -948,8 +1092,6 @@ class OrderController extends Controller
                  VALUES (?, ?, ?, ?, ?, ?, ?, 'csv_import', ?)"
             );
             $stmt->execute([$store['id'], $customerId, $productId, $customerName, $productName, $quantity, $price, $defaultWarehouse['id']]);
-
-            $this->productModel->decreaseWarehouseStock($productId, $defaultWarehouse['id'], $quantity);
 
             $importedCount++;
         }

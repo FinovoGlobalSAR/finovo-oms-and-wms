@@ -16,6 +16,7 @@ class StockController extends Controller
     {
         parent::__construct();
         $this->requireRole(['admin', 'manager', 'warehouse staff']);
+        $this->requireStoreContext();
         $this->transferModel = new StockTransfer();
         $this->adjustmentModel = new StockAdjustment();
         $this->warehouseModel = new Warehouse();

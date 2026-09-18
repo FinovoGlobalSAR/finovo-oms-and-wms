@@ -6,6 +6,18 @@ $currentPath = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
 $currentRole = strtolower(trim($_SESSION['user']['role'] ?? ''));
 
+// Orders/Products/Shipments waghera sirf tabhi dikhte hain jab
+// kisi store pe "Manage" dabaya gaya ho.
+$storeContextActive = !empty($_SESSION['store_context_active']);
+$managedStoreName = null;
+
+if ($storeContextActive && !empty($_SESSION['current_store_id'])) {
+    require_once __DIR__ . '/../../Models/Store.php';
+    $sidebarStoreModel = new Store();
+    $sidebarStore = $sidebarStoreModel->find((int) $_SESSION['current_store_id']);
+    $managedStoreName = $sidebarStore['name'] ?? null;
+}
+
 $navigation = [
 
     'Design' => [
@@ -18,64 +30,96 @@ $navigation = [
 
     'General' => [
         [
-            'label' => 'Orders',
-            'url'   => '/orders',
-            'icon'  => 'orders',
-            'roles' => ['admin', 'manager', 'sales staff'],
-        ],
-        [
-            'label' => 'Products',
-            'url'   => '/products',
-            'icon'  => 'inventory',
-            'roles' => ['admin', 'manager', 'warehouse staff'],
-        ],
-        [
             'label' => 'Warehouses',
             'url'   => '/warehouses',
             'icon'  => 'warehouse',
             'roles' => ['admin', 'manager', 'warehouse staff'],
         ],
         [
+            'label' => 'Stores',
+            'url'   => '/stores',
+            'icon'  => 'store',
+            'roles' => ['admin', 'manager'],
+        ],
+    ],
+
+    'Store Management' => [
+        [
+            'label' => 'Orders',
+            'url'   => '/orders',
+            'icon'  => 'orders',
+            'roles' => ['admin', 'manager', 'sales staff'],
+            'requires_store' => true,
+        ],
+        [
+            'label' => 'Products',
+            'url'   => '/products',
+            'icon'  => 'inventory',
+            'roles' => ['admin', 'manager', 'warehouse staff'],
+            'requires_store' => true,
+        ],
+        [
             'label' => 'Shipments',
             'url'   => '/shipments',
             'icon'  => 'truck',
             'roles' => ['admin', 'manager', 'warehouse staff'],
+            'requires_store' => true,
         ],
         [
             'label' => 'Picking',
             'url'   => '/picking',
             'icon'  => 'checklist',
             'roles' => ['admin', 'manager', 'warehouse staff'],
+            'requires_store' => true,
         ],
         [
             'label' => 'Purchase Orders',
             'url'   => '/purchase-orders',
             'icon'  => 'clipboard',
             'roles' => ['admin', 'manager', 'warehouse staff'],
+            'requires_store' => true,
         ],
         [
             'label' => 'Stock Movements',
             'url'   => '/stock',
             'icon'  => 'transfer',
             'roles' => ['admin', 'manager', 'warehouse staff'],
+            'requires_store' => true,
         ],
         [
             'label' => 'Returns',
             'url'   => '/returns',
             'icon'  => 'return',
             'roles' => ['admin', 'manager', 'sales staff'],
+            'requires_store' => true,
         ],
         [
             'label' => 'Customers',
             'url'   => '/customers',
             'icon'  => 'users',
             'roles' => ['admin', 'manager', 'sales staff'],
+            'requires_store' => true,
         ],
         [
-            'label' => 'Stores',
-            'url'   => '/stores',
-            'icon'  => 'store',
+            'label' => 'SKU Mappings',
+            'url'   => '/sku-mappings',
+            'icon'  => 'mapping',
             'roles' => ['admin', 'manager'],
+            'requires_store' => true,
+        ],
+        [
+            'label' => 'Integration Errors',
+            'url'   => '/integration-errors',
+            'icon'  => 'alert',
+            'roles' => ['admin', 'manager'],
+            'requires_store' => true,
+        ],
+        [
+            'label' => 'Audit Log',
+            'url'   => '/audit-log',
+            'icon'  => 'audit',
+            'roles' => ['admin', 'manager'],
+            'requires_store' => true,
         ],
     ],
 
@@ -90,10 +134,11 @@ $navigation = [
 
 ];
 
-// Har item ke liye check karo current role allowed hai ya nahi.
-// Jis item mein 'roles' key hi nahi hai (jaise Dashboard), wo sabko dikhega.
 foreach ($navigation as $section => &$items) {
-    $items = array_filter($items, function ($item) use ($currentRole) {
+    $items = array_filter($items, function ($item) use ($currentRole, $storeContextActive) {
+        if (!empty($item['requires_store']) && !$storeContextActive) {
+            return false;
+        }
         if (!isset($item['roles'])) {
             return true;
         }
@@ -102,7 +147,6 @@ foreach ($navigation as $section => &$items) {
 }
 unset($items);
 
-// Khali ho chuke sections ko hata do
 $navigation = array_filter($navigation, fn($items) => !empty($items));
 
 ?>
@@ -144,6 +188,20 @@ $navigation = array_filter($navigation, fn($items) => !empty($items));
                     <p class="text-xs font-semibold text-gray-900 truncate"><?= htmlspecialchars($_SESSION['user']['name']) ?></p>
                     <p class="text-[11px] text-gray-500 truncate"><?= htmlspecialchars(ucwords($currentRole)) ?></p>
                 </div>
+            </div>
+        </div>
+    <?php endif; ?>
+
+    <?php if ($storeContextActive && $managedStoreName): ?>
+        <div class="px-4 pt-2 pb-1">
+            <div class="flex items-center justify-between px-2.5 py-2 rounded-lg bg-blue-50 border border-blue-100">
+                <div class="min-w-0">
+                    <p class="text-[10px] font-semibold uppercase tracking-wider text-blue-500">Managing</p>
+                    <p class="text-[12px] font-medium text-blue-800 truncate"><?= htmlspecialchars($managedStoreName) ?></p>
+                </div>
+                <a href="/stores/exit-management" title="Exit store management" class="text-blue-400 hover:text-blue-700 text-[11px] flex-shrink-0 ml-2">
+                    <i class="bi bi-x-lg"></i>
+                </a>
             </div>
         </div>
     <?php endif; ?>
@@ -238,6 +296,25 @@ $navigation = array_filter($navigation, fn($items) => !empty($items));
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" />
                                         <circle cx="9" cy="7" r="4" fill="none" stroke="currentColor" stroke-width="1.8" />
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
+                                    </svg>
+
+                                <?php elseif ($item['icon'] === 'alert'): ?>
+                                    <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                                    </svg>
+
+                                <?php elseif ($item['icon'] === 'mapping'): ?>
+                                    <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <circle cx="6" cy="6" r="2.5" stroke="currentColor" stroke-width="1.8" fill="none" />
+                                        <circle cx="18" cy="18" r="2.5" stroke="currentColor" stroke-width="1.8" fill="none" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8.2 7.8l7.6 8.4" />
+                                    </svg>
+
+                                <?php elseif ($item['icon'] === 'audit'): ?>
+                                    <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 5a2 2 0 012-2h2a2 2 0 012 2v0a2 2 0 01-2 2h-2a2 2 0 01-2-2v0z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6M9 16h6" />
                                     </svg>
 
                                 <?php endif; ?>

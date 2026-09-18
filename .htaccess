@@ -1,6 +1,11 @@
 RewriteEngine On
 
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(app|core|config|database|routes|libraries)(/.*)?$ - [F,L]
+RewriteRule ^\.env$ - [F,L]
+RewriteRule ^migrate\.php$ - [F,L]
 
-RewriteRule ^ public/index.php [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{DOCUMENT_ROOT}/public%{REQUEST_URI} -f
+RewriteRule ^(.*)$ public/$1 [L]
+
+RewriteRule ^(.*)$ public/index.php [L]
