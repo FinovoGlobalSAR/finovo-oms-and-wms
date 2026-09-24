@@ -84,13 +84,36 @@
 
     <hr style="margin: 24px 0; border: none; border-top: 1px solid var(--border-color);">
 
+    <?php $platform = $settings['platform'] ?? 'manual'; ?>
+
     <div style="display: flex; flex-direction: column; gap: 8px;">
-        <a href="/orders/sync-shopify" class="toolbar-btn" style="justify-content: center;">
-            <i class="bi bi-arrow-repeat"></i> Sync Orders from Shopify
-        </a>
-        <a href="/orders/sync-woocommerce" class="toolbar-btn" style="justify-content: center;">
-            <i class="bi bi-arrow-repeat"></i> Sync Orders from WooCommerce
-        </a>
+        <?php if ($platform === 'shopify'): ?>
+            <a href="/orders/sync-shopify" class="toolbar-btn" style="justify-content: center;">
+                <i class="bi bi-arrow-repeat"></i> Sync Orders from Shopify
+            </a>
+        <?php elseif ($platform === 'woocommerce'): ?>
+            <a href="/orders/sync-woocommerce" class="toolbar-btn" style="justify-content: center;">
+                <i class="bi bi-arrow-repeat"></i> Sync Orders from WooCommerce
+            </a>
+        <?php elseif ($platform === 'bigcommerce'): ?>
+            <a href="/orders/sync-bigcommerce" class="toolbar-btn" style="justify-content: center;">
+                <i class="bi bi-arrow-repeat"></i> Sync Orders from BigCommerce
+            </a>
+        <?php elseif ($platform === 'prestashop'): ?>
+            <a href="/orders/sync-prestashop" class="toolbar-btn" style="justify-content: center;">
+                <i class="bi bi-arrow-repeat"></i> Sync Orders from PrestaShop
+            </a>
+        <?php elseif ($platform === 'opencart'): ?>
+            <a href="/orders/sync-opencart" class="toolbar-btn" style="justify-content: center;">
+                <i class="bi bi-arrow-repeat"></i> Sync Orders from OpenCart
+            </a>
+        <?php elseif ($platform === 'oscommerce'): ?>
+            <a href="/orders/sync-oscommerce" class="toolbar-btn" style="justify-content: center;">
+                <i class="bi bi-arrow-repeat"></i> Sync Orders from osCommerce
+            </a>
+        <?php else: ?>
+            <p style="font-size:13px; color:var(--text-muted); margin:0;">This store's platform is manual — no external sync available.</p>
+        <?php endif; ?>
     </div>
 
 </div>

@@ -1,10 +1,5 @@
 <?php
-/**
- * Canonical Mapping Layer — har platform (Shopify, WooCommerce, Custom
- * Bridge) apna alag naam/status use karta hai. Yeh class un sabko
- * ek common "Finovo canonical" naam mein convert karta hai, taaki
- * baaki poora system (OMS/WMS) ko pata na chale ke order kahan se aaya.
- */
+
 class CanonicalMapper
 {
     // Yeh Finovo ke apne, standard order statuses hain — sab platforms
@@ -47,9 +42,6 @@ class CanonicalMapper
         };
     }
 
-    /**
-     * Custom Bridge ka status Finovo canonical status mein badalta hai.
-     */
     public static function fromCustomBridge(string $bridgeStatus): string
     {
         return match ($bridgeStatus) {

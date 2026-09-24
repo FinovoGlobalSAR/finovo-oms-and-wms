@@ -116,3 +116,35 @@ $router->post('/woocommerce-connect/callback', ['WooCommerceConnectController', 
 $router->get('/shopify-connect/connect', ['ShopifyConnectController', 'connect']);
 $router->post('/shopify-connect/connect', ['ShopifyConnectController', 'connect']);
 $router->get('/shopify-connect/callback', ['ShopifyConnectController', 'callback']);
+
+$router->get('/products/sync-bigcommerce', ['ProductController', 'syncBigCommerce']);
+$router->get('/orders/sync-bigcommerce', ['OrderController', 'syncBigCommerce']);
+
+$router->get('/bigcommerce-connect/callback', ['BigCommerceConnectController', 'authCallback']);
+$router->get('/bigcommerce-connect/load', ['BigCommerceConnectController', 'loadCallback']);
+$router->get('/bigcommerce-connect/uninstall', ['BigCommerceConnectController', 'uninstallCallback']);
+
+$router->get('/products/sync-prestashop', ['ProductController', 'syncPrestaShop']);
+$router->get('/orders/sync-prestashop', ['OrderController', 'syncPrestaShop']);
+$router->post('/prestashop-connect/receive-key', ['PrestaShopConnectController', 'receiveKey']);
+
+$router->get('/products/sync-opencart', ['ProductController', 'syncOpenCart']);
+$router->get('/orders/sync-opencart', ['OrderController', 'syncOpenCart']);
+
+$router->get('/products/sync-oscommerce', ['ProductController', 'syncOsCommerce']);
+$router->get('/orders/sync-oscommerce', ['OrderController', 'syncOsCommerce']);
+
+$router->get('/field-mappings', ['FieldMappingController', 'index']);
+$router->post('/field-mappings/save', ['FieldMappingController', 'save']);
+
+$router->get('/3pl/scan', ['ThreePlController', 'scanForm']);
+$router->post('/3pl/scan/submit', ['ThreePlController', 'scanSubmit']);
+$router->get('/3pl/remittance', ['ThreePlController', 'remittanceIndex']);
+$router->post('/3pl/remittance/update', ['ThreePlController', 'remittanceUpdate']);
+
+$router->get('/3pl/track', ['ThreePlController', 'trackShipment']);
+
+$router->get('/payment/initiate', ['PaymentController', 'initiate']);
+$router->get('/payment/success', ['PaymentController', 'success']);
+
+$router->get('/products/sync-shopify-async', ['ProductController', 'syncShopifyAsync']);

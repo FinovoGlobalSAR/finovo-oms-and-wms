@@ -7,6 +7,7 @@ $avatarColors = [
     ['bg' => '#e0e7ff', 'text' => '#4338ca'],
     ['bg' => '#cffafe', 'text' => '#0e7490'],
 ];
+$platform = $store['platform'] ?? 'manual';
 ?>
 
 <div class="breadcrumb"><a href="/dashboard" class="breadcrumb-link">Finovo</a> <i class="bi bi-chevron-right"></i> Products</div>
@@ -18,6 +19,9 @@ $avatarColors = [
 
 <?php if (!empty($lowStockCount)): ?>
     <div class="banner banner-error"><i class="bi bi-exclamation-triangle"></i> <?= (int)$lowStockCount ?> product(s) are low on stock or out of stock.</div>
+<?php endif; ?>
+<?php if (!empty($_GET['queued'])): ?>
+    <div class="banner banner-success">Sync queued (Job #<?= (int) $_GET['queued'] ?>). Run <code>php worker.php</code> in a terminal to process it.</div>
 <?php endif; ?>
 <?php if (!empty($synced)): ?>
     <div class="banner banner-success"><?= (int)$synced ?> product(s) synced.</div>
@@ -42,9 +46,27 @@ $avatarColors = [
     <div class="filter-row">
         <div class="push-right" style="margin-left:0;">
             <a href="/warehouses" class="toolbar-btn"><i class="bi bi-building"></i> Warehouses</a>
-            <a href="/products/sync-shopify" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Pull from Shopify</a>
-            <a href="/products/sync-woocommerce" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Pull from WooCommerce</a>
-            <a href="/products/sync-custom-bridge" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync Custom Store</a>
+
+            <?php if ($platform === 'shopify'): ?>
+                <a href="/products/sync-shopify" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Pull from Shopify</a>
+                <a href="/products/sync-shopify-async" class="toolbar-btn"><i class="bi bi-lightning"></i> Sync (Async/Queue)</a>
+            <?php elseif ($platform === 'woocommerce'): ?>
+                <a href="/products/sync-woocommerce" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Pull from WooCommerce</a>
+            <?php elseif ($platform === 'bigcommerce'): ?>
+                <a href="/products/sync-bigcommerce" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync BigCommerce</a>
+            <?php elseif ($platform === 'prestashop'): ?>
+                <a href="/products/sync-prestashop" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync PrestaShop</a>
+            <?php elseif ($platform === 'opencart'): ?>
+                <a href="/products/sync-opencart" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync OpenCart</a>
+            <?php elseif ($platform === 'oscommerce'): ?>
+                <a href="/products/sync-oscommerce" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync osCommerce</a>
+            <?php elseif ($platform === 'custom'): ?>
+                <a href="/products/sync-custom-bridge" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync Custom Store</a>
+            <?php endif; ?>
+
+            <button type="button" class="toolbar-btn" id="autoRefreshBtn" onclick="toggleAutoRefresh()">
+                <i class="bi bi-clock-history"></i> <span id="autoRefreshLabel">Auto-sync: Off</span>
+            </button>
             <button type="button" class="toolbar-btn" onclick="openModal('importProductModal')"><i class="bi bi-upload"></i> Import CSV</button>
             <a href="/products/export-csv" class="toolbar-btn"><i class="bi bi-download"></i> Export CSV</a>
         </div>
@@ -68,7 +90,15 @@ $avatarColors = [
             <?php else: ?>
                 <?php foreach ($products as $i => $product):
                     $avColor = $avatarColors[$i % count($avatarColors)];
-                    $currencySymbol = !empty($product['external_product_id']) ? '$' : 'Rs.';
+
+                    $isExternal = !empty($product['external_product_id'])
+                        || !empty($product['external_wc_product_id'])
+                        || !empty($product['external_bc_product_id'])
+                        || !empty($product['external_ps_product_id'])
+                        || !empty($product['external_ocart_product_id'])
+                        || !empty($product['external_osc_product_id']);
+                    $currencySymbol = $isExternal ? '$' : 'Rs.';
+
                     $stock = (int) ($product['stock_quantity'] ?? 0);
                     $threshold = (int) ($product['low_stock_threshold'] ?? 5);
                     $variantCount = (int) ($product['variant_count'] ?? 0);
@@ -278,4 +308,27 @@ function toggleRowMenu(event, menuId) {
 document.addEventListener('click', function() {
     document.querySelectorAll('.row-menu.show').forEach(m => m.classList.remove('show'));
 });
+
+// ---------- Auto-Refresh (Client-Side Scheduled Reconciliation) ----------
+let autoRefreshInterval = null;
+
+function toggleAutoRefresh() {
+    const label = document.getElementById('autoRefreshLabel');
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+        label.textContent = 'Auto-sync: Off';
+        localStorage.removeItem('autoRefreshProducts');
+    } else {
+        autoRefreshInterval = setInterval(() => {
+            window.location.reload();
+        }, 5 * 60 * 1000);
+        label.textContent = 'Auto-sync: On (5 min)';
+        localStorage.setItem('autoRefreshProducts', '1');
+    }
+}
+
+if (localStorage.getItem('autoRefreshProducts') === '1') {
+    toggleAutoRefresh();
+}
 </script>

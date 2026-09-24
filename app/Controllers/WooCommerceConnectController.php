@@ -3,15 +3,7 @@ require_once __DIR__ . '/../../core/Controller.php';
 require_once __DIR__ . '/../../core/Database.php';
 require_once __DIR__ . '/../Models/Store.php';
 
-/**
- * WooCommerce ka apna official "REST API Authorization" flow use karta hai
- * (/wc-auth/v1/authorize). Customer sirf apna store URL likhta hai, WooCommerce
- * khud "Approve" page kholta hai, aur automatically Consumer Key/Secret
- * generate karke Finovo ko bhej deta hai — customer ko kuch copy-paste nahi karna.
- *
- * getBaseUrl() yahan bhi dynamic hai — jis bhi domain se request aayi ho
- * (localhost, ngrok, ya live domain), khud usi ko use karega.
- */
+
 class WooCommerceConnectController extends Controller
 {
     private Store $storeModel;
@@ -19,13 +11,14 @@ class WooCommerceConnectController extends Controller
     public function __construct()
     {
         parent::__construct();
-        $this->requireRole(['admin', 'manager']);
         $this->storeModel = new Store();
     }
 
     // Step 1 — Customer ko WooCommerce ke authorize page pe bhejo
     public function connect(): void
     {
+        $this->requireRole(['admin', 'manager']);
+
         $storeId = (int) ($_POST['store_id'] ?? $_GET['store_id'] ?? 0);
         $wpUrl = trim($_POST['wp_url'] ?? $_GET['wp_url'] ?? '');
 
@@ -41,14 +34,7 @@ class WooCommerceConnectController extends Controller
 
         $wpUrl = rtrim($wpUrl, '/');
 
-        // Ek random token banate hain — jab callback aayega, isse verify karenge ke
-        // yeh request genuinely humne bheji thi, koi fake callback nahi hai
-        $state = bin2hex(random_bytes(16));
-        $_SESSION['wc_connect_state'] = $state;
-        $_SESSION['wc_connect_store_id'] = $storeId;
-        $_SESSION['wc_connect_wp_url'] = $wpUrl;
-
-        $callbackUrl = $this->getBaseUrl() . '/woocommerce-connect/callback?state=' . $state;
+        $callbackUrl = $this->getBaseUrl() . '/woocommerce-connect/callback?store_id=' . $storeId . '&wp_url=' . urlencode($wpUrl);
         $returnUrl = $this->getBaseUrl() . '/stores?woo_connected=1';
 
         $params = http_build_query([
@@ -59,16 +45,20 @@ class WooCommerceConnectController extends Controller
             'callback_url' => $callbackUrl,
         ]);
 
-        // WooCommerce ka apna official authorize endpoint
         $authorizeUrl = $wpUrl . '/wc-auth/v1/authorize?' . $params;
 
         header('Location: ' . $authorizeUrl);
         exit;
     }
 
-    // Step 2 — WooCommerce yahan automatically Consumer Key/Secret POST karta hai
+    // Step 2 — WooCommerce yahan automatically Consumer Key/Secret POST karta hai.
+    // Session ki zaroorat nahi — turant chhod dete hain, taaki koi lock wait na ho.
     public function callback(): void
     {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+
         $rawBody = file_get_contents('php://input');
         $data = json_decode($rawBody, true);
 
@@ -78,12 +68,12 @@ class WooCommerceConnectController extends Controller
             return;
         }
 
-        $storeId = (int) ($_SESSION['wc_connect_store_id'] ?? 0);
-        $wpUrl = $_SESSION['wc_connect_wp_url'] ?? '';
+        $storeId = (int) ($_GET['store_id'] ?? 0);
+        $wpUrl = $_GET['wp_url'] ?? '';
 
-        if ($storeId <= 0) {
+        if ($storeId <= 0 || !$this->storeModel->find($storeId)) {
             http_response_code(400);
-            echo json_encode(['error' => 'No pending connection found.']);
+            echo json_encode(['error' => 'Invalid or missing store_id.']);
             return;
         }
 
@@ -94,17 +84,17 @@ class WooCommerceConnectController extends Controller
             $data['consumer_secret']
         );
 
-        unset($_SESSION['wc_connect_state'], $_SESSION['wc_connect_store_id'], $_SESSION['wc_connect_wp_url']);
-
         http_response_code(200);
         echo json_encode(['success' => true]);
     }
 
     private function getBaseUrl(): string
     {
-        // Dynamic — jis domain se request aayi (localhost, ngrok, live domain),
-        // khud usi ko use karega. Koi hardcoding nahi.
-        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO'])) {
+            $scheme = $_SERVER['HTTP_X_FORWARDED_PROTO'];
+        } else {
+            $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        }
         return $scheme . '://' . $_SERVER['HTTP_HOST'];
     }
 }

@@ -34,7 +34,6 @@ class Product extends Model
         $row = $stmt->fetch();
         return $row ?: null;
     }
-
     public function create(int $storeId, string $name, float $price, ?string $sku = null, int $stock = 0, ?string $imageUrl = null): int
     {
         $this->query(
@@ -73,7 +72,6 @@ class Product extends Model
             [$name, $sku, $price, $lowStockThreshold, $id]
         );
     }
-
     public function delete(int $id): void
     {
         $this->query("DELETE FROM products WHERE id = ?", [$id]);
@@ -91,6 +89,27 @@ class Product extends Model
         return (int) ($stmt->fetch()['c'] ?? 0);
     }
 
+    // N+1 query se bachne ke liye — sabhi products ke variant counts ek hi
+    // query mein le aata hai, loop mein alag-alag query chalane ki jagah.
+    public function variantCountsForProducts(array $productIds): array
+    {
+        if (empty($productIds)) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($productIds), '?'));
+        $stmt = $this->query(
+            "SELECT product_id, COUNT(*) as c FROM product_variants WHERE product_id IN ({$placeholders}) GROUP BY product_id",
+            $productIds
+        );
+
+        $counts = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $counts[(int) $row['product_id']] = (int) $row['c'];
+        }
+        return $counts;
+    }
+
     // Order list page ke currency ke liye — batata hai product Shopify/WooCommerce se aaya hai ya nahi
     public function isExternal(int $productId): bool
     {
@@ -106,7 +125,6 @@ class Product extends Model
 
         return !empty($row['external_product_id']) || !empty($row['external_wc_product_id']);
     }
-
     // ---------- Warehouse-aware stock methods (simple/no-variant products) ----------
 
     public function getWarehouseStock(int $productId, int $warehouseId): int
@@ -146,9 +164,6 @@ class Product extends Model
         );
         return $stmt->fetchAll();
     }
-
-    // Order form ke dropdown ke liye — jis bhi warehouse mein stock hai, wo product orderable hai,
-    // chahe wo product kisi bhi store ka "apna" ho. Warehouse hi sach ka source hai.
     public function availableForOrder(int $storeId, int $warehouseId): array
     {
         $stmt = $this->query(
@@ -187,7 +202,6 @@ class Product extends Model
         );
         $this->recomputeStock($productId);
     }
-
     public function decreaseWarehouseStock(int $productId, int $warehouseId, int $quantity): void
     {
         $this->query(
@@ -232,7 +246,6 @@ class Product extends Model
         $total = (int) ($stmt->fetch()['total'] ?? 0);
         $this->query("UPDATE products SET stock_quantity = ? WHERE id = ?", [$total, $productId]);
     }
-
     public function lowStockList(int $storeId): array
     {
         $stmt = $this->query(

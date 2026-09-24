@@ -48,6 +48,12 @@ class StoreController extends Controller
         $bridgeUrl = trim($_POST['bridge_url'] ?? '');
         $bridgeApiKey = trim($_POST['bridge_api_key'] ?? '');
         $bridgeSharedSecret = trim($_POST['bridge_shared_secret'] ?? '');
+        $bcStoreHash = trim($_POST['bigcommerce_store_hash'] ?? '');
+        $bcAccessToken = trim($_POST['bigcommerce_access_token'] ?? '');
+        $psStoreUrl = trim($_POST['prestashop_store_url'] ?? '');
+        $psApiKey = trim($_POST['prestashop_api_key'] ?? '');
+        $ocStoreUrl = trim($_POST['opencart_store_url'] ?? '');
+        $oscStoreUrl = trim($_POST['oscommerce_store_url'] ?? '');
         $warehouseIds = array_map('intval', $_POST['warehouse_ids'] ?? []);
 
         if ($name === '') {
@@ -63,6 +69,22 @@ class StoreController extends Controller
 
         if ($bridgeUrl !== '') {
             $this->storeModel->updateBridgeCredentials($storeId, $bridgeUrl, $bridgeApiKey, $bridgeSharedSecret);
+        }
+
+        if ($bcStoreHash !== '') {
+            $this->storeModel->updateBigCommerceCredentials($storeId, $bcStoreHash, $bcAccessToken);
+        }
+
+        if ($psStoreUrl !== '') {
+            $this->storeModel->updatePrestaShopCredentials($storeId, $psStoreUrl, $psApiKey);
+        }
+
+        if ($ocStoreUrl !== '') {
+            $this->storeModel->updateOpenCartCredentials($storeId, $ocStoreUrl, '', '');
+        }
+
+        if ($oscStoreUrl !== '') {
+            $this->storeModel->updateOsCommerceCredentials($storeId, $oscStoreUrl, '', '');
         }
 
         foreach ($warehouseIds as $index => $warehouseId) {
@@ -85,6 +107,12 @@ class StoreController extends Controller
         $bridgeUrl = trim($_POST['bridge_url'] ?? '');
         $bridgeApiKey = trim($_POST['bridge_api_key'] ?? '');
         $bridgeSharedSecret = trim($_POST['bridge_shared_secret'] ?? '');
+        $bcStoreHash = trim($_POST['bigcommerce_store_hash'] ?? '');
+        $bcAccessToken = trim($_POST['bigcommerce_access_token'] ?? '');
+        $psStoreUrl = trim($_POST['prestashop_store_url'] ?? '');
+        $psApiKey = trim($_POST['prestashop_api_key'] ?? '');
+        $ocStoreUrl = trim($_POST['opencart_store_url'] ?? '');
+        $oscStoreUrl = trim($_POST['oscommerce_store_url'] ?? '');
         $warehouseIds = array_map('intval', $_POST['warehouse_ids'] ?? []);
 
         if ($id <= 0 || $name === '' || !$this->storeModel->find($id)) {
@@ -95,6 +123,10 @@ class StoreController extends Controller
         $this->storeModel->update($id, $name, $platform, $storeUrl ?: null);
         $this->storeModel->updateWooCommerceCredentials($id, $wcStoreUrl, $wcConsumerKey, $wcConsumerSecret);
         $this->storeModel->updateBridgeCredentials($id, $bridgeUrl, $bridgeApiKey, $bridgeSharedSecret);
+        $this->storeModel->updateBigCommerceCredentials($id, $bcStoreHash, $bcAccessToken);
+        $this->storeModel->updatePrestaShopCredentials($id, $psStoreUrl, $psApiKey);
+        $this->storeModel->updateOpenCartCredentials($id, $ocStoreUrl, '', '');
+        $this->storeModel->updateOsCommerceCredentials($id, $oscStoreUrl, '', '');
 
         $current = $this->warehouseModel->allByStore($id);
         $currentIds = array_map(fn($w) => (int) $w['id'], $current);

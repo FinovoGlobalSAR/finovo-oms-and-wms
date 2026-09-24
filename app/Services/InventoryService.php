@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../core/Database.php';
+require_once __DIR__ . '/../Models/Warehouse.php';
 
 /**
  * Har stock-dependent decision ISI service se guzarti hai — browser/controller
@@ -85,6 +86,82 @@ class InventoryService
             $this->db->rollBack();
             throw $e;
         }
+    }
+
+    /**
+     * Multi-Warehouse Allocation — agar ek warehouse mein poori quantity nahi
+     * hai, to store ke sath linked baaki warehouses se bhi milake pura karta
+     * hai. Pahle DRY-RUN mein check karta hai ke total (sab warehouses milake)
+     * itna stock hai ya nahi — tab hi actual deduction shuru karta hai, taaki
+     * "aadha reserve, aadha fail" na ho.
+     *
+     * @return array{ok: bool, allocations?: array, requested?: int, available?: int}
+     */
+    public function reserveAcrossWarehouses(int $productId, ?int $variantId, int $storeId, int $quantity, string $source, ?string $reference = null, ?string $actor = null): array
+    {
+        $warehouseModel = new Warehouse();
+        $warehouses = $warehouseModel->allByStore($storeId);
+
+        // Default warehouse ko pahle try karo, baaki uske baad
+        usort($warehouses, fn($a, $b) => ((int) $b['is_default']) <=> ((int) $a['is_default']));
+
+        // Step 1: Dry-run — bina deduct kiye, dekho total kitna available hai
+        // aur kis warehouse se kitna lena padega
+        $remaining = $quantity;
+        $plan = [];
+
+        foreach ($warehouses as $w) {
+            if ($remaining <= 0) break;
+
+            $available = $this->checkAvailability($productId, $variantId, (int) $w['id']);
+            if ($available <= 0) continue;
+
+            $take = min($available, $remaining);
+            $plan[] = [
+                'warehouse_id' => (int) $w['id'],
+                'warehouse_name' => $w['name'],
+                'quantity' => $take,
+            ];
+            $remaining -= $take;
+        }
+
+        if ($remaining > 0) {
+            // Sab warehouses milake bhi poora nahi hua
+            $totalAvailable = $quantity - $remaining;
+            return [
+                'ok' => false,
+                'code' => 'INVENTORY_UNAVAILABLE',
+                'requested' => $quantity,
+                'available' => $totalAvailable,
+            ];
+        }
+
+        // Step 2: Ab actual reserve karo, warehouse-by-warehouse. Agar beech
+        // mein koi step fail ho jaye (race condition — kisi aur order ne
+        // isी waqt stock le liya), to jo already reserve ho chuka hai usse
+        // wapas release karke poori tarah rollback karo.
+        $committed = [];
+
+        foreach ($plan as $step) {
+            $result = $this->reserve($productId, $variantId, $step['warehouse_id'], $step['quantity'], $source, $reference, $actor);
+
+            if (!$result['ok']) {
+                foreach ($committed as $done) {
+                    $this->release($productId, $variantId, $done['warehouse_id'], $done['quantity'], 'multi_warehouse_rollback', $reference, $actor);
+                }
+
+                return [
+                    'ok' => false,
+                    'code' => 'INVENTORY_UNAVAILABLE',
+                    'requested' => $quantity,
+                    'available' => $result['available'] ?? 0,
+                ];
+            }
+
+            $committed[] = $step;
+        }
+
+        return ['ok' => true, 'allocations' => $plan];
     }
 
     /**

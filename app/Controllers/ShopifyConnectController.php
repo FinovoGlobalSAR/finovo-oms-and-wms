@@ -3,19 +3,6 @@ require_once __DIR__ . '/../../core/Controller.php';
 require_once __DIR__ . '/../../core/Database.php';
 require_once __DIR__ . '/../Models/Store.php';
 
-/**
- * Shopify ka apna official OAuth flow use karta hai. Customer sirf apna
- * store URL likhta hai, Shopify khud "Approve" page kholta hai, aur
- * automatically access token generate karke Finovo ko bhej deta hai —
- * customer ko kuch copy-paste nahi karna.
- *
- * Client ID/Secret ab .env se aate hain (hardcoded nahi) — GitHub push
- * protection ne yeh secret detect karke block kiya tha, isliye .env mein
- * move kiya.
- *
- * getBaseUrl() dynamic hai — jis bhi domain se request aayi ho
- * (localhost, ngrok, ya live domain), khud usi ko use karega.
- */
 class ShopifyConnectController extends Controller
 {
     private Store $storeModel;
@@ -28,7 +15,6 @@ class ShopifyConnectController extends Controller
         $this->storeModel = new Store();
     }
 
-    // Step 1 — Customer ko Shopify ke authorize page pe bhejo (login zaroori hai)
     public function connect(): void
     {
         $this->requireRole(['admin', 'manager']);
@@ -46,13 +32,11 @@ class ShopifyConnectController extends Controller
             return;
         }
 
-        // "yourstore.myshopify.com" format confirm karo
         $shopUrl = preg_replace('#^https?://#', '', rtrim($shopUrl, '/'));
         if (!str_ends_with($shopUrl, '.myshopify.com')) {
             $shopUrl .= '.myshopify.com';
         }
 
-        // State token — CSRF se bachne ke liye, aur store_id carry karne ke liye
         $state = bin2hex(random_bytes(16)) . '.' . $storeId;
 
         $redirectUri = $this->getBaseUrl() . '/shopify-connect/callback';
@@ -70,8 +54,6 @@ class ShopifyConnectController extends Controller
         exit;
     }
 
-    // Step 2 — Shopify customer ko yahan wapis bhejta hai, "code" ke sath.
-    // Yahan se Finovo khud (backend se) us code ko access token se exchange karta hai.
     public function callback(): void
     {
         $shop = $_GET['shop'] ?? '';
@@ -100,7 +82,6 @@ class ShopifyConnectController extends Controller
             return;
         }
 
-        // Code ko access token se exchange karo (Shopify ka apna token endpoint)
         $tokenUrl = 'https://' . $shop . '/admin/oauth/access_token';
 
         $ch = curl_init($tokenUrl);
@@ -130,7 +111,6 @@ class ShopifyConnectController extends Controller
             return;
         }
 
-        // Access token ko save kar do — automatically, customer ko kuch copy-paste nahi karna
         $this->storeModel->updateCredentials($storeId, $shop, $accessToken);
 
         $this->redirect('/stores?shopify_connected=1');
@@ -157,9 +137,11 @@ class ShopifyConnectController extends Controller
 
     private function getBaseUrl(): string
     {
-        // Dynamic — jis domain se request aayi (localhost, ngrok, live domain),
-        // khud usi ko use karega. Koi hardcoding nahi.
-        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO'])) {
+            $scheme = $_SERVER['HTTP_X_FORWARDED_PROTO'];
+        } else {
+            $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        }
         return $scheme . '://' . $_SERVER['HTTP_HOST'];
     }
 }

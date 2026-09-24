@@ -11,6 +11,10 @@ $avatarColors = [
 $sourceColors = [
     'shopify_pull'     => ['bg' => '#ede9fe', 'text' => '#6d28d9'],
     'woocommerce_pull' => ['bg' => '#dcfce7', 'text' => '#15803d'],
+    'bigcommerce_pull' => ['bg' => '#dbeafe', 'text' => '#1d4ed8'],
+    'prestashop_pull'  => ['bg' => '#fce7f3', 'text' => '#be185d'],
+    'opencart_pull'    => ['bg' => '#fef9c3', 'text' => '#854d0e'],
+    'oscommerce_pull'  => ['bg' => '#e0f2fe', 'text' => '#0369a1'],
     'manual'           => ['bg' => '#ffedd5', 'text' => '#c2410c'],
     'api_push'         => ['bg' => '#cffafe', 'text' => '#0e7490'],
     'csv_import'       => ['bg' => '#fce7f3', 'text' => '#be185d'],
@@ -32,6 +36,8 @@ $shipmentColors = [
     'delivered'   => ['bg' => '#dcfce7', 'text' => '#15803d'],
     'returned'    => ['bg' => '#fee2e2', 'text' => '#991b1b'],
 ];
+
+$platform = $store['platform'] ?? 'manual';
 ?>
 
 <div class="breadcrumb">Finovo <i class="bi bi-chevron-right"></i> Orders</div>
@@ -73,6 +79,10 @@ $shipmentColors = [
                 <option value="custom" <?= $selectedPlatform === 'custom' ? 'selected' : '' ?>>API push</option>
                 <option value="shopify" <?= $selectedPlatform === 'shopify' ? 'selected' : '' ?>>Shopify</option>
                 <option value="woocommerce" <?= $selectedPlatform === 'woocommerce' ? 'selected' : '' ?>>WooCommerce</option>
+                <option value="bigcommerce" <?= $selectedPlatform === 'bigcommerce' ? 'selected' : '' ?>>BigCommerce</option>
+                <option value="prestashop" <?= $selectedPlatform === 'prestashop' ? 'selected' : '' ?>>PrestaShop</option>
+                <option value="opencart" <?= $selectedPlatform === 'opencart' ? 'selected' : '' ?>>OpenCart</option>
+                <option value="oscommerce" <?= $selectedPlatform === 'oscommerce' ? 'selected' : '' ?>>osCommerce</option>
                 <option value="csv" <?= $selectedPlatform === 'csv' ? 'selected' : '' ?>>CSV import</option>
             </select>
             <button type="submit" class="filter-btn"><i class="bi bi-search"></i></button>
@@ -80,8 +90,21 @@ $shipmentColors = [
         <div class="push-right">
             <button type="button" class="toolbar-btn" onclick="openModal('importOrderModal')"><i class="bi bi-upload"></i> Import CSV</button>
             <a href="/orders/export-csv" class="toolbar-btn"><i class="bi bi-download"></i> Export CSV</a>
-            <a href="/orders/sync-shopify" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync Shopify</a>
-            <a href="/orders/sync-woocommerce" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync WooCommerce</a>
+
+            <?php if ($platform === 'shopify'): ?>
+                <a href="/orders/sync-shopify" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync Shopify</a>
+            <?php elseif ($platform === 'woocommerce'): ?>
+                <a href="/orders/sync-woocommerce" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync WooCommerce</a>
+            <?php elseif ($platform === 'bigcommerce'): ?>
+                <a href="/orders/sync-bigcommerce" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync BigCommerce</a>
+            <?php elseif ($platform === 'prestashop'): ?>
+                <a href="/orders/sync-prestashop" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync PrestaShop</a>
+            <?php elseif ($platform === 'opencart'): ?>
+                <a href="/orders/sync-opencart" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync OpenCart</a>
+            <?php elseif ($platform === 'oscommerce'): ?>
+                <a href="/orders/sync-oscommerce" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync osCommerce</a>
+            <?php endif; ?>
+
             <a href="/shipments" class="toolbar-btn"><i class="bi bi-truck"></i> Shipments</a>
             <a href="/orders/settings" class="toolbar-btn"><i class="bi bi-gear"></i> Settings</a>
             <a href="/orders/create" class="toolbar-btn btn-dark"><i class="bi bi-plus-lg"></i> Add order</a>
@@ -156,6 +179,11 @@ $shipmentColors = [
                             </span>
                             <?php if (!empty($order['payment_method'])): ?>
                                 <div style="font-size:11px; color:var(--text-muted); margin-top:3px;"><?= htmlspecialchars($order['payment_method']) ?></div>
+                            <?php endif; ?>
+                            <?php if ($payKey !== 'paid' && in_array($order['payment_method'] ?? '', ['Card'], true)): ?>
+                                <a href="/payment/initiate?order_id=<?= $order['id'] ?>" class="action-link" style="display:block; margin-top:4px; font-size:11px;">
+                                    <i class="bi bi-credit-card"></i> Pay Now
+                                </a>
                             <?php endif; ?>
                         </td>
                         <td>

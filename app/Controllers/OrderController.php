@@ -12,6 +12,7 @@ require_once __DIR__ . '/../Models/Shipment.php';
 require_once __DIR__ . '/../Services/InventoryService.php';
 require_once __DIR__ . '/../Services/AuditLogService.php';
 require_once __DIR__ . '/../Middlewares/CanonicalMapper.php';
+require_once __DIR__ . '/../Middlewares/ProductAvailabilityGuard.php';
 
 class OrderController extends Controller
 {
@@ -23,6 +24,7 @@ class OrderController extends Controller
     private Shipment $shipmentModel;
     private InventoryService $inventoryService;
     private AuditLogService $auditService;
+    private ProductAvailabilityGuard $availabilityGuard;
 
     public static array $paymentMethods = ['COD', 'Bank Transfer', 'JazzCash', 'Easypaisa', 'Card', 'Other'];
 
@@ -39,6 +41,20 @@ class OrderController extends Controller
         $this->shipmentModel = new Shipment();
         $this->inventoryService = new InventoryService();
         $this->auditService = new AuditLogService();
+        $this->availabilityGuard = new ProductAvailabilityGuard();
+    }
+
+    // OpenCart/osCommerce external MySQL databases se connect karne ke liye
+    // — .env se credentials leta hai (live hosting pe sirf .env badalna hai)
+    private function externalDbConnection(string $dbName): PDO
+    {
+        $host = $_ENV['DB_EXTERNAL_HOST'] ?? 'localhost';
+        $user = $_ENV['DB_EXTERNAL_USER'] ?? 'root';
+        $password = $_ENV['DB_EXTERNAL_PASSWORD'] ?? '';
+
+        $pdo = new PDO("mysql:host={$host};dbname={$dbName};charset=utf8mb4", $user, $password);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        return $pdo;
     }
 
     public function index(): void
@@ -50,19 +66,20 @@ class OrderController extends Controller
         $sourceMap = [
             'shopify'     => 'shopify_pull',
             'woocommerce' => 'woocommerce_pull',
+            'bigcommerce' => 'bigcommerce_pull',
+            'prestashop'  => 'prestashop_pull',
+            'opencart'    => 'opencart_pull',
+            'oscommerce'  => 'oscommerce_pull',
             'custom'      => 'api_push',
             'manual'      => 'manual',
             'csv'         => 'csv_import',
         ];
 
         if ($platform !== 'all' && isset($sourceMap[$platform])) {
-            $orders = $this->orderModel->filterBySource($sourceMap[$platform]);
+            $orders = $this->orderModel->filterBySourceAndStore($sourceMap[$platform], (int) $store['id']);
         } else {
-            $orders = $this->orderModel->all();
+            $orders = $this->orderModel->allByStore((int) $store['id']);
         }
-
-        $orders = array_filter($orders, fn($o) => (int) $o['store_id'] === (int) $store['id']);
-        $orders = array_values($orders);
 
         $search = trim($_GET['search'] ?? '');
         if ($search !== '') {
@@ -73,7 +90,7 @@ class OrderController extends Controller
             $orders = array_values($orders);
         }
 
-        $externalSources = ['shopify_pull', 'woocommerce_pull'];
+        $externalSources = ['shopify_pull', 'woocommerce_pull', 'bigcommerce_pull', 'prestashop_pull', 'opencart_pull', 'oscommerce_pull'];
         foreach ($orders as &$order) {
             $isExternalSource = in_array($order['source'] ?? 'manual', $externalSources, true);
             $isExternalProduct = !empty($order['product_id']) && $this->productModel->isExternal((int) $order['product_id']);
@@ -86,6 +103,7 @@ class OrderController extends Controller
 
         $this->view('orders/index', [
             'orders' => $orders,
+            'store' => $store,
             'shipmentMap' => $shipmentMap,
             'apiKey' => $store['api_key'] ?? null,
             'synced' => $_GET['synced'] ?? null,
@@ -224,15 +242,15 @@ class OrderController extends Controller
         $orderGroup = 'ORD-' . date('YmdHis') . '-' . random_int(100, 999);
         $reservedForRollback = [];
 
-        foreach ($items as $item) {
+        foreach ($items as &$item) {
             $product = $item['product'];
             $variant = $item['variant'];
             $quantity = $item['quantity'];
 
-            $result = $this->inventoryService->reserve(
+            $result = $this->inventoryService->reserveAcrossWarehouses(
                 (int) $product['id'],
                 $variant ? (int) $variant['id'] : null,
-                (int) $defaultWarehouse['id'],
+                (int) $store['id'],
                 $quantity,
                 'manual_order',
                 "order_group:{$orderGroup}",
@@ -241,54 +259,61 @@ class OrderController extends Controller
 
             if (!$result['ok']) {
                 foreach ($reservedForRollback as $done) {
-                    $this->inventoryService->release(
-                        $done['product_id'],
-                        $done['variant_id'],
-                        (int) $defaultWarehouse['id'],
-                        $done['quantity'],
-                        'order_rollback',
-                        "order_group:{$orderGroup}",
-                        $actor
-                    );
+                    foreach ($done['allocations'] as $alloc) {
+                        $this->inventoryService->release(
+                            $done['product_id'],
+                            $done['variant_id'],
+                            $alloc['warehouse_id'],
+                            $alloc['quantity'],
+                            'order_rollback',
+                            "order_group:{$orderGroup}",
+                            $actor
+                        );
+                    }
                 }
 
                 $this->view('orders/create', [
-                    'error' => "\"{$item['label']}\" is out of stock — requested {$result['requested']}, only {$result['available']} available.",
+                    'error' => "\"{$item['label']}\" is out of stock — requested {$result['requested']}, only {$result['available']} available across all linked warehouses.",
                     'products' => $this->getAvailableProductsForForm(),
                     'paymentMethods' => self::$paymentMethods,
                 ]);
                 return;
             }
 
+            $item['allocations'] = $result['allocations'];
+
             $reservedForRollback[] = [
                 'product_id' => (int) $product['id'],
                 'variant_id' => $variant ? (int) $variant['id'] : null,
-                'quantity' => $quantity,
+                'allocations' => $result['allocations'],
             ];
         }
+        unset($item);
 
         foreach ($items as $item) {
             $product = $item['product'];
             $variant = $item['variant'];
-            $quantity = $item['quantity'];
+            $allocations = $item['allocations'];
 
-            $stmt = $db->prepare(
-                "INSERT INTO orders (store_id, customer_name, product_name, quantity, price, source, order_group, variant_id, variant_label, product_id, warehouse_id, payment_method)
-                 VALUES (?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?, ?, ?)"
-            );
-            $stmt->execute([
-                $store['id'],
-                $customer,
-                $product['name'],
-                $quantity,
-                $item['price'],
-                $orderGroup,
-                $variant ? $variant['id'] : null,
-                $variant ? $variant['label'] : null,
-                $product['id'],
-                $defaultWarehouse['id'],
-                $paymentMethod,
-            ]);
+            foreach ($allocations as $alloc) {
+                $stmt = $db->prepare(
+                    "INSERT INTO orders (store_id, customer_name, product_name, quantity, price, source, order_group, variant_id, variant_label, product_id, warehouse_id, payment_method)
+                     VALUES (?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?, ?, ?)"
+                );
+                $stmt->execute([
+                    $store['id'],
+                    $customer,
+                    $product['name'],
+                    $alloc['quantity'],
+                    $item['price'],
+                    $orderGroup,
+                    $variant ? $variant['id'] : null,
+                    $variant ? $variant['label'] : null,
+                    $product['id'],
+                    $alloc['warehouse_id'],
+                    $paymentMethod,
+                ]);
+            }
         }
 
         $this->redirect('/orders');
@@ -655,6 +680,12 @@ class OrderController extends Controller
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
+        if ($httpCode === 204) {
+            $this->storeModel->markHealthy((int) $store['id']);
+            $this->redirect('/orders?synced=0');
+            return;
+        }
+
         if ($httpCode !== 200) {
             $this->storeModel->markUnhealthy((int) $store['id'], "Shopify API error (HTTP {$httpCode})");
             $this->redirect('/orders/settings?error=' . urlencode("Shopify API error (HTTP {$httpCode})."));
@@ -664,7 +695,6 @@ class OrderController extends Controller
         $data = json_decode($response, true);
         $shopifyOrders = $data['orders'] ?? [];
         $importedCount = 0;
-        $warningCount = 0;
 
         foreach ($shopifyOrders as $order) {
             $externalId = (string) $order['id'];
@@ -686,6 +716,20 @@ class OrderController extends Controller
                 continue;
             }
 
+            $productName = $order['line_items'][0]['name'] ?? 'Unknown product';
+            $quantity = $order['line_items'][0]['quantity'] ?? 1;
+
+            $guard = $this->availabilityGuard->check($store['id'], $productName);
+            if (!$guard['allowed']) {
+                continue;
+            }
+            $productId = $guard['product_id'];
+
+            $available = $this->inventoryService->checkAvailability($productId, null, (int) $defaultWarehouse['id']);
+            if ($available < $quantity) {
+                continue;
+            }
+
             $customerName = trim(($order['customer']['first_name'] ?? '') . ' ' . ($order['customer']['last_name'] ?? ''));
             if ($customerName === '') {
                 $customerName = trim(($order['billing_address']['name'] ?? '') ?: ($order['shipping_address']['name'] ?? ''));
@@ -694,33 +738,24 @@ class OrderController extends Controller
                 $customerName = $order['email'] ?? ('Order #' . ($order['order_number'] ?? $order['id']));
             }
 
-            $productName = $order['line_items'][0]['name'] ?? 'Unknown product';
-            $quantity = $order['line_items'][0]['quantity'] ?? 1;
             $price = (float) ($order['total_price'] ?? 0);
 
-            $productId = $this->productModel->findOrCreate($store['id'], $productName, $price);
-
             $result = $this->inventoryService->reserve($productId, null, (int) $defaultWarehouse['id'], $quantity, 'shopify_pull', "external:{$externalId}", 'shopify_sync');
-            $stockWarning = $result['ok'] ? 0 : 1;
-            if ($stockWarning) {
-                $warningCount++;
+            if (!$result['ok']) {
+                continue;
             }
 
             $stmt = $db->prepare(
-                "INSERT INTO orders (store_id, customer_name, product_name, quantity, price, source, external_order_id, status, payment_status, product_id, warehouse_id, stock_warning, payment_method)
-                 VALUES (?, ?, ?, ?, ?, 'shopify_pull', ?, ?, ?, ?, ?, ?, ?)"
+                "INSERT INTO orders (store_id, customer_name, product_name, quantity, price, source, external_order_id, status, payment_status, product_id, warehouse_id, payment_method)
+                 VALUES (?, ?, ?, ?, ?, 'shopify_pull', ?, ?, ?, ?, ?, ?)"
             );
-            $stmt->execute([$store['id'], $customerName, $productName, $quantity, $price, $externalId, $orderStatus, $paymentStatus, $productId, $defaultWarehouse['id'], $stockWarning, $gateway]);
+            $stmt->execute([$store['id'], $customerName, $productName, $quantity, $price, $externalId, $orderStatus, $paymentStatus, $productId, $defaultWarehouse['id'], $gateway]);
 
             $importedCount++;
         }
 
-        $redirectUrl = '/orders?synced=' . $importedCount;
-        if ($warningCount > 0) {
-            $redirectUrl .= '&stock_warning=' . $warningCount;
-        }
         $this->storeModel->markHealthy((int) $store['id']);
-        $this->redirect($redirectUrl);
+        $this->redirect('/orders?synced=' . $importedCount);
     }
 
     // ---------- Shopify: Order Push ----------
@@ -825,6 +860,12 @@ class OrderController extends Controller
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
+        if ($httpCode === 204) {
+            $this->storeModel->markHealthy((int) $store['id']);
+            $this->redirect('/orders?synced=0');
+            return;
+        }
+
         if ($httpCode !== 200) {
             $this->storeModel->markUnhealthy((int) $store['id'], "WooCommerce API error (HTTP {$httpCode})");
             $this->redirect('/orders/settings?error=' . urlencode("WooCommerce API error (HTTP {$httpCode}): " . $response));
@@ -833,7 +874,6 @@ class OrderController extends Controller
 
         $wcOrders = json_decode($response, true) ?? [];
         $importedCount = 0;
-        $warningCount = 0;
 
         foreach ($wcOrders as $order) {
             $externalId = (string) $order['id'];
@@ -844,15 +884,27 @@ class OrderController extends Controller
                 continue;
             }
 
+            $lineItems = $order['line_items'][0] ?? [];
+            $productName = $lineItems['name'] ?? 'Unknown product';
+            $quantity = $lineItems['quantity'] ?? 1;
+
+            $guard = $this->availabilityGuard->check($store['id'], $productName);
+            if (!$guard['allowed']) {
+                continue;
+            }
+            $productId = $guard['product_id'];
+
+            $available = $this->inventoryService->checkAvailability($productId, null, (int) $defaultWarehouse['id']);
+            if ($available < $quantity) {
+                continue;
+            }
+
             $billing = $order['billing'] ?? [];
             $customerName = trim(($billing['first_name'] ?? '') . ' ' . ($billing['last_name'] ?? ''));
             if ($customerName === '') {
                 $customerName = $billing['email'] ?? 'Unknown';
             }
 
-            $lineItems = $order['line_items'][0] ?? [];
-            $productName = $lineItems['name'] ?? 'Unknown product';
-            $quantity = $lineItems['quantity'] ?? 1;
             $price = (float) ($order['total'] ?? 0);
             $paymentMethodTitle = $order['payment_method_title'] ?? 'Other';
 
@@ -861,29 +913,22 @@ class OrderController extends Controller
             $canonicalStatus = CanonicalMapper::fromWooCommerce($wcStatus);
             $orderStatus = CanonicalMapper::toInternalOrderStatus($canonicalStatus);
 
-            $productId = $this->productModel->findOrCreate($store['id'], $productName, $price);
-
             $result = $this->inventoryService->reserve($productId, null, (int) $defaultWarehouse['id'], $quantity, 'woocommerce_pull', "external:{$externalId}", 'woocommerce_sync');
-            $stockWarning = $result['ok'] ? 0 : 1;
-            if ($stockWarning) {
-                $warningCount++;
+            if (!$result['ok']) {
+                continue;
             }
 
             $stmt = $db->prepare(
-                "INSERT INTO orders (store_id, customer_name, product_name, quantity, price, source, external_wc_order_id, status, payment_status, product_id, warehouse_id, stock_warning, payment_method)
-                 VALUES (?, ?, ?, ?, ?, 'woocommerce_pull', ?, ?, ?, ?, ?, ?, ?)"
+                "INSERT INTO orders (store_id, customer_name, product_name, quantity, price, source, external_wc_order_id, status, payment_status, product_id, warehouse_id, payment_method)
+                 VALUES (?, ?, ?, ?, ?, 'woocommerce_pull', ?, ?, ?, ?, ?, ?)"
             );
-            $stmt->execute([$store['id'], $customerName, $productName, $quantity, $price, $externalId, $orderStatus, $paymentStatus, $productId, $defaultWarehouse['id'], $stockWarning, $paymentMethodTitle]);
+            $stmt->execute([$store['id'], $customerName, $productName, $quantity, $price, $externalId, $orderStatus, $paymentStatus, $productId, $defaultWarehouse['id'], $paymentMethodTitle]);
 
             $importedCount++;
         }
 
-        $redirectUrl = '/orders?synced=' . $importedCount;
-        if ($warningCount > 0) {
-            $redirectUrl .= '&stock_warning=' . $warningCount;
-        }
         $this->storeModel->markHealthy((int) $store['id']);
-        $this->redirect($redirectUrl);
+        $this->redirect('/orders?synced=' . $importedCount);
     }
 
     // ---------- WooCommerce: Order Push ----------
@@ -1010,6 +1055,441 @@ class OrderController extends Controller
         }
 
         $this->redirect('/orders?exported=1');
+    }
+
+    // ---------- BigCommerce: Orders Pull ----------
+
+    public function syncBigCommerce(): void
+    {
+        $db = Database::getConnection();
+        $store = $this->getCurrentStore();
+        $defaultWarehouse = $this->warehouseModel->getDefault($store['id']);
+
+        if (empty($store['bigcommerce_store_hash']) || empty($store['bigcommerce_access_token'])) {
+            $this->redirect('/orders/settings?error=' . urlencode('Please save this store\'s BigCommerce Store Hash and Access Token first.'));
+            return;
+        }
+
+        $apiUrl = 'https://api.bigcommerce.com/stores/' . $store['bigcommerce_store_hash'] . '/v2/orders?limit=20&sort=date_created:desc';
+
+        $ch = curl_init($apiUrl);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'X-Auth-Token: ' . $store['bigcommerce_access_token'],
+            'Accept: application/json',
+        ]);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode === 204) {
+            $this->storeModel->markHealthy((int) $store['id']);
+            $this->redirect('/orders?synced=0');
+            return;
+        }
+
+        if ($httpCode !== 200) {
+            $this->storeModel->markUnhealthy((int) $store['id'], "BigCommerce API error (HTTP {$httpCode})");
+            $this->redirect('/orders/settings?error=' . urlencode("BigCommerce API error (HTTP {$httpCode})."));
+            return;
+        }
+
+        $bcOrders = json_decode($response, true) ?? [];
+        $importedCount = 0;
+
+        foreach ($bcOrders as $order) {
+            $externalId = (string) ($order['id'] ?? '');
+            if ($externalId === '') continue;
+
+            $check = $db->prepare("SELECT id FROM orders WHERE external_bc_order_id = ? AND store_id = ?");
+            $check->execute([$externalId, $store['id']]);
+            $existing = $check->fetch();
+
+            $bcStatus = $order['status'] ?? 'Pending';
+            $orderStatus = 'pending';
+
+            if (str_contains($bcStatus, 'Shipped') || str_contains($bcStatus, 'Completed')) {
+                $orderStatus = 'delivered';
+            } elseif (str_contains($bcStatus, 'Cancelled') || str_contains($bcStatus, 'Declined') || str_contains($bcStatus, 'Refunded')) {
+                $orderStatus = 'cancelled';
+            } elseif (in_array($bcStatus, ['Awaiting Fulfillment', 'Partially Shipped'], true)) {
+                $orderStatus = 'processing';
+            }
+
+            $paymentStatus = in_array($bcStatus, ['Awaiting Fulfillment', 'Shipped', 'Partially Shipped', 'Completed'], true) ? 'paid' : 'unpaid';
+
+            if ($existing) {
+                $updateStmt = $db->prepare("UPDATE orders SET status = ?, payment_status = ? WHERE id = ?");
+                $updateStmt->execute([$orderStatus, $paymentStatus, $existing['id']]);
+                continue;
+            }
+
+            $productsUrl = 'https://api.bigcommerce.com/stores/' . $store['bigcommerce_store_hash'] . "/v2/orders/{$externalId}/products";
+            $pch = curl_init($productsUrl);
+            curl_setopt($pch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($pch, CURLOPT_HTTPHEADER, [
+                'X-Auth-Token: ' . $store['bigcommerce_access_token'],
+                'Accept: application/json',
+            ]);
+            curl_setopt($pch, CURLOPT_TIMEOUT, 15);
+            $productsResponse = curl_exec($pch);
+            curl_close($pch);
+
+            $lineItems = json_decode($productsResponse, true) ?? [];
+            $firstItem = $lineItems[0] ?? [];
+
+            $productName = $firstItem['name'] ?? 'Unknown product';
+            $quantity = (int) ($firstItem['quantity'] ?? 1);
+
+            $guard = $this->availabilityGuard->check($store['id'], $productName);
+            if (!$guard['allowed']) {
+                continue;
+            }
+            $productId = $guard['product_id'];
+
+            $available = $this->inventoryService->checkAvailability($productId, null, (int) $defaultWarehouse['id']);
+            if ($available < $quantity) {
+                continue;
+            }
+
+            $billing = $order['billing_address'] ?? [];
+            $customerName = trim(($billing['first_name'] ?? '') . ' ' . ($billing['last_name'] ?? ''));
+            if ($customerName === '') {
+                $customerName = $billing['email'] ?? ('Order #' . $externalId);
+            }
+
+            $price = (float) ($order['total_inc_tax'] ?? 0);
+
+            $result = $this->inventoryService->reserve($productId, null, (int) $defaultWarehouse['id'], $quantity, 'bigcommerce_pull', "external:{$externalId}", 'bigcommerce_sync');
+            if (!$result['ok']) {
+                continue;
+            }
+
+            $stmt = $db->prepare(
+                "INSERT INTO orders (store_id, customer_name, product_name, quantity, price, source, external_bc_order_id, status, payment_status, product_id, warehouse_id)
+                 VALUES (?, ?, ?, ?, ?, 'bigcommerce_pull', ?, ?, ?, ?, ?)"
+            );
+            $stmt->execute([$store['id'], $customerName, $productName, $quantity, $price, $externalId, $orderStatus, $paymentStatus, $productId, $defaultWarehouse['id']]);
+
+            $importedCount++;
+        }
+
+        $this->storeModel->markHealthy((int) $store['id']);
+        $this->redirect('/orders?synced=' . $importedCount);
+    }
+
+    // ---------- PrestaShop: Orders Pull ----------
+
+    public function syncPrestaShop(): void
+    {
+        $db = Database::getConnection();
+        $store = $this->getCurrentStore();
+        $defaultWarehouse = $this->warehouseModel->getDefault($store['id']);
+
+        if (empty($store['prestashop_store_url']) || empty($store['prestashop_api_key'])) {
+            $this->redirect('/orders/settings?error=' . urlencode('Please save this store\'s PrestaShop Store URL and API Key first.'));
+            return;
+        }
+
+        $baseUrl = rtrim($store['prestashop_store_url'], '/');
+        $apiUrl = $baseUrl . '/api/orders?ws_key=' . urlencode($store['prestashop_api_key']) . '&output_format=JSON&display=[id,id_customer,total_paid,current_state]&sort=[id_DESC]&limit=20';
+
+        $ch = curl_init($apiUrl);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode === 404) {
+            $this->storeModel->markHealthy((int) $store['id']);
+            $this->redirect('/orders?synced=0');
+            return;
+        }
+
+        if ($httpCode !== 200) {
+            $this->storeModel->markUnhealthy((int) $store['id'], "PrestaShop API error (HTTP {$httpCode})");
+            $this->redirect('/orders/settings?error=' . urlencode("PrestaShop API error (HTTP {$httpCode})."));
+            return;
+        }
+
+        $data = json_decode($response, true);
+        $psOrders = $data['orders'] ?? [];
+        $importedCount = 0;
+
+        foreach ($psOrders as $order) {
+            $externalId = (string) ($order['id'] ?? '');
+            if ($externalId === '') continue;
+
+            $check = $db->prepare("SELECT id FROM orders WHERE external_ps_order_id = ? AND store_id = ?");
+            $check->execute([$externalId, $store['id']]);
+            $existing = $check->fetch();
+
+            $stateId = (int) ($order['current_state'] ?? 0);
+            $orderStatus = match (true) {
+                in_array($stateId, [5], true) => 'delivered',
+                in_array($stateId, [6, 7, 8], true) => 'cancelled',
+                in_array($stateId, [2, 3, 4], true) => 'processing',
+                default => 'pending',
+            };
+            $paymentStatus = in_array($stateId, [2, 3, 4, 5], true) ? 'paid' : 'unpaid';
+
+            if ($existing) {
+                $updateStmt = $db->prepare("UPDATE orders SET status = ?, payment_status = ? WHERE id = ?");
+                $updateStmt->execute([$orderStatus, $paymentStatus, $existing['id']]);
+                continue;
+            }
+
+            $productName = 'PrestaShop Order #' . $externalId;
+            $quantity = 1;
+
+            $guard = $this->availabilityGuard->check($store['id'], $productName);
+            if (!$guard['allowed']) {
+                continue;
+            }
+            $productId = $guard['product_id'];
+
+            $available = $this->inventoryService->checkAvailability($productId, null, (int) $defaultWarehouse['id']);
+            if ($available < $quantity) {
+                continue;
+            }
+
+            $customerId = (int) ($order['id_customer'] ?? 0);
+            $customerName = 'Order #' . $externalId;
+
+            if ($customerId > 0) {
+                $custUrl = $baseUrl . '/api/customers/' . $customerId . '?ws_key=' . urlencode($store['prestashop_api_key']) . '&output_format=JSON&display=[firstname,lastname]';
+                $cch = curl_init($custUrl);
+                curl_setopt($cch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($cch, CURLOPT_TIMEOUT, 10);
+                curl_setopt($cch, CURLOPT_SSL_VERIFYPEER, false);
+                $custResponse = curl_exec($cch);
+                curl_close($cch);
+
+                $custData = json_decode($custResponse, true);
+                $cust = $custData['customer'] ?? [];
+                $fullName = trim(($cust['firstname'] ?? '') . ' ' . ($cust['lastname'] ?? ''));
+                if ($fullName !== '') {
+                    $customerName = $fullName;
+                }
+            }
+
+            $price = (float) ($order['total_paid'] ?? 0);
+
+            $result = $this->inventoryService->reserve($productId, null, (int) $defaultWarehouse['id'], $quantity, 'prestashop_pull', "external:{$externalId}", 'prestashop_sync');
+            if (!$result['ok']) {
+                continue;
+            }
+
+            $stmt = $db->prepare(
+                "INSERT INTO orders (store_id, customer_name, product_name, quantity, price, source, external_ps_order_id, status, payment_status, product_id, warehouse_id)
+                 VALUES (?, ?, ?, ?, ?, 'prestashop_pull', ?, ?, ?, ?, ?)"
+            );
+            $stmt->execute([$store['id'], $customerName, $productName, $quantity, $price, $externalId, $orderStatus, $paymentStatus, $productId, $defaultWarehouse['id']]);
+
+            $importedCount++;
+        }
+
+        $this->storeModel->markHealthy((int) $store['id']);
+        $this->redirect('/orders?synced=' . $importedCount);
+    }
+
+    // ---------- OpenCart: Orders Pull (direct DB read) ----------
+
+    public function syncOpenCart(): void
+    {
+        $db = Database::getConnection();
+        $store = $this->getCurrentStore();
+        $defaultWarehouse = $this->warehouseModel->getDefault($store['id']);
+
+        $ocDbName = $store['opencart_store_url'] ?? '';
+        if ($ocDbName === '') {
+            $this->redirect('/orders/settings?error=' . urlencode('Please save this store\'s OpenCart database name first.'));
+            return;
+        }
+
+        try {
+            $ocDb = $this->externalDbConnection($ocDbName);
+        } catch (PDOException $e) {
+            $this->storeModel->markUnhealthy((int) $store['id'], 'Could not connect to OpenCart database.');
+            $this->redirect('/orders/settings?error=' . urlencode('Could not connect to OpenCart database: ' . $e->getMessage()));
+            return;
+        }
+
+        $stmt = $ocDb->query(
+            "SELECT o.order_id, o.firstname, o.lastname, o.total, o.order_status_id,
+                    op.name AS product_name, op.quantity
+             FROM oc_order o
+             LEFT JOIN oc_order_product op ON op.order_id = o.order_id
+             WHERE o.order_status_id > 0
+             ORDER BY o.order_id DESC
+             LIMIT 20"
+        );
+        $ocOrders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $importedCount = 0;
+
+        foreach ($ocOrders as $order) {
+            $externalId = (string) ($order['order_id'] ?? '');
+            if ($externalId === '') continue;
+
+            $statusId = (int) ($order['order_status_id'] ?? 0);
+            $orderStatus = match (true) {
+                in_array($statusId, [5, 3], true) => 'delivered',
+                in_array($statusId, [7, 8, 9], true) => 'cancelled',
+                in_array($statusId, [2, 10], true) => 'processing',
+                default => 'pending',
+            };
+            $paymentStatus = $statusId >= 2 ? 'paid' : 'unpaid';
+
+            $check = $db->prepare("SELECT id FROM orders WHERE external_ocart_order_id = ? AND store_id = ?");
+            $check->execute([$externalId, $store['id']]);
+            $existing = $check->fetch();
+
+            if ($existing) {
+                $update = $db->prepare("UPDATE orders SET status = ?, payment_status = ? WHERE id = ?");
+                $update->execute([$orderStatus, $paymentStatus, $existing['id']]);
+                continue;
+            }
+
+            $productName = $order['product_name'] ?? 'Unknown product';
+            $quantity = (int) ($order['quantity'] ?? 1);
+
+            $guard = $this->availabilityGuard->check($store['id'], $productName);
+            if (!$guard['allowed']) {
+                continue;
+            }
+            $productId = $guard['product_id'];
+
+            $available = $this->inventoryService->checkAvailability($productId, null, (int) $defaultWarehouse['id']);
+            if ($available < $quantity) {
+                continue;
+            }
+
+            $customerName = trim(($order['firstname'] ?? '') . ' ' . ($order['lastname'] ?? ''));
+            if ($customerName === '') {
+                $customerName = 'Order #' . $externalId;
+            }
+
+            $price = (float) ($order['total'] ?? 0);
+
+            $result = $this->inventoryService->reserve($productId, null, (int) $defaultWarehouse['id'], $quantity, 'opencart_pull', "external:{$externalId}", 'opencart_sync');
+            if (!$result['ok']) {
+                continue;
+            }
+
+            $stmt2 = $db->prepare(
+                "INSERT INTO orders (store_id, customer_name, product_name, quantity, price, source, external_ocart_order_id, status, payment_status, product_id, warehouse_id)
+                 VALUES (?, ?, ?, ?, ?, 'opencart_pull', ?, ?, ?, ?, ?)"
+            );
+            $stmt2->execute([$store['id'], $customerName, $productName, $quantity, $price, $externalId, $orderStatus, $paymentStatus, $productId, $defaultWarehouse['id']]);
+
+            $importedCount++;
+        }
+
+        $this->storeModel->markHealthy((int) $store['id']);
+        $this->redirect('/orders?synced=' . $importedCount);
+    }
+
+    // ---------- osCommerce: Orders Pull (direct DB read) ----------
+
+    public function syncOsCommerce(): void
+    {
+        $db = Database::getConnection();
+        $store = $this->getCurrentStore();
+        $defaultWarehouse = $this->warehouseModel->getDefault($store['id']);
+
+        $oscDbName = $store['oscommerce_store_url'] ?? '';
+        if ($oscDbName === '') {
+            $this->redirect('/orders/settings?error=' . urlencode('Please save this store\'s osCommerce database name first.'));
+            return;
+        }
+
+        try {
+            $oscDb = $this->externalDbConnection($oscDbName);
+        } catch (PDOException $e) {
+            $this->storeModel->markUnhealthy((int) $store['id'], 'Could not connect to osCommerce database.');
+            $this->redirect('/orders/settings?error=' . urlencode('Could not connect to osCommerce database: ' . $e->getMessage()));
+            return;
+        }
+
+        $stmt = $oscDb->query(
+            "SELECT o.orders_id, o.customers_name, o.customers_firstname, o.customers_lastname, o.orders_status,
+                    op.products_name, op.products_price, op.products_quantity
+             FROM orders o
+             LEFT JOIN orders_products op ON op.orders_id = o.orders_id
+             ORDER BY o.orders_id DESC
+             LIMIT 20"
+        );
+        $oscOrders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $importedCount = 0;
+
+        foreach ($oscOrders as $order) {
+            $externalId = (string) ($order['orders_id'] ?? '');
+            if ($externalId === '') continue;
+
+            $statusId = (int) ($order['orders_status'] ?? 0);
+            $orderStatus = match ($statusId) {
+                3 => 'delivered',
+                4 => 'cancelled',
+                2 => 'processing',
+                default => 'pending',
+            };
+            $paymentStatus = $statusId >= 2 ? 'paid' : 'unpaid';
+
+            $check = $db->prepare("SELECT id FROM orders WHERE external_osc_order_id = ? AND store_id = ?");
+            $check->execute([$externalId, $store['id']]);
+            $existing = $check->fetch();
+
+            if ($existing) {
+                $update = $db->prepare("UPDATE orders SET status = ?, payment_status = ? WHERE id = ?");
+                $update->execute([$orderStatus, $paymentStatus, $existing['id']]);
+                continue;
+            }
+
+            $productName = $order['products_name'] ?? 'Unknown product';
+            $quantity = (int) ($order['products_quantity'] ?? 1);
+
+            $guard = $this->availabilityGuard->check($store['id'], $productName);
+            if (!$guard['allowed']) {
+                continue;
+            }
+            $productId = $guard['product_id'];
+
+            $available = $this->inventoryService->checkAvailability($productId, null, (int) $defaultWarehouse['id']);
+            if ($available < $quantity) {
+                continue;
+            }
+
+            $customerName = trim($order['customers_name'] ?? '');
+            if ($customerName === '') {
+                $customerName = trim(($order['customers_firstname'] ?? '') . ' ' . ($order['customers_lastname'] ?? ''));
+            }
+            if ($customerName === '') {
+                $customerName = 'Order #' . $externalId;
+            }
+
+            $price = (float) ($order['products_price'] ?? 0) * $quantity;
+
+            $result = $this->inventoryService->reserve($productId, null, (int) $defaultWarehouse['id'], $quantity, 'oscommerce_pull', "external:{$externalId}", 'oscommerce_sync');
+            if (!$result['ok']) {
+                continue;
+            }
+
+            $stmt2 = $db->prepare(
+                "INSERT INTO orders (store_id, customer_name, product_name, quantity, price, source, external_osc_order_id, status, payment_status, product_id, warehouse_id)
+                 VALUES (?, ?, ?, ?, ?, 'oscommerce_pull', ?, ?, ?, ?, ?)"
+            );
+            $stmt2->execute([$store['id'], $customerName, $productName, $quantity, $price, $externalId, $orderStatus, $paymentStatus, $productId, $defaultWarehouse['id']]);
+
+            $importedCount++;
+        }
+
+        $this->storeModel->markHealthy((int) $store['id']);
+        $this->redirect('/orders?synced=' . $importedCount);
     }
 
     // ---------- CSV Export ----------

@@ -1,4 +1,13 @@
-<?php $currentPage = 'stores'; ?>
+<?php
+$avatarColors = [
+    ['bg' => '#dbeafe', 'text' => '#1d4ed8'],
+    ['bg' => '#dcfce7', 'text' => '#15803d'],
+    ['bg' => '#fce7f3', 'text' => '#be185d'],
+    ['bg' => '#fef3c7', 'text' => '#b45309'],
+    ['bg' => '#e0e7ff', 'text' => '#4338ca'],
+    ['bg' => '#cffafe', 'text' => '#0e7490'],
+];
+?>
 
 <div class="breadcrumb"><a href="/dashboard" class="breadcrumb-link">Finovo</a> <i class="bi bi-chevron-right"></i> Stores</div>
 
@@ -103,6 +112,10 @@
                     <option value="shopify">Shopify</option>
                     <option value="woocommerce">WooCommerce</option>
                     <option value="custom">Custom Store</option>
+                    <option value="bigcommerce">BigCommerce</option>
+                    <option value="prestashop">PrestaShop</option>
+                    <option value="opencart">OpenCart</option>
+                    <option value="oscommerce">osCommerce</option>
                 </select>
             </div>
             <div class="form-group">
@@ -132,6 +145,30 @@
             <div class="form-group">
                 <label>Bridge Shared Secret (optional)</label>
                 <input type="text" name="bridge_shared_secret" placeholder="Generate a random secret">
+            </div>
+            <div class="form-group">
+                <label>BigCommerce Store Hash (optional)</label>
+                <input type="text" name="bigcommerce_store_hash" placeholder="e.g. zej9n5vxfp">
+            </div>
+            <div class="form-group">
+                <label>BigCommerce Access Token (optional)</label>
+                <input type="text" name="bigcommerce_access_token">
+            </div>
+            <div class="form-group">
+                <label>PrestaShop Store URL (optional)</label>
+                <input type="text" name="prestashop_store_url" placeholder="http://localhost/prestashop">
+            </div>
+            <div class="form-group">
+                <label>PrestaShop API Key (optional)</label>
+                <input type="text" name="prestashop_api_key">
+            </div>
+            <div class="form-group">
+                <label>OpenCart Database Name (optional)</label>
+                <input type="text" name="opencart_store_url" placeholder="e.g. opencart_test">
+            </div>
+            <div class="form-group">
+                <label>osCommerce Store URL (optional)</label>
+                <input type="text" name="oscommerce_store_url" placeholder="http://localhost/oscommerce">
             </div>
             <div class="form-group">
                 <label>Link to warehouse(s)</label>
@@ -176,6 +213,10 @@
                     <option value="shopify">Shopify</option>
                     <option value="woocommerce">WooCommerce</option>
                     <option value="custom">Custom Store</option>
+                    <option value="bigcommerce">BigCommerce</option>
+                    <option value="prestashop">PrestaShop</option>
+                    <option value="opencart">OpenCart</option>
+                    <option value="oscommerce">osCommerce</option>
                 </select>
             </div>
             <div class="form-group">
@@ -228,6 +269,30 @@
                 <input type="text" name="bridge_shared_secret" id="editStoreBridgeSecret">
             </div>
             <div class="form-group">
+                <label>BigCommerce Store Hash</label>
+                <input type="text" name="bigcommerce_store_hash" id="editStoreBcHash">
+            </div>
+            <div class="form-group">
+                <label>BigCommerce Access Token</label>
+                <input type="text" name="bigcommerce_access_token" id="editStoreBcToken">
+            </div>
+            <div class="form-group">
+                <label>PrestaShop Store URL</label>
+                <input type="text" name="prestashop_store_url" id="editStorePsUrl">
+            </div>
+            <div class="form-group">
+                <label>PrestaShop API Key</label>
+                <input type="text" name="prestashop_api_key" id="editStorePsKey">
+            </div>
+            <div class="form-group">
+                <label>OpenCart Database Name</label>
+                <input type="text" name="opencart_store_url" id="editStoreOcUrl">
+            </div>
+            <div class="form-group">
+                <label>osCommerce Store URL</label>
+                <input type="text" name="oscommerce_store_url" id="editStoreOscUrl">
+            </div>
+            <div class="form-group">
                 <label>Linked warehouse(s)</label>
                 <?php if (!empty($allWarehouses)): ?>
                     <div id="editWarehouseCheckboxes" style="max-height:140px; overflow-y:auto; border:1px solid var(--border-color); border-radius:8px; padding:8px 10px;">
@@ -263,6 +328,12 @@ function openEditModal(store) {
     document.getElementById('editStoreBridgeUrl').value = store.bridge_url || '';
     document.getElementById('editStoreBridgeKey').value = store.bridge_api_key || '';
     document.getElementById('editStoreBridgeSecret').value = store.bridge_shared_secret || '';
+    document.getElementById('editStoreBcHash').value = store.bigcommerce_store_hash || '';
+    document.getElementById('editStoreBcToken').value = store.bigcommerce_access_token || '';
+    document.getElementById('editStorePsUrl').value = store.prestashop_store_url || '';
+    document.getElementById('editStorePsKey').value = store.prestashop_api_key || '';
+    document.getElementById('editStoreOcUrl').value = store.opencart_store_url || '';
+    document.getElementById('editStoreOscUrl').value = store.oscommerce_store_url || '';
     document.getElementById('wooConnectUrl').value = store.woocommerce_store_url || '';
     document.getElementById('shopifyConnectUrl').value = store.store_url || '';
 

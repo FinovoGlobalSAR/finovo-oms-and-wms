@@ -16,6 +16,23 @@ class Order extends Model
         return $stmt->fetchAll();
     }
 
+    // SQL level pe hi store_id filter karta hai — pehle poore database ke
+    // orders laake PHP mein filter hota tha, jo bade data pe slow hai.
+    public function allByStore(int $storeId): array
+    {
+        $stmt = $this->query("SELECT * FROM orders WHERE store_id = ? ORDER BY id DESC", [$storeId]);
+        return $stmt->fetchAll();
+    }
+
+    public function filterBySourceAndStore(string $source, int $storeId): array
+    {
+        $stmt = $this->query(
+            "SELECT * FROM orders WHERE source = ? AND store_id = ? ORDER BY id DESC",
+            [$source, $storeId]
+        );
+        return $stmt->fetchAll();
+    }
+
     public function create(string $customerName, string $productName, int $quantity, float $price, string $source = 'manual'): int
     {
         $this->query(
@@ -44,7 +61,6 @@ class Order extends Model
         } else {
             $rows = [$main];
         }
-
         $storeStmt = $this->query("SELECT name FROM stores WHERE id = ?", [$main['store_id']]);
         $storeRow = $storeStmt->fetch();
 

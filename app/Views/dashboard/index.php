@@ -35,7 +35,13 @@ function statCard(string $label, string $value, string $icon, string $color): st
 <!-- ============ STAT CARDS (all roles) ============ -->
 <div style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:20px;">
     <?php echo statCard('Total Orders', (string) $totalOrders, 'bi-bag-check', '#4338ca'); ?>
-    <?php echo statCard('Total Revenue', $currencySymbol . ' ' . number_format($totalRevenue, 2), 'bi-cash-stack', '#15803d'); ?>
+
+    <?php if ($totalRevenueUsd > 0): ?>
+        <?php echo statCard('Total Revenue ($)', '$ ' . number_format($totalRevenueUsd, 2), 'bi-cash-stack', '#15803d'); ?>
+    <?php endif; ?>
+    <?php if ($totalRevenuePkr > 0 || $totalRevenueUsd == 0): ?>
+        <?php echo statCard('Total Revenue (Rs.)', 'Rs. ' . number_format($totalRevenuePkr, 2), 'bi-cash-stack', '#0e7490'); ?>
+    <?php endif; ?>
 
     <?php if (in_array($role, ['admin', 'manager'], true)): ?>
         <?php echo statCard('Low Stock Items', (string) $lowStockCount, 'bi-exclamation-triangle', '#b45309'); ?>
@@ -68,7 +74,6 @@ function statCard(string $label, string $value, string $icon, string $color): st
         <h3 style="font-size:14px; font-weight:600; margin-bottom:14px; color:var(--text-dark);">Orders by Status</h3>
         <canvas id="statusChart" height="200"></canvas>
     </div>
-
 </div>
 
 <?php if (in_array($role, ['admin', 'manager'], true)): ?>
@@ -147,7 +152,6 @@ function statCard(string $label, string $value, string $icon, string $color): st
 
 </div>
 <?php endif; ?>
-
 <!-- ============ RECENT ORDERS (all roles) ============ -->
 <div class="card" style="padding:0; overflow:hidden;">
     <h3 style="font-size:14px; font-weight:600; padding:20px 20px 0; color:var(--text-dark);">Recent Orders</h3>
@@ -226,7 +230,6 @@ new Chart(statusCtx, {
         plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } }
     }
 });
-
 <?php if (in_array($role, ['admin', 'manager'], true)): ?>
 const sourceCtx = document.getElementById('sourceChart');
 new Chart(sourceCtx, {

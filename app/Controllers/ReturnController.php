@@ -4,12 +4,16 @@ require_once __DIR__ . '/../../core/Database.php';
 require_once __DIR__ . '/../Models/ReturnRequest.php';
 require_once __DIR__ . '/../Models/Product.php';
 require_once __DIR__ . '/../Models/ProductVariant.php';
+require_once __DIR__ . '/../Services/InventoryService.php';
 
 class ReturnController extends Controller
 {
     private ReturnRequest $returnModel;
     private Product $productModel;
     private ProductVariant $variantModel;
+    private InventoryService $inventoryService;
+
+    private array $externalSources = ['shopify_pull', 'woocommerce_pull', 'bigcommerce_pull', 'prestashop_pull', 'opencart_pull', 'oscommerce_pull'];
 
     public function __construct()
     {
@@ -19,6 +23,7 @@ class ReturnController extends Controller
         $this->returnModel = new ReturnRequest();
         $this->productModel = new Product();
         $this->variantModel = new ProductVariant();
+        $this->inventoryService = new InventoryService();
     }
 
     public function index(): void
@@ -26,12 +31,24 @@ class ReturnController extends Controller
         $store = $this->getCurrentStore();
         $db = Database::getConnection();
 
+        $alreadyReturned = $this->returnModel->returnedOrderIds((int) $store['id']);
+
         $stmt = $db->prepare("SELECT * FROM orders WHERE store_id = ? ORDER BY id DESC LIMIT 100");
         $stmt->execute([(int) $store['id']]);
-        $recentOrders = $stmt->fetchAll();
+        $allOrders = $stmt->fetchAll();
+
+        $recentOrders = array_values(array_filter($allOrders, function ($o) use ($alreadyReturned) {
+            return !in_array((int) $o['id'], $alreadyReturned, true);
+        }));
+
+        $returns = $this->returnModel->all((int) $store['id']);
+        foreach ($returns as &$r) {
+            $r['currency_symbol'] = in_array($r['order_source'] ?? 'manual', $this->externalSources, true) ? '$' : 'Rs.';
+        }
+        unset($r);
 
         $this->view('returns/index', [
-            'returns' => $this->returnModel->all((int) $store['id']),
+            'returns' => $returns,
             'recentOrders' => $recentOrders,
             'statuses' => ReturnRequest::$statuses,
             'conditions' => ReturnRequest::$conditions,
@@ -86,6 +103,7 @@ class ReturnController extends Controller
         $id = (int) ($_POST['id'] ?? 0);
         $status = trim($_POST['status'] ?? '');
         $condition = trim($_POST['condition_status'] ?? 'resellable');
+        $actor = $_SESSION['user']['name'] ?? 'system';
 
         $return = $this->returnModel->find($id);
 
@@ -94,12 +112,17 @@ class ReturnController extends Controller
             return;
         }
 
-        // Jab return "completed" ho aur product resellable ho, tabhi stock wapas warehouse mein jaye
         if ($status === 'completed' && $return['status'] !== 'completed' && $condition === 'resellable') {
-            if (!empty($return['variant_id'])) {
-                $this->variantModel->increaseWarehouseStock((int) $return['variant_id'], (int) $return['warehouse_id'], (int) $return['quantity']);
-            } elseif (!empty($return['product_id'])) {
-                $this->productModel->increaseWarehouseStock((int) $return['product_id'], (int) $return['warehouse_id'], (int) $return['quantity']);
+            if (!empty($return['product_id'])) {
+                $this->inventoryService->release(
+                    (int) $return['product_id'],
+                    !empty($return['variant_id']) ? (int) $return['variant_id'] : null,
+                    (int) $return['warehouse_id'],
+                    (int) $return['quantity'],
+                    'return_completed',
+                    "return:{$id}",
+                    $actor
+                );
             }
         }
 

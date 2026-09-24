@@ -18,6 +18,7 @@ $statusColors = [
 
 <?php if (!empty($created)): ?><div class="banner banner-success">Shipment created.</div><?php endif; ?>
 <?php if (!empty($updated)): ?><div class="banner banner-success">Shipment updated.</div><?php endif; ?>
+<?php if (!empty($_GET['tracked'])): ?><div class="banner banner-success">Live status: <?= htmlspecialchars($_GET['tracked']) ?></div><?php endif; ?>
 <?php if (!empty($error)): ?><div class="banner banner-error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
 <div class="card" style="overflow: visible;">
@@ -28,7 +29,6 @@ $statusColors = [
             </button>
         </div>
     </div>
-
     <table class="data-table">
         <thead>
             <tr>
@@ -38,7 +38,7 @@ $statusColors = [
                 <th>Courier</th>
                 <th>Tracking #</th>
                 <th>Status</th>
-                <th style="width:180px;">Update Status</th>
+                <th style="width:200px;">Update Status</th>
             </tr>
         </thead>
         <tbody>
@@ -73,6 +73,9 @@ $statusColors = [
                                 </select>
                                 <button type="submit" class="filter-btn" style="padding:5px 10px;"><i class="bi bi-check-lg"></i></button>
                             </form>
+                            <a href="/3pl/track?id=<?= $s['id'] ?>" class="action-link" style="display:block; margin-top:6px; font-size:11px;">
+                                <i class="bi bi-satellite"></i> Track Live (DHL only for now)
+                            </a>
                         </td>
                     </tr>
                 <?php endforeach; ?>
@@ -80,7 +83,6 @@ $statusColors = [
         </tbody>
     </table>
 </div>
-
 <div class="modal-backdrop" id="createShipmentModal">
     <div class="modal-box">
         <div class="modal-header">

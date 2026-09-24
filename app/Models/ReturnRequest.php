@@ -9,7 +9,7 @@ class ReturnRequest extends Model
     public function all(int $storeId): array
     {
         $stmt = $this->query(
-            "SELECT r.*, o.customer_name, o.product_name
+            "SELECT r.*, o.customer_name, o.product_name, o.source AS order_source
              FROM returns r
              INNER JOIN orders o ON o.id = r.order_id
              WHERE r.store_id = ?
@@ -24,6 +24,15 @@ class ReturnRequest extends Model
         $stmt = $this->query("SELECT * FROM returns WHERE id = ?", [$id]);
         $row = $stmt->fetch();
         return $row ?: null;
+    }
+
+    public function returnedOrderIds(int $storeId): array
+    {
+        $stmt = $this->query(
+            "SELECT DISTINCT order_id FROM returns WHERE store_id = ? AND status != 'rejected'",
+            [$storeId]
+        );
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
     }
 
     public function create(int $storeId, int $orderId, ?int $productId, ?int $variantId, int $warehouseId, int $quantity, ?string $reason, float $refundAmount): int

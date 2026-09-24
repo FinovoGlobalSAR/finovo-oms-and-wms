@@ -43,33 +43,38 @@ $statusColors = [
             <?php else: ?>
                 <?php foreach ($returns as $r):
                     $statusColor = $statusColors[$r['status']] ?? ['bg' => '#f3f4f6', 'text' => '#374151'];
+                    $currency = $r['currency_symbol'] ?? 'Rs.';
                 ?>
                     <tr>
                         <td>#<?= (int) $r['id'] ?></td>
                         <td>#<?= (int) $r['order_id'] ?> — <?= htmlspecialchars($r['customer_name']) ?></td>
                         <td><?= htmlspecialchars($r['product_name']) ?></td>
                         <td><?= (int) $r['quantity'] ?></td>
-                        <td>Rs. <?= number_format((float) $r['refund_amount'], 2) ?></td>
+                        <td><?= $currency ?> <?= number_format((float) $r['refund_amount'], 2) ?></td>
                         <td>
                             <span class="source-badge" style="background:<?= $statusColor['bg'] ?>; color:<?= $statusColor['text'] ?>;">
                                 <?= ucfirst($r['status']) ?>
                             </span>
                         </td>
                         <td>
-                            <form method="POST" action="/returns/update-status" style="display:flex; gap:6px;">
-                                <input type="hidden" name="id" value="<?= $r['id'] ?>">
-                                <select name="status" style="border:1px solid var(--border-color); border-radius:6px; padding:5px 6px; font-size:12px; font-family:'Inter',sans-serif;">
-                                    <?php foreach ($statuses as $st): ?>
-                                        <option value="<?= $st ?>" <?= $r['status'] === $st ? 'selected' : '' ?>><?= ucfirst($st) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <select name="condition_status" style="border:1px solid var(--border-color); border-radius:6px; padding:5px 6px; font-size:12px; font-family:'Inter',sans-serif;">
-                                    <?php foreach ($conditions as $c): ?>
-                                        <option value="<?= $c ?>" <?= $r['condition_status'] === $c ? 'selected' : '' ?>><?= ucfirst($c) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <button type="submit" class="filter-btn" style="padding:5px 10px;"><i class="bi bi-check-lg"></i></button>
-                            </form>
+                            <?php if ($r['status'] !== 'completed' && $r['status'] !== 'rejected'): ?>
+                                <form method="POST" action="/returns/update-status" style="display:flex; gap:6px;">
+                                    <input type="hidden" name="id" value="<?= $r['id'] ?>">
+                                    <select name="status" style="border:1px solid var(--border-color); border-radius:6px; padding:5px 6px; font-size:12px; font-family:'Inter',sans-serif;">
+                                        <?php foreach ($statuses as $st): ?>
+                                            <option value="<?= $st ?>" <?= $r['status'] === $st ? 'selected' : '' ?>><?= ucfirst($st) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <select name="condition_status" style="border:1px solid var(--border-color); border-radius:6px; padding:5px 6px; font-size:12px; font-family:'Inter',sans-serif;">
+                                        <?php foreach ($conditions as $c): ?>
+                                            <option value="<?= $c ?>" <?= $r['condition_status'] === $c ? 'selected' : '' ?>><?= ucfirst($c) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <button type="submit" class="filter-btn" style="padding:5px 10px;"><i class="bi bi-check-lg"></i></button>
+                                </form>
+                            <?php else: ?>
+                                <span style="font-size:12px; color:var(--text-muted);">Final</span>
+                            <?php endif; ?>
                         </td>
                     </tr>
                 <?php endforeach; ?>
@@ -89,6 +94,9 @@ $statusColors = [
                 <label>Order</label>
                 <select name="order_id" required style="width:100%; border:1px solid var(--border-color); border-radius:8px; padding:8px 10px; font-size:14px; font-family:'Inter',sans-serif;">
                     <option value="">Select order...</option>
+                    <?php if (empty($recentOrders)): ?>
+                        <option value="" disabled>No eligible orders — all recent orders already have a return.</option>
+                    <?php endif; ?>
                     <?php foreach ($recentOrders as $o): ?>
                         <option value="<?= $o['id'] ?>">#<?= $o['id'] ?> — <?= htmlspecialchars($o['customer_name']) ?> — <?= htmlspecialchars($o['product_name']) ?></option>
                     <?php endforeach; ?>

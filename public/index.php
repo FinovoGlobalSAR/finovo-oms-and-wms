@@ -4,6 +4,13 @@ ini_set('display_errors', 1);
 
 session_start();
 
+if (php_sapi_name() === 'cli-server') {
+    $requestedPath = __DIR__ . parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+    if ($_SERVER['REQUEST_URI'] !== '/' && is_file($requestedPath)) {
+        return false;
+    }
+}
+
 require_once __DIR__ . '/../core/Router.php';
 require_once __DIR__ . '/../core/Database.php';
 

@@ -6,6 +6,8 @@ require_once __DIR__ . '/../Models/Product.php';
 require_once __DIR__ . '/../Models/Store.php';
 require_once __DIR__ . '/../Models/Warehouse.php';
 require_once __DIR__ . '/../Models/ProductVariant.php';
+require_once __DIR__ . '/../Models/FieldMapping.php';
+require_once __DIR__ . '/../Models/JobQueue.php';
 require_once __DIR__ . '/../Services/IntegrationErrorService.php';
 
 class ProductController extends Controller
@@ -15,6 +17,7 @@ class ProductController extends Controller
     private Warehouse $warehouseModel;
     private ProductVariant $variantModel;
     private IntegrationErrorService $errorService;
+    private FieldMapping $fieldMappingModel;
 
     public function __construct()
     {
@@ -26,6 +29,21 @@ class ProductController extends Controller
         $this->warehouseModel = new Warehouse();
         $this->variantModel = new ProductVariant();
         $this->errorService = new IntegrationErrorService();
+        $this->fieldMappingModel = new FieldMapping();
+    }
+
+    // OpenCart/osCommerce ke external MySQL databases se connect karne ke
+    // liye — .env se credentials leta hai, taaki live server pe sirf .env
+    // badalna pade, code kahin change na karna pade.
+    private function externalDbConnection(string $dbName): PDO
+    {
+        $host = $_ENV['DB_EXTERNAL_HOST'] ?? 'localhost';
+        $user = $_ENV['DB_EXTERNAL_USER'] ?? 'root';
+        $password = $_ENV['DB_EXTERNAL_PASSWORD'] ?? '';
+
+        $pdo = new PDO("mysql:host={$host};dbname={$dbName};charset=utf8mb4", $user, $password);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        return $pdo;
     }
 
     public function index(): void
@@ -33,8 +51,11 @@ class ProductController extends Controller
         $store = $this->getCurrentStore();
         $products = $this->productModel->all($store['id']);
 
+        $productIds = array_map(fn($p) => (int) $p['id'], $products);
+        $variantCounts = $this->productModel->variantCountsForProducts($productIds);
+
         foreach ($products as &$p) {
-            $variantCount = $this->productModel->variantCount((int) $p['id']);
+            $variantCount = $variantCounts[(int) $p['id']] ?? 0;
             $p['variant_count'] = $variantCount;
 
             if ($variantCount > 0) {
@@ -58,6 +79,7 @@ class ProductController extends Controller
 
         $this->view('products/index', [
             'products' => $products,
+            'store' => $store,
             'lowStockCount' => $lowStockCount,
             'synced' => $_GET['synced'] ?? null,
             'exported' => $_GET['exported'] ?? null,
@@ -206,6 +228,8 @@ class ProductController extends Controller
             return;
         }
 
+        $mapping = $this->fieldMappingModel->allForStore((int) $store['id'], 'shopify', 'product');
+
         $apiUrl = 'https://' . rtrim($store['store_url'], '/') . '/admin/api/2026-07/products.json?limit=50';
 
         $ch = curl_init($apiUrl);
@@ -244,10 +268,9 @@ class ProductController extends Controller
                     $this->productModel->updateImage($productId, $imageUrl);
                 }
             } else {
-                $name = $sp['title'] ?? 'Unknown product';
-                $firstVariant = $variants[0] ?? [];
-                $price = (float) ($firstVariant['price'] ?? 0);
-                $sku = $firstVariant['sku'] ?? null;
+                $name = FieldMapping::extract($sp, $mapping['name']) ?? 'Unknown product';
+                $price = (float) (FieldMapping::extract($sp, $mapping['price']) ?? 0);
+                $sku = FieldMapping::extract($sp, $mapping['sku']);
 
                 $stmt = $db->prepare(
                     "INSERT INTO products (store_id, name, sku, price, external_product_id, image_url) VALUES (?, ?, ?, ?, ?, ?)"
@@ -288,6 +311,18 @@ class ProductController extends Controller
 
         $this->storeModel->markHealthy((int) $store['id']);
         $this->redirect('/products?synced=' . $importedCount);
+    }
+
+    // ---------- Shopify: Async Sync (Queue-Based) ----------
+
+    public function syncShopifyAsync(): void
+    {
+        $store = $this->getCurrentStore();
+
+        $jobQueue = new JobQueue();
+        $jobId = $jobQueue->push('shopify_products_sync', (int) $store['id']);
+
+        $this->redirect('/products?queued=' . $jobId);
     }
 
     // ---------- Shopify: Product Push ----------
@@ -490,7 +525,6 @@ class ProductController extends Controller
         require_once __DIR__ . '/../../app/Connectors/BridgeConnector.php';
         $connector = new BridgeConnector($store['bridge_url'], $store['bridge_api_key'], $store['bridge_shared_secret']);
 
-        // Pehle connection test karo — agar bridge hi reachable nahi hai, to error log karke rok do
         $testResult = $connector->testConnection();
 
         if (!$testResult['ok']) {
@@ -528,6 +562,267 @@ class ProductController extends Controller
         }
 
         $this->errorService->markResolved((int) $store['id'], 'custom_bridge', 'sync_products', null);
+        $this->storeModel->markHealthy((int) $store['id']);
+        $this->redirect('/products?synced=' . $importedCount);
+    }
+
+    // ---------- BigCommerce: Products Pull ----------
+
+    public function syncBigCommerce(): void
+    {
+        $store = $this->getCurrentStore();
+        $defaultWarehouse = $this->warehouseModel->getDefault($store['id']);
+
+        if (empty($store['bigcommerce_store_hash']) || empty($store['bigcommerce_access_token'])) {
+            $this->redirect('/products?error=' . urlencode('Please save this store\'s BigCommerce Store Hash and Access Token first.'));
+            return;
+        }
+
+        $apiUrl = 'https://api.bigcommerce.com/stores/' . $store['bigcommerce_store_hash'] . '/v3/catalog/products?limit=50';
+
+        $ch = curl_init($apiUrl);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'X-Auth-Token: ' . $store['bigcommerce_access_token'],
+            'Accept: application/json',
+        ]);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode !== 200) {
+            $this->errorService->logFailure((int) $store['id'], 'bigcommerce', 'sync_products', null, null, $httpCode, $response ?: 'No response');
+            $this->storeModel->markUnhealthy((int) $store['id'], "BigCommerce API error (HTTP {$httpCode})");
+            $this->redirect('/products?error=' . urlencode("BigCommerce API error (HTTP {$httpCode})."));
+            return;
+        }
+
+        $data = json_decode($response, true);
+        $bcProducts = $data['data'] ?? [];
+        $db = Database::getConnection();
+        $importedCount = 0;
+
+        foreach ($bcProducts as $bp) {
+            $externalId = (string) ($bp['id'] ?? '');
+            if ($externalId === '') continue;
+
+            $check = $db->prepare("SELECT id FROM products WHERE store_id = ? AND external_bc_product_id = ?");
+            $check->execute([$store['id'], $externalId]);
+            $existing = $check->fetch();
+
+            if (!$existing) {
+                $name = $bp['name'] ?? 'Unknown product';
+                $price = (float) ($bp['price'] ?? 0);
+                $sku = $bp['sku'] ?? null;
+
+                $stmt = $db->prepare("INSERT INTO products (store_id, name, sku, price, external_bc_product_id) VALUES (?, ?, ?, ?, ?)");
+                $stmt->execute([$store['id'], $name, $sku, $price, $externalId]);
+                $productId = (int) $db->lastInsertId();
+                $importedCount++;
+
+                $stock = (int) ($bp['inventory_level'] ?? 0);
+                $this->productModel->setWarehouseStock($productId, $defaultWarehouse['id'], $stock);
+            }
+        }
+
+        $this->errorService->markResolved((int) $store['id'], 'bigcommerce', 'sync_products', null);
+        $this->storeModel->markHealthy((int) $store['id']);
+        $this->redirect('/products?synced=' . $importedCount);
+    }
+
+    // ---------- PrestaShop: Products Pull ----------
+
+    public function syncPrestaShop(): void
+    {
+        $store = $this->getCurrentStore();
+        $defaultWarehouse = $this->warehouseModel->getDefault($store['id']);
+
+        if (empty($store['prestashop_store_url']) || empty($store['prestashop_api_key'])) {
+            $this->redirect('/products?error=' . urlencode('Please save this store\'s PrestaShop Store URL and API Key first.'));
+            return;
+        }
+
+        $baseUrl = rtrim($store['prestashop_store_url'], '/');
+        $apiUrl = $baseUrl . '/api/products?ws_key=' . urlencode($store['prestashop_api_key']) . '&output_format=JSON&display=[id,name,price,reference,active]&filter[active]=1';
+
+        $ch = curl_init($apiUrl);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode !== 200) {
+            $this->errorService->logFailure((int) $store['id'], 'prestashop', 'sync_products', null, null, $httpCode, $response ?: 'No response');
+            $this->storeModel->markUnhealthy((int) $store['id'], "PrestaShop API error (HTTP {$httpCode})");
+            $this->redirect('/products?error=' . urlencode("PrestaShop API error (HTTP {$httpCode})."));
+            return;
+        }
+
+        $data = json_decode($response, true);
+        $psProducts = $data['products'] ?? [];
+        $db = Database::getConnection();
+        $importedCount = 0;
+
+        foreach ($psProducts as $pp) {
+            $externalId = (string) ($pp['id'] ?? '');
+            if ($externalId === '') continue;
+
+            $nameRaw = $pp['name'] ?? 'Unknown product';
+            $name = is_array($nameRaw) ? ($nameRaw[0]['value'] ?? 'Unknown product') : $nameRaw;
+
+            $check = $db->prepare("SELECT id FROM products WHERE store_id = ? AND external_ps_product_id = ?");
+            $check->execute([$store['id'], $externalId]);
+            $existing = $check->fetch();
+
+            if (!$existing) {
+                $price = (float) ($pp['price'] ?? 0);
+                $sku = $pp['reference'] ?? null;
+
+                $stmt = $db->prepare("INSERT INTO products (store_id, name, sku, price, external_ps_product_id) VALUES (?, ?, ?, ?, ?)");
+                $stmt->execute([$store['id'], $name, $sku, $price, $externalId]);
+                $productId = (int) $db->lastInsertId();
+                $importedCount++;
+
+                $stockUrl = $baseUrl . '/api/stock_availables?ws_key=' . urlencode($store['prestashop_api_key']) . '&output_format=JSON&filter[id_product]=' . $externalId . '&display=[quantity]';
+                $sch = curl_init($stockUrl);
+                curl_setopt($sch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($sch, CURLOPT_TIMEOUT, 10);
+                curl_setopt($sch, CURLOPT_SSL_VERIFYPEER, false);
+                $stockResponse = curl_exec($sch);
+                curl_close($sch);
+
+                $stockData = json_decode($stockResponse, true);
+                $stockList = $stockData['stock_availables'] ?? [];
+                $stock = (int) ($stockList[0]['quantity'] ?? 0);
+
+                $this->productModel->setWarehouseStock($productId, $defaultWarehouse['id'], $stock);
+            }
+        }
+
+        $this->errorService->markResolved((int) $store['id'], 'prestashop', 'sync_products', null);
+        $this->storeModel->markHealthy((int) $store['id']);
+        $this->redirect('/products?synced=' . $importedCount);
+    }
+
+    // ---------- OpenCart: Products Pull (direct DB read) ----------
+
+    public function syncOpenCart(): void
+    {
+        $store = $this->getCurrentStore();
+        $defaultWarehouse = $this->warehouseModel->getDefault($store['id']);
+
+        $ocDbName = $store['opencart_store_url'] ?? '';
+        if ($ocDbName === '') {
+            $this->redirect('/products?error=' . urlencode('Please save this store\'s OpenCart database name first.'));
+            return;
+        }
+
+        try {
+            $ocDb = $this->externalDbConnection($ocDbName);
+        } catch (PDOException $e) {
+            $this->errorService->logFailure((int) $store['id'], 'opencart', 'sync_products', null, null, 0, $e->getMessage());
+            $this->storeModel->markUnhealthy((int) $store['id'], 'Could not connect to OpenCart database.');
+            $this->redirect('/products?error=' . urlencode('Could not connect to OpenCart database: ' . $e->getMessage()));
+            return;
+        }
+
+        $stmt = $ocDb->query(
+            "SELECT p.product_id, p.model, p.price, p.quantity, pd.name
+             FROM oc_product p
+             INNER JOIN oc_product_description pd ON pd.product_id = p.product_id
+             WHERE p.status = 1"
+        );
+        $ocProducts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $db = Database::getConnection();
+        $importedCount = 0;
+
+        foreach ($ocProducts as $op) {
+            $externalId = (string) $op['product_id'];
+
+            $check = $db->prepare("SELECT id FROM products WHERE store_id = ? AND external_ocart_product_id = ?");
+            $check->execute([$store['id'], $externalId]);
+            $existing = $check->fetch();
+
+            if (!$existing) {
+                $name = $op['name'] ?? 'Unknown product';
+                $price = (float) ($op['price'] ?? 0);
+                $sku = $op['model'] ?? null;
+
+                $insert = $db->prepare("INSERT INTO products (store_id, name, sku, price, external_ocart_product_id) VALUES (?, ?, ?, ?, ?)");
+                $insert->execute([$store['id'], $name, $sku, $price, $externalId]);
+                $productId = (int) $db->lastInsertId();
+                $importedCount++;
+
+                $stock = (int) ($op['quantity'] ?? 0);
+                $this->productModel->setWarehouseStock($productId, $defaultWarehouse['id'], $stock);
+            }
+        }
+
+        $this->errorService->markResolved((int) $store['id'], 'opencart', 'sync_products', null);
+        $this->storeModel->markHealthy((int) $store['id']);
+        $this->redirect('/products?synced=' . $importedCount);
+    }
+
+    // ---------- osCommerce: Products Pull (direct DB read) ----------
+
+    public function syncOsCommerce(): void
+    {
+        $store = $this->getCurrentStore();
+        $defaultWarehouse = $this->warehouseModel->getDefault($store['id']);
+
+        $oscDbName = $store['oscommerce_store_url'] ?? '';
+        if ($oscDbName === '') {
+            $this->redirect('/products?error=' . urlencode('Please save this store\'s osCommerce database name first.'));
+            return;
+        }
+
+        try {
+            $oscDb = $this->externalDbConnection($oscDbName);
+        } catch (PDOException $e) {
+            $this->errorService->logFailure((int) $store['id'], 'oscommerce', 'sync_products', null, null, 0, $e->getMessage());
+            $this->storeModel->markUnhealthy((int) $store['id'], 'Could not connect to osCommerce database.');
+            $this->redirect('/products?error=' . urlencode('Could not connect to osCommerce database: ' . $e->getMessage()));
+            return;
+        }
+
+        $stmt = $oscDb->query(
+            "SELECT p.products_id, p.products_model, p.products_price, p.products_quantity, pd.products_name
+             FROM products p
+             INNER JOIN products_description pd ON pd.products_id = p.products_id AND pd.language_id = 1
+             WHERE p.products_status = 1"
+        );
+        $oscProducts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $db = Database::getConnection();
+        $importedCount = 0;
+
+        foreach ($oscProducts as $op) {
+            $externalId = (string) $op['products_id'];
+
+            $check = $db->prepare("SELECT id FROM products WHERE store_id = ? AND external_osc_product_id = ?");
+            $check->execute([$store['id'], $externalId]);
+            $existing = $check->fetch();
+
+            if (!$existing) {
+                $name = $op['products_name'] ?? 'Unknown product';
+                $price = (float) ($op['products_price'] ?? 0);
+                $sku = $op['products_model'] ?? null;
+
+                $insert = $db->prepare("INSERT INTO products (store_id, name, sku, price, external_osc_product_id) VALUES (?, ?, ?, ?, ?)");
+                $insert->execute([$store['id'], $name, $sku, $price, $externalId]);
+                $productId = (int) $db->lastInsertId();
+                $importedCount++;
+
+                $stock = (int) ($op['products_quantity'] ?? 0);
+                $this->productModel->setWarehouseStock($productId, $defaultWarehouse['id'], $stock);
+            }
+        }
+
+        $this->errorService->markResolved((int) $store['id'], 'oscommerce', 'sync_products', null);
         $this->storeModel->markHealthy((int) $store['id']);
         $this->redirect('/products?synced=' . $importedCount);
     }

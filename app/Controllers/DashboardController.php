@@ -5,6 +5,9 @@ require_once __DIR__ . '/../Models/Product.php';
 
 class DashboardController extends Controller
 {
+    // In sources se aane wale orders ($) — baki sab manual/Rs.
+    private array $externalSources = ['shopify_pull', 'woocommerce_pull', 'bigcommerce_pull', 'prestashop_pull', 'opencart_pull', 'oscommerce_pull'];
+
     public function __construct()
     {
         parent::__construct();
@@ -31,19 +34,17 @@ class DashboardController extends Controller
         $totalOrdersStmt->execute([$storeId]);
         $data['totalOrders'] = (int) $totalOrdersStmt->fetch()['c'];
 
-        $revenueStmt = $db->prepare("SELECT COALESCE(SUM(price * quantity), 0) as total FROM orders WHERE store_id = ?");
-        $revenueStmt->execute([$storeId]);
-        $data['totalRevenue'] = (float) $revenueStmt->fetch()['total'];
+        // Revenue ko currency ke hisab se alag-alag jodte hain — order khud
+        // external source se aaya ho, YA uska product khud kisi external
+        // platform se sync hua ho, dono cases mein wo "$" revenue mein aata hai.
+        [$data['totalRevenueUsd'], $data['totalRevenuePkr']] = $this->splitRevenueByCurrency($db, $storeId, $productModel);
 
         $recentOrdersStmt = $db->prepare("SELECT * FROM orders WHERE store_id = ? ORDER BY id DESC LIMIT 8");
         $recentOrdersStmt->execute([$storeId]);
         $recentOrders = $recentOrdersStmt->fetchAll();
 
-        // Currency: order khud external source se aaya ho, YA order ke andar wala product
-        // khud Shopify/WooCommerce se pull hua ho — dono cases mein $ dikhana hai.
-        $externalSources = ['shopify_pull', 'woocommerce_pull'];
         foreach ($recentOrders as &$ro) {
-            $isExternalSource = in_array($ro['source'] ?? 'manual', $externalSources, true);
+            $isExternalSource = in_array($ro['source'] ?? 'manual', $this->externalSources, true);
             $isExternalProduct = !empty($ro['product_id']) && $productModel->isExternal((int) $ro['product_id']);
             $ro['currency_symbol'] = ($isExternalSource || $isExternalProduct) ? '$' : 'Rs.';
         }
@@ -170,5 +171,49 @@ class DashboardController extends Controller
         }
 
         $this->view('dashboard/index', $data);
+    }
+
+    /**
+     * Store ke orders ko unke currency ke hisab se do totals mein baantta
+     * hai: [$ wala total, Rs. wala total]. Order khud external source se
+     * aaya ho, ya uska product external ho — dono "$" ban jaate hain.
+     */
+    private function splitRevenueByCurrency(PDO $db, int $storeId, Product $productModel): array
+    {
+        $sourcesList = "'" . implode("','", $this->externalSources) . "'";
+
+        $stmt = $db->prepare(
+            "SELECT o.source, o.price, o.quantity,
+                    p.external_product_id, p.external_wc_product_id, p.external_bc_product_id,
+                    p.external_ps_product_id, p.external_ocart_product_id, p.external_osc_product_id
+             FROM orders o
+             LEFT JOIN products p ON p.id = o.product_id
+             WHERE o.store_id = ?"
+        );
+        $stmt->execute([$storeId]);
+        $rows = $stmt->fetchAll();
+
+        $usdTotal = 0.0;
+        $pkrTotal = 0.0;
+
+        foreach ($rows as $row) {
+            $isExternalSource = in_array($row['source'] ?? 'manual', $this->externalSources, true);
+            $isExternalProduct = !empty($row['external_product_id'])
+                || !empty($row['external_wc_product_id'])
+                || !empty($row['external_bc_product_id'])
+                || !empty($row['external_ps_product_id'])
+                || !empty($row['external_ocart_product_id'])
+                || !empty($row['external_osc_product_id']);
+
+            $lineTotal = (float) $row['price'] * (int) $row['quantity'];
+
+            if ($isExternalSource || $isExternalProduct) {
+                $usdTotal += $lineTotal;
+            } else {
+                $pkrTotal += $lineTotal;
+            }
+        }
+
+        return [$usdTotal, $pkrTotal];
     }
 }
