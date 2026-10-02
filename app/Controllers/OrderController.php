@@ -13,6 +13,10 @@ require_once __DIR__ . '/../Services/InventoryService.php';
 require_once __DIR__ . '/../Services/AuditLogService.php';
 require_once __DIR__ . '/../Middlewares/CanonicalMapper.php';
 require_once __DIR__ . '/../Middlewares/ProductAvailabilityGuard.php';
+require_once __DIR__ . '/../Connectors/WixConnector.php';
+require_once __DIR__ . '/../Connectors/EbayConnector.php';
+require_once __DIR__ . '/../Services/EbayAuthService.php';
+require_once __DIR__ . '/../Services/EbayOrderImporter.php';
 
 class OrderController extends Controller
 {
@@ -44,8 +48,6 @@ class OrderController extends Controller
         $this->availabilityGuard = new ProductAvailabilityGuard();
     }
 
-    // OpenCart/osCommerce external MySQL databases se connect karne ke liye
-    // — .env se credentials leta hai (live hosting pe sirf .env badalna hai)
     private function externalDbConnection(string $dbName): PDO
     {
         $host = $_ENV['DB_EXTERNAL_HOST'] ?? 'localhost';
@@ -70,6 +72,8 @@ class OrderController extends Controller
             'prestashop'  => 'prestashop_pull',
             'opencart'    => 'opencart_pull',
             'oscommerce'  => 'oscommerce_pull',
+            'wix'         => 'wix_pull',
+            'ebay'        => 'ebay_pull',
             'custom'      => 'api_push',
             'manual'      => 'manual',
             'csv'         => 'csv_import',
@@ -90,7 +94,7 @@ class OrderController extends Controller
             $orders = array_values($orders);
         }
 
-        $externalSources = ['shopify_pull', 'woocommerce_pull', 'bigcommerce_pull', 'prestashop_pull', 'opencart_pull', 'oscommerce_pull'];
+        $externalSources = externalOrderSources();
         foreach ($orders as &$order) {
             $isExternalSource = in_array($order['source'] ?? 'manual', $externalSources, true);
             $isExternalProduct = !empty($order['product_id']) && $this->productModel->isExternal((int) $order['product_id']);
@@ -406,7 +410,7 @@ class OrderController extends Controller
             'message' => 'Order created successfully.',
         ]);
     }
-
+    
     // ---------- Edit / Delete (CRUD) ----------
 
     public function editForm(): void
@@ -580,6 +584,39 @@ class OrderController extends Controller
         $wcConsumerSecret = trim($_POST['woocommerce_consumer_secret'] ?? '');
         $this->storeModel->updateWooCommerceCredentials((int) $store['id'], $wcStoreUrl, $wcConsumerKey, $wcConsumerSecret);
 
+        $bcStoreHash = trim($_POST['bigcommerce_store_hash'] ?? '');
+        $bcAccessToken = trim($_POST['bigcommerce_access_token'] ?? '');
+        if ($bcStoreHash !== '' || $bcAccessToken !== '') {
+            $this->storeModel->updateBigCommerceCredentials((int) $store['id'], $bcStoreHash, $bcAccessToken);
+        }
+
+        $psStoreUrl = trim($_POST['prestashop_store_url'] ?? '');
+        $psApiKey = trim($_POST['prestashop_api_key'] ?? '');
+        if ($psStoreUrl !== '' || $psApiKey !== '') {
+            $this->storeModel->updatePrestaShopCredentials((int) $store['id'], $psStoreUrl, $psApiKey);
+        }
+
+        $ocStoreUrl = trim($_POST['opencart_store_url'] ?? '');
+        if ($ocStoreUrl !== '') {
+            $this->storeModel->updateOpenCartCredentials((int) $store['id'], $ocStoreUrl, '', '');
+        }
+
+        $oscStoreUrl = trim($_POST['oscommerce_store_url'] ?? '');
+        if ($oscStoreUrl !== '') {
+            $this->storeModel->updateOsCommerceCredentials((int) $store['id'], $oscStoreUrl, '', '');
+        }
+
+        $wixSiteId = trim($_POST['wix_site_id'] ?? '');
+        $wixApiKey = trim($_POST['wix_api_key'] ?? '');
+        if ($wixSiteId !== '' || $wixApiKey !== '') {
+            $this->storeModel->updateWixCredentials((int) $store['id'], $wixSiteId, $wixApiKey);
+        }
+
+        $ebayUserToken = trim($_POST['ebay_user_token'] ?? '');
+        if ($ebayUserToken !== '') {
+            $this->storeModel->updateEbayCredentials((int) $store['id'], $ebayUserToken);
+        }
+
         $shopifyWebhookSecret = trim($_POST['shopify_webhook_secret'] ?? '');
         $wcWebhookSecret = trim($_POST['woocommerce_webhook_secret'] ?? '');
 
@@ -587,7 +624,7 @@ class OrderController extends Controller
         $stmt = $db->prepare("UPDATE stores SET shopify_webhook_secret = ?, woocommerce_webhook_secret = ? WHERE id = ?");
         $stmt->execute([$shopifyWebhookSecret ?: null, $wcWebhookSecret ?: null, (int) $store['id']]);
 
-        $this->auditService->log((int) $store['id'], 'credential_update', 'store', (string) $store['id'], 'Shopify/WooCommerce credentials updated.');
+        $this->auditService->log((int) $store['id'], 'credential_update', 'store', (string) $store['id'], 'Store credentials updated.');
 
         $this->redirect('/orders/settings?saved=1');
     }
@@ -645,7 +682,7 @@ class OrderController extends Controller
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_USERPWD, $auth);
         curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, curlVerifySsl());
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
@@ -757,26 +794,36 @@ class OrderController extends Controller
         $this->storeModel->markHealthy((int) $store['id']);
         $this->redirect('/orders?synced=' . $importedCount);
     }
-
+    
     // ---------- Shopify: Order Push ----------
 
-    public function exportToShopify(): void
+        public function exportToShopify(): void
     {
         $db = Database::getConnection();
         $store = $this->getCurrentStore();
         $id = (int) ($_GET['id'] ?? 0);
+
+        if (($store['platform'] ?? '') !== 'shopify') {
+            $this->redirect('/orders?error=' . urlencode('This store is not a Shopify store, so orders cannot be pushed to Shopify.'));
+            return;
+        }
 
         if (empty($store['store_url']) || empty($store['access_token'])) {
             $this->redirect('/orders?error=' . urlencode('Please save this store\'s Shopify Settings first.'));
             return;
         }
 
-        $stmt = $db->prepare("SELECT * FROM orders WHERE id = ?");
-        $stmt->execute([$id]);
+        $stmt = $db->prepare("SELECT * FROM orders WHERE id = ? AND store_id = ?");
+        $stmt->execute([$id, (int) $store['id']]);
         $order = $stmt->fetch();
 
         if (!$order) {
             $this->redirect('/orders?error=' . urlencode('Order not found.'));
+            return;
+        }
+
+        if (!empty($order['external_order_id'])) {
+            $this->redirect('/orders?error=' . urlencode('This order is already in Shopify.'));
             return;
         }
 
@@ -834,7 +881,6 @@ class OrderController extends Controller
 
         $this->redirect('/orders?exported=1');
     }
-
     // ---------- WooCommerce: Orders Pull ----------
 
     public function syncWooCommerce(): void
@@ -855,7 +901,7 @@ class OrderController extends Controller
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_USERPWD, $auth);
         curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, curlVerifySsl());
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
@@ -939,17 +985,27 @@ class OrderController extends Controller
         $store = $this->getCurrentStore();
         $id = (int) ($_GET['id'] ?? 0);
 
+        if (($store['platform'] ?? '') !== 'woocommerce') {
+            $this->redirect('/orders?error=' . urlencode('This store is not a WooCommerce store, so orders cannot be pushed to WooCommerce.'));
+            return;
+        }
+
         if (empty($store['woocommerce_store_url']) || empty($store['woocommerce_consumer_key']) || empty($store['woocommerce_consumer_secret'])) {
             $this->redirect('/orders?error=' . urlencode('Please save this store\'s WooCommerce Settings first.'));
             return;
         }
 
-        $stmt = $db->prepare("SELECT * FROM orders WHERE id = ?");
-        $stmt->execute([$id]);
+        $stmt = $db->prepare("SELECT * FROM orders WHERE id = ? AND store_id = ?");
+        $stmt->execute([$id, (int) $store['id']]);
         $order = $stmt->fetch();
 
         if (!$order) {
             $this->redirect('/orders?error=' . urlencode('Order not found.'));
+            return;
+        }
+
+        if (!empty($order['external_wc_order_id'])) {
+            $this->redirect('/orders?error=' . urlencode('This order is already in WooCommerce.'));
             return;
         }
 
@@ -961,7 +1017,7 @@ class OrderController extends Controller
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_USERPWD, $auth);
         curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, curlVerifySsl());
         $searchResponse = curl_exec($ch);
         curl_close($ch);
 
@@ -989,7 +1045,7 @@ class OrderController extends Controller
             curl_setopt($ch, CURLOPT_USERPWD, $auth);
             curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
             curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, curlVerifySsl());
             $createResponse = curl_exec($ch);
             $createHttpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
@@ -1036,7 +1092,7 @@ class OrderController extends Controller
         curl_setopt($ch, CURLOPT_USERPWD, $auth);
         curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
         curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, curlVerifySsl());
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
@@ -1178,7 +1234,7 @@ class OrderController extends Controller
         $this->storeModel->markHealthy((int) $store['id']);
         $this->redirect('/orders?synced=' . $importedCount);
     }
-
+    
     // ---------- PrestaShop: Orders Pull ----------
 
     public function syncPrestaShop(): void
@@ -1198,7 +1254,7 @@ class OrderController extends Controller
         $ch = curl_init($apiUrl);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, curlVerifySsl());
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
@@ -1264,7 +1320,7 @@ class OrderController extends Controller
                 $cch = curl_init($custUrl);
                 curl_setopt($cch, CURLOPT_RETURNTRANSFER, true);
                 curl_setopt($cch, CURLOPT_TIMEOUT, 10);
-                curl_setopt($cch, CURLOPT_SSL_VERIFYPEER, false);
+                curl_setopt($cch, CURLOPT_SSL_VERIFYPEER, curlVerifySsl());
                 $custResponse = curl_exec($cch);
                 curl_close($cch);
 
@@ -1487,6 +1543,118 @@ class OrderController extends Controller
 
             $importedCount++;
         }
+
+        $this->storeModel->markHealthy((int) $store['id']);
+        $this->redirect('/orders?synced=' . $importedCount);
+    }
+
+    // ---------- Wix: Orders Pull ----------
+
+    public function syncWix(): void
+    {
+        $db = Database::getConnection();
+        $store = $this->getCurrentStore();
+        $defaultWarehouse = $this->warehouseModel->getDefault($store['id']);
+
+        if (empty($store['wix_site_id']) || empty($store['wix_api_key'])) {
+            $this->redirect('/orders/settings?error=' . urlencode('Please save this store\'s Wix Site ID and API Key first.'));
+            return;
+        }
+
+        $connector = new WixConnector($store['wix_api_key'], $store['wix_site_id']);
+        $result = $connector->fetchOrders();
+
+        if (!$result['ok']) {
+            $this->storeModel->markUnhealthy((int) $store['id'], $result['message']);
+            $this->redirect('/orders/settings?error=' . urlencode($result['message']));
+            return;
+        }
+
+        $importedCount = 0;
+
+        foreach ($result['orders'] as $order) {
+            $externalId = (string) ($order['id'] ?? '');
+            if ($externalId === '') continue;
+
+            $check = $db->prepare("SELECT id FROM orders WHERE external_wix_order_id = ? AND store_id = ?");
+            $check->execute([$externalId, $store['id']]);
+            if ($check->fetch()) continue;
+
+            $lineItems = $order['lineItems'][0] ?? [];
+            $productName = $lineItems['productName']['original'] ?? 'Unknown product';
+            $quantity = (int) ($lineItems['quantity'] ?? 1);
+
+            $guard = $this->availabilityGuard->check($store['id'], $productName);
+            if (!$guard['allowed']) {
+                continue;
+            }
+            $productId = $guard['product_id'];
+
+            $available = $this->inventoryService->checkAvailability($productId, null, (int) $defaultWarehouse['id']);
+            if ($available < $quantity) {
+                continue;
+            }
+
+            $buyerInfo = $order['buyerInfo'] ?? [];
+            $customerName = trim(($buyerInfo['firstName'] ?? '') . ' ' . ($buyerInfo['lastName'] ?? ''));
+            if ($customerName === '') {
+                $customerName = $buyerInfo['email'] ?? ('Order #' . $externalId);
+            }
+
+            $price = (float) ($order['priceSummary']['total']['amount'] ?? 0);
+
+            $wixStatus = $order['status'] ?? 'APPROVED';
+            $orderStatus = match ($wixStatus) {
+                'FULFILLED' => 'delivered',
+                'CANCELED' => 'cancelled',
+                'APPROVED', 'PARTIALLY_FULFILLED' => 'processing',
+                default => 'pending',
+            };
+            $paymentStatus = ($order['paymentStatus'] ?? '') === 'PAID' ? 'paid' : 'unpaid';
+
+            $result2 = $this->inventoryService->reserve($productId, null, (int) $defaultWarehouse['id'], $quantity, 'wix_pull', "external:{$externalId}", 'wix_sync');
+            if (!$result2['ok']) {
+                continue;
+            }
+
+            $stmt = $db->prepare(
+                "INSERT INTO orders (store_id, customer_name, product_name, quantity, price, source, external_wix_order_id, status, payment_status, product_id, warehouse_id)
+                 VALUES (?, ?, ?, ?, ?, 'wix_pull', ?, ?, ?, ?, ?)"
+            );
+            $stmt->execute([$store['id'], $customerName, $productName, $quantity, $price, $externalId, $orderStatus, $paymentStatus, $productId, $defaultWarehouse['id']]);
+
+            $importedCount++;
+        }
+
+        $this->storeModel->markHealthy((int) $store['id']);
+        $this->redirect('/orders?synced=' . $importedCount);
+    }
+
+    // ---------- eBay: Orders Pull ----------
+
+    public function syncEbay(): void
+    {
+        $store = $this->getCurrentStore();
+
+        // Connect eBay (OAuth) wala token khud refresh hota hai; purana manual token bhi chalta hai
+        $token = EbayAuthService::getValidAccessToken($store);
+
+        if ($token === null) {
+            $this->redirect('/orders/settings?error=' . urlencode('This store is not connected to eBay. Use "Connect eBay" on the Stores page (or save an eBay User Token).'));
+            return;
+        }
+
+        $connector = new EbayConnector($token);
+        $result = $connector->fetchOrders();
+
+        if (!$result['ok']) {
+            $this->storeModel->markUnhealthy((int) $store['id'], $result['message']);
+            $this->redirect('/orders/settings?error=' . urlencode($result['message']));
+            return;
+        }
+
+        $importer = new EbayOrderImporter();
+        $importedCount = $importer->importOrders($store, $result['orders']);
 
         $this->storeModel->markHealthy((int) $store['id']);
         $this->redirect('/orders?synced=' . $importedCount);

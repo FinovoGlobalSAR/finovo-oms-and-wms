@@ -148,3 +148,37 @@ $router->get('/payment/initiate', ['PaymentController', 'initiate']);
 $router->get('/payment/success', ['PaymentController', 'success']);
 
 $router->get('/products/sync-shopify-async', ['ProductController', 'syncShopifyAsync']);
+$router->get('/products/sync-woocommerce-async', ['ProductController', 'syncWooCommerceAsync']);
+$router->get('/products/sync-bigcommerce-async', ['ProductController', 'syncBigCommerceAsync']);
+$router->get('/products/sync-prestashop-async', ['ProductController', 'syncPrestaShopAsync']);
+$router->get('/products/sync-opencart-async', ['ProductController', 'syncOpenCartAsync']);
+$router->get('/products/sync-oscommerce-async', ['ProductController', 'syncOsCommerceAsync']);
+
+$router->post('/webhooks/bigcommerce', ['WebhookController', 'bigcommerce']);
+
+$router->get('/products/sync-wix', ['ProductController', 'syncWix']);
+$router->get('/orders/sync-wix', ['OrderController', 'syncWix']);
+
+$router->post('/webhooks/wix', ['WebhookController', 'wix']);
+
+$router->get('/products/sync-ebay', ['ProductController', 'syncEbay']);
+$router->get('/orders/sync-ebay', ['OrderController', 'syncEbay']);
+
+$router->get('/products/sync-cj', ['ProductController', 'syncCj']);
+
+// ---------- CJdropshipping: order push (fulfillment) ----------
+$router->get('/orders/cj-fulfill', ['CjFulfillmentController', 'form']);
+$router->post('/orders/cj-fulfill/quote', ['CjFulfillmentController', 'quote']);
+$router->post('/orders/cj-fulfill/submit', ['CjFulfillmentController', 'submit']);
+$router->get('/orders/cj-refresh', ['CjFulfillmentController', 'refresh']);
+$router->get('/orders/sync-cj', ['CjFulfillmentController', 'syncAll']);
+
+// ---------- Magento 2 ----------
+$router->get('/products/sync-magento', ['MagentoController', 'syncProducts']);
+$router->get('/orders/sync-magento', ['MagentoController', 'syncOrders']);
+
+// ---------- eBay: Connect (OAuth) + real-time webhook ----------
+$router->get('/ebay-connect/connect', ['EbayConnectController', 'connect']);
+$router->get('/ebay-connect/callback', ['EbayConnectController', 'callback']);
+$router->get('/webhooks/ebay', ['EbayWebhookController', 'handle']);
+$router->post('/webhooks/ebay', ['EbayWebhookController', 'handle']);

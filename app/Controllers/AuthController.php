@@ -60,7 +60,22 @@ class AuthController
             $this->redirectToLogin();
         }
 
-        $role = strtolower(trim($user['role'] ?? ''));
+        $rawRole = strtolower(trim($user['role'] ?? ''));
+
+        // Permanent fix: database mein role ka naam chahe "Company Admin",
+        // "Admin", ya kuch bhi ho, hamesha ek consistent naam mein convert
+        // karo taaki poora system (requireRole checks in 20+ controllers)
+        // hamesha match kare. Future mein naya role add karna ho to bas
+        // yahan ek line add karo, kahin aur kuch chhedne ki zaroorat nahi.
+        $roleNormalizeMap = [
+            'company admin' => 'admin',
+            'admin' => 'admin',
+            'manager' => 'manager',
+            'sales staff' => 'sales staff',
+            'warehouse staff' => 'warehouse staff',
+        ];
+        $role = $roleNormalizeMap[$rawRole] ?? $rawRole;
+
         $allowedRoles = ['admin', 'manager', 'sales staff', 'warehouse staff'];
 
         if (!in_array($role, $allowedRoles, true)) {
@@ -90,7 +105,6 @@ class AuthController
     }
 
     // ---------- Forgot Password: Step 1 — Request Code ----------
-
     public function showForgotPassword(): void
     {
         require __DIR__ . '/../Views/auth/forgot-password.php';

@@ -1,15 +1,9 @@
 <?php
-/**
- * Store credentials (Shopify token, WooCommerce secret, Bridge secret)
- * ko database mein plain text mein save nahi karte — yahan se guzarte
- * hain taaki agar database kisi ko dikh bhi jaye, credentials khule na hon.
- */
+
 class EncryptionService
 {
     private static string $cipher = 'aes-256-cbc';
 
-    // Yeh key sirf server pe rehti hai, kabhi database mein nahi jaati.
-    // Production mein isko .env file se lena chahiye, filhal fixed rakha hai.
     private static function getKey(): string
     {
         $key = 'finovo-secret-encryption-key-32chars!!';
@@ -26,7 +20,6 @@ class EncryptionService
         $iv = openssl_random_pseudo_bytes($ivLength);
         $encrypted = openssl_encrypt($plainText, self::$cipher, self::getKey(), 0, $iv);
 
-        // IV ko encrypted text ke sath hi store karte hain (base64 mein), taaki decrypt karte waqt mil jaye
         return base64_encode($iv . '::' . $encrypted);
     }
 

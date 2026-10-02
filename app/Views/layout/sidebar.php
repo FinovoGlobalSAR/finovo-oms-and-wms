@@ -20,7 +20,7 @@ if ($storeContextActive && !empty($_SESSION['current_store_id'])) {
 
 $navigation = [
 
-    'Design' => [
+    'Division' => [
         [
             'label' => 'Dashboard',
             'url'   => '/dashboard',
@@ -170,251 +170,159 @@ foreach ($navigation as $section => &$items) {
 unset($items);
 
 $navigation = array_filter($navigation, fn($items) => !empty($items));
+// ---------- Sidebar icons (UI only) ----------
+$sidebarIcons = [
+    'dashboard' => '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>',
+    'warehouse' => '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/>',
+    'store'     => '<path d="M3 9l1.5-5h15L21 9"/><path d="M3 9h18v1.5a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0z"/><path d="M5 13v8h14v-8"/>',
+    'orders'    => '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h6"/>',
+    'inventory' => '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/>',
+    'truck'     => '<path d="M3 6h11v10H3z"/><path d="M14 10h4l3 3v3h-7"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
+    'checklist' => '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="m8 12 3 3 5-6"/>',
+    'clipboard' => '<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>',
+    'transfer'  => '<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>',
+    'return'    => '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
+    'users'     => '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9"/><path d="M16 3.1a4 4 0 0 1 0 7.8"/>',
+    'employees' => '<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>',
+    'mapping'   => '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',
+    'alert'     => '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
+    'audit'     => '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+    'logout'    => '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
+];
+
+function sidebarIcon(array $icons, string $name, string $class = 'w-[17px] h-[17px]'): string
+{
+    $paths = $icons[$name] ?? $icons['orders'];
+    return '<svg class="' . $class . ' flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . $paths . '</svg>';
+}
 
 ?>
-<aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-[250px] bg-white border-r border-gray-200 transform -translate-x-full lg:translate-x-0 transition-transform duration-300">
+<aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 flex flex-col">
 
-    <div class="h-16 px-5 border-b border-gray-100 flex items-center">
-        <div class="flex items-center justify-between w-full">
-            <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-                    <span class="text-white font-bold text-sm">F</span>
-                </div>
-                <div>
-                    <div class="flex items-center gap-1">
-                        <span class="text-sm font-semibold text-gray-900">Finovo</span>
-                        <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9l6 6 6-6" />
-                        </svg>
-                    </div>
-                    <p class="text-[11px] text-gray-400">OMS / WMS</p>
-                </div>
-            </div>
-            <button class="w-7 h-7 rounded-md flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 20h9" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16.5 3.5a2.1 2.1 0 013 3L8 18l-4 1 1-4L16.5 3.5z" />
-                </svg>
-            </button>
+    <!-- Logo -->
+    <div class="px-5 pt-5 pb-3 flex items-center gap-2.5">
+        <a href="/dashboard" class="w-9 h-9 rounded-[9px] bg-blue-700 flex items-center justify-center flex-shrink-0">
+            <span class="text-white font-bold text-[17px]">F</span>
+        </a>
+        <div class="leading-tight">
+            <p class="text-[15px] font-bold text-slate-900">Finovo</p>
+            <p class="text-[11px] text-slate-500">OMS / WMS</p>
         </div>
     </div>
 
+    <!-- Logged-in user -->
     <?php if (!empty($_SESSION['user']['name'])): ?>
-        <div class="px-4 pt-3 pb-1">
-            <div class="flex items-center gap-2 px-2 py-2 rounded-lg bg-gray-50">
-                <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-semibold">
-                    <?= strtoupper(substr($_SESSION['user']['name'], 0, 1)) ?>
+        <div class="px-4 pb-3">
+            <div class="flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] border border-gray-200">
+                <div class="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center text-[11px] font-semibold flex-shrink-0">
+                    <?= htmlspecialchars(strtoupper(substr($_SESSION['user']['name'], 0, 1))) ?>
                 </div>
                 <div class="min-w-0">
-                    <p class="text-xs font-semibold text-gray-900 truncate"><?= htmlspecialchars($_SESSION['user']['name']) ?></p>
-                    <p class="text-[11px] text-gray-500 truncate"><?= htmlspecialchars(ucwords($currentRole)) ?></p>
+                    <p class="text-[13px] font-semibold text-slate-900 truncate"><?= htmlspecialchars($_SESSION['user']['name']) ?></p>
+                    <p class="text-[11px] text-slate-500 truncate"><?= htmlspecialchars(ucwords($currentRole)) ?></p>
                 </div>
             </div>
         </div>
     <?php endif; ?>
 
+    <!-- Store being managed -->
     <?php if ($storeContextActive && $managedStoreName): ?>
-        <div class="px-4 pt-2 pb-1">
-            <div class="flex items-center justify-between px-2.5 py-2 rounded-lg bg-blue-50 border border-blue-100">
-                <div class="min-w-0">
-                    <p class="text-[10px] font-semibold uppercase tracking-wider text-blue-500">Managing</p>
-                    <p class="text-[12px] font-medium text-blue-800 truncate"><?= htmlspecialchars($managedStoreName) ?></p>
-                </div>
-                <a href="/stores/exit-management" title="Exit store management" class="text-blue-400 hover:text-blue-700 text-[11px] flex-shrink-0 ml-2">
-                    <i class="bi bi-x-lg"></i>
+        <div class="px-4 pb-2">
+            <div class="flex items-center gap-2.5 pl-3 pr-2 py-2.5 rounded-[10px] bg-blue-50 border border-blue-100">
+                <a href="/stores" class="flex items-center gap-2.5 min-w-0 flex-1" title="Go to Stores">
+                    <span class="w-[30px] h-[30px] rounded-lg bg-white text-blue-700 flex items-center justify-center flex-shrink-0">
+                        <?= sidebarIcon($sidebarIcons, 'store', 'w-4 h-4') ?>
+                    </span>
+                    <span class="min-w-0 leading-tight">
+                        <span class="block text-[11px] font-semibold text-blue-700">Managing</span>
+                        <span class="block text-[13px] font-bold text-blue-900 truncate"><?= htmlspecialchars($managedStoreName) ?></span>
+                    </span>
+                </a>
+                <a href="/stores/exit-management" title="Exit store management" aria-label="Exit store management" class="w-7 h-7 rounded-md flex items-center justify-center text-blue-500 hover:bg-white hover:text-blue-800 flex-shrink-0">
+                    <i class="bi bi-x-lg text-[12px]"></i>
                 </a>
             </div>
         </div>
     <?php endif; ?>
-    <nav class="px-3 py-4 overflow-y-auto h-[calc(100vh-190px)]">
+
+    <!-- Navigation -->
+    <nav class="flex-1 overflow-y-auto px-4 pb-3">
 
         <?php foreach ($navigation as $section => $items): ?>
 
-            <div class="mb-6">
+            <p class="px-2 pt-3 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-slate-400">
+                <?= htmlspecialchars($section) ?>
+            </p>
 
-                <p class="px-2 mb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-                    <?= htmlspecialchars($section) ?>
-                </p>
+            <div class="space-y-0.5">
 
-                <div class="space-y-0.5">
+                <?php foreach ($items as $item): ?>
 
-                    <?php foreach ($items as $item): ?>
+                    <?php if (!empty($item['children'])): ?>
 
-                        <?php if (!empty($item['children'])): ?>
-
-                            <?php
-                            // Dropdown ko open rakho agar current page uske kisi child ka URL hai
-                            $childIsActive = false;
-                            foreach ($item['children'] as $child) {
-                                if (str_ends_with($currentPath, $child['url'])) {
-                                    $childIsActive = true;
-                                    break;
-                                }
+                        <?php
+                        // Dropdown ko open rakho agar current page uske kisi child ka URL hai
+                        $childIsActive = false;
+                        foreach ($item['children'] as $child) {
+                            if (str_ends_with($currentPath, $child['url'])) {
+                                $childIsActive = true;
+                                break;
                             }
-                            $dropdownId = 'dropdown-' . preg_replace('/[^a-z0-9]+/i', '-', strtolower($item['label']));
-                            $iconColor = $childIsActive ? 'text-gray-700' : 'text-gray-400';
-                            $dropdownIcon = $item['icon'] ?? 'mapping';
+                        }
+                        $dropdownId = 'dropdown-' . preg_replace('/[^a-z0-9]+/i', '-', strtolower($item['label']));
+                        $dropdownIcon = $item['icon'] ?? 'mapping';
+                        ?>
+
+                        <button type="button"
+                                aria-expanded="<?= $childIsActive ? 'true' : 'false' ?>"
+                                aria-controls="<?= $dropdownId ?>"
+                                onclick="var d=document.getElementById('<?= $dropdownId ?>'); d.classList.toggle('hidden'); this.querySelector('.dropdown-chevron').classList.toggle('rotate-180'); this.setAttribute('aria-expanded', d.classList.contains('hidden') ? 'false' : 'true');"
+                                class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] transition <?= $childIsActive ? 'text-slate-900 font-semibold' : 'text-slate-700 font-medium hover:bg-slate-50 hover:text-slate-900' ?>">
+                            <span class="<?= $childIsActive ? 'text-blue-700' : 'text-slate-500' ?>"><?= sidebarIcon($sidebarIcons, $dropdownIcon) ?></span>
+                            <span class="flex-1 text-left"><?= htmlspecialchars($item['label']) ?></span>
+                            <svg class="dropdown-chevron w-3.5 h-3.5 text-slate-400 transition-transform duration-150 <?= $childIsActive ? 'rotate-180' : '' ?>" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                        </button>
+
+                        <div id="<?= $dropdownId ?>" class="<?= $childIsActive ? '' : 'hidden' ?> ml-[18px] pl-3 border-l border-gray-200 space-y-px mb-1">
+                            <?php foreach ($item['children'] as $child):
+                                $childActive = str_ends_with($currentPath, $child['url']);
                             ?>
+                                <a href="<?= htmlspecialchars($baseUrl . $child['url']) ?>" class="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[12.5px] transition <?= $childActive ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 font-medium hover:bg-slate-50 hover:text-slate-900' ?>">
+                                    <span class="w-[5px] h-[5px] rounded-full <?= $childActive ? 'bg-blue-700' : 'bg-slate-300' ?>"></span>
+                                    <?= htmlspecialchars($child['label']) ?>
+                                </a>
+                            <?php endforeach; ?>
+                        </div>
 
-                            <button type="button"
-                                    onclick="document.getElementById('<?= $dropdownId ?>').classList.toggle('hidden'); this.querySelector('.dropdown-chevron').classList.toggle('rotate-90');"
-                                    class="w-full flex items-center justify-between px-2.5 py-2 rounded-md text-[13px] transition <?= $childIsActive ? 'bg-gray-100 text-gray-900 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' ?>">
+                    <?php else: ?>
 
-                                <div class="flex items-center gap-2.5">
-                                    <?php if ($dropdownIcon === 'truck'): ?>
-                                        <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" />
-                                            <circle cx="7" cy="18" r="1.6" stroke="currentColor" stroke-width="1.8" fill="none" />
-                                            <circle cx="17.5" cy="18" r="1.6" stroke="currentColor" stroke-width="1.8" fill="none" />
-                                        </svg>
-                                    <?php else: ?>
-                                        <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <circle cx="6" cy="6" r="2.5" stroke="currentColor" stroke-width="1.8" fill="none" />
-                                            <circle cx="18" cy="18" r="2.5" stroke="currentColor" stroke-width="1.8" fill="none" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8.2 7.8l7.6 8.4" />
-                                        </svg>
-                                    <?php endif; ?>
-                                    <span><?= htmlspecialchars($item['label']) ?></span>
-                                </div>
+                        <?php
+                        $url = $item['url'];
+                        $fullUrl = $url === '#' ? '#' : $baseUrl . $url;
+                        $isActive = $url !== '#' && str_ends_with($currentPath, $url);
+                        ?>
 
-                                <svg class="dropdown-chevron w-3.5 h-3.5 text-gray-400 transition-transform duration-150 <?= $childIsActive ? 'rotate-90' : '' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                                </svg>
-                            </button>
+                        <a href="<?= htmlspecialchars($fullUrl) ?>" <?= $isActive ? 'aria-current="page"' : '' ?> class="relative flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] transition <?= $isActive ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-700 font-medium hover:bg-slate-50 hover:text-slate-900' ?>">
+                            <?php if ($isActive): ?>
+                                <span class="absolute -left-4 top-1.5 bottom-1.5 w-[3px] rounded-r bg-blue-700"></span>
+                            <?php endif; ?>
+                            <span class="<?= $isActive ? 'text-blue-700' : 'text-slate-500' ?>"><?= sidebarIcon($sidebarIcons, $item['icon']) ?></span>
+                            <span><?= htmlspecialchars($item['label']) ?></span>
+                        </a>
 
-                            <div id="<?= $dropdownId ?>" class="<?= $childIsActive ? '' : 'hidden' ?> pl-7 space-y-0.5 mt-0.5">
-                                <?php foreach ($item['children'] as $child):
-                                    $childActive = str_ends_with($currentPath, $child['url']);
-                                ?>
-                                    <a href="<?= htmlspecialchars($baseUrl . $child['url']) ?>" class="block px-2.5 py-1.5 rounded-md text-[13px] transition <?= $childActive ? 'bg-gray-100 text-gray-900 font-medium' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900' ?>">
-                                        <?= htmlspecialchars($child['label']) ?>
-                                    </a>
-                                <?php endforeach; ?>
-                            </div>
+                    <?php endif; ?>
 
-                        <?php else: ?>
-
-                            <?php
-                            $url = $item['url'];
-                            $fullUrl = $url === '#' ? '#' : $baseUrl . $url;
-                            $isActive = $url !== '#' && str_ends_with($currentPath, $url);
-                            $iconColor = $isActive ? 'text-gray-700' : 'text-gray-400';
-                            ?>
-
-                            <a href="<?= htmlspecialchars($fullUrl) ?>" class="flex items-center justify-between px-2.5 py-2 rounded-md text-[13px] transition <?= $isActive ? 'bg-gray-100 text-gray-900 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' ?>">
-
-                                <div class="flex items-center gap-2.5">
-
-                                    <?php if ($item['icon'] === 'dashboard'): ?>
-                                        <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" />
-                                        </svg>
-                                    <?php elseif ($item['icon'] === 'orders'): ?>
-                                        <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 6h16v14H4zM8 6V4h8v2M8 10h8M8 14h5" />
-                                        </svg>
-
-                                    <?php elseif ($item['icon'] === 'inventory'): ?>
-                                        <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 7h16v13H4zM8 7V4h8v3M8 11h8M8 15h5" />
-                                        </svg>
-
-                                    <?php elseif ($item['icon'] === 'warehouse'): ?>
-                                        <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 21V9l9-6 9 6v12M3 21h18M9 21v-6h6v6" />
-                                        </svg>
-
-                                    <?php elseif ($item['icon'] === 'truck'): ?>
-                                        <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" />
-                                            <circle cx="7" cy="18" r="1.6" stroke="currentColor" stroke-width="1.8" fill="none" />
-                                            <circle cx="17.5" cy="18" r="1.6" stroke="currentColor" stroke-width="1.8" fill="none" />
-                                        </svg>
-
-                                    <?php elseif ($item['icon'] === 'checklist'): ?>
-                                        <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 11l2 2 4-4M5 5h14v14H5z" />
-                                        </svg>
-
-                                    <?php elseif ($item['icon'] === 'clipboard'): ?>
-                                        <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 4h6a1 1 0 011 1v1H8V5a1 1 0 011-1zM6 6h12v14H6z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6M9 16h4" />
-                                        </svg>
-
-                                    <?php elseif ($item['icon'] === 'transfer'): ?>
-                                        <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 7h11l-3-3M17 17H6l3 3" />
-                                        </svg>
-
-                                    <?php elseif ($item['icon'] === 'return'): ?>
-                                        <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 14l-4-4 4-4M5 10h9a5 5 0 015 5v1" />
-                                        </svg>
-                                    <?php elseif ($item['icon'] === 'store'): ?>
-                                        <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 9l1-5h14l1 5M4 9v11h16V9M4 9a2 2 0 004 0 2 2 0 004 0 2 2 0 004 0 2 2 0 004 0" />
-                                        </svg>
-
-                                    <?php elseif ($item['icon'] === 'employees'): ?>
-                                        <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 20v-2a4 4 0 00-3-3.87M13 3.13a4 4 0 010 7.75" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M11 20v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-                                            <circle cx="7" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="1.8" />
-                                        </svg>
-
-                                    <?php elseif ($item['icon'] === 'users'): ?>
-                                        <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" />
-                                            <circle cx="9" cy="7" r="4" fill="none" stroke="currentColor" stroke-width="1.8" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
-                                        </svg>
-
-                                    <?php elseif ($item['icon'] === 'alert'): ?>
-                                        <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                                        </svg>
-                                    <?php elseif ($item['icon'] === 'mapping'): ?>
-                                        <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <circle cx="6" cy="6" r="2.5" stroke="currentColor" stroke-width="1.8" fill="none" />
-                                            <circle cx="18" cy="18" r="2.5" stroke="currentColor" stroke-width="1.8" fill="none" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8.2 7.8l7.6 8.4" />
-                                        </svg>
-
-                                    <?php elseif ($item['icon'] === 'audit'): ?>
-                                        <svg class="w-4 h-4 <?= $iconColor ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 5a2 2 0 012-2h2a2 2 0 012 2v0a2 2 0 01-2 2h-2a2 2 0 01-2-2v0z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6M9 16h6" />
-                                        </svg>
-
-                                    <?php endif; ?>
-
-                                    <span><?= htmlspecialchars($item['label']) ?></span>
-
-                                </div>
-
-                            </a>
-
-                        <?php endif; ?>
-
-                    <?php endforeach; ?>
-
-                </div>
+                <?php endforeach; ?>
 
             </div>
-       <?php endforeach; ?>
 
-        <div class="pt-2">
-             <p class="px-2 mb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Account</p>
-            <a href="#" onclick="if(confirm('Are you sure you want to logout?')){window.location.href='/logout';} return false;" class="flex items-center gap-2.5 px-2.5 py-2 rounded-md text-[13px] text-gray-600 hover:bg-gray-50 hover:text-gray-900">
-                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 16l4-4m0 0l-4-4m4 4H7" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13 5H5a2 2 0 00-2 2v10a2 2 0 002 2h8" />
-                </svg>
-                Logout
-            </a>
-        </div>
+        <?php endforeach; ?>
+
+        <p class="px-2 pt-3 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-slate-400">Account</p>
+        <a href="#" onclick="if(confirm('Are you sure you want to logout?')){window.location.href='/logout';} return false;" class="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium text-slate-700 hover:bg-red-50 hover:text-red-700">
+            <span class="text-slate-500"><?= sidebarIcon($sidebarIcons, 'logout') ?></span>
+            Logout
+        </a>
 
     </nav>
 

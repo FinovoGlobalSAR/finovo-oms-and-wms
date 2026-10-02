@@ -5,7 +5,8 @@ require_once __DIR__ . '/../Models/Store.php';
 require_once __DIR__ . '/../Models/Product.php';
 require_once __DIR__ . '/../Models/Warehouse.php';
 require_once __DIR__ . '/../Services/InventoryService.php';
-require_once __DIR__ . '/../Middleware/CanonicalMapper.php';
+require_once __DIR__ . '/../Middlewares/CanonicalMapper.php';
+require_once __DIR__ . '/../Connectors/WixConnector.php';
 
 /**
  * Webhooks external duniya se aate hain — koi login session nahi hota.
@@ -29,7 +30,6 @@ class WebhookController extends Controller
     }
 
     // ---------- Shopify Webhook ----------
-
     public function shopify(): void
     {
         $storeId = (int) ($_GET['store_id'] ?? 0);
@@ -56,7 +56,6 @@ class WebhookController extends Controller
             echo json_encode(['error' => 'Invalid payload.']);
             return;
         }
-
         $externalId = (string) $data['id'];
         $eventType = $_SERVER['HTTP_X_SHOPIFY_TOPIC'] ?? 'orders/create';
 
@@ -91,7 +90,6 @@ class WebhookController extends Controller
         if ($check->fetch()) {
             return;
         }
-
         $customerName = trim(($order['customer']['first_name'] ?? '') . ' ' . ($order['customer']['last_name'] ?? ''));
         if ($customerName === '') {
             $customerName = $order['email'] ?? ('Order #' . ($order['order_number'] ?? $order['id']));
@@ -129,7 +127,6 @@ class WebhookController extends Controller
             echo json_encode(['error' => 'Unknown store or webhook not configured.']);
             return;
         }
-
         $rawBody = file_get_contents('php://input');
         $signature = $_SERVER['HTTP_X_WC_WEBHOOK_SIGNATURE'] ?? '';
 
@@ -169,7 +166,6 @@ class WebhookController extends Controller
         $computed = base64_encode(hash_hmac('sha256', $rawBody, $secret, true));
         return hash_equals($computed, $signature);
     }
-
     private function ingestWooOrder(array $store, array $order, string $externalId): void
     {
         $db = Database::getConnection();
@@ -206,6 +202,201 @@ class WebhookController extends Controller
              VALUES (?, ?, ?, ?, ?, 'woocommerce_pull', ?, 'processing', ?, ?, ?, ?, ?)"
         );
         $stmt->execute([$store['id'], $customerName, $productName, $quantity, $price, $externalId, $paymentStatus, $productId, $defaultWarehouse['id'], $stockWarning, $paymentMethodTitle]);
+    }
+
+    // ---------- BigCommerce Webhook ----------
+
+    public function bigcommerce(): void
+    {
+        $storeId = (int) ($_GET['store_id'] ?? 0);
+        $store = $this->storeModel->find($storeId);
+
+        if (!$store || empty($store['bigcommerce_access_token'])) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Unknown store or BigCommerce not configured.']);
+            return;
+        }
+
+        $rawBody = file_get_contents('php://input');
+        $data = json_decode($rawBody, true);
+
+        if (!$data || empty($data['data']['id'])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid payload.']);
+            return;
+        }
+
+        $externalId = (string) $data['data']['id'];
+        $eventType = $data['scope'] ?? 'store/order/created';
+
+        if (!$this->recordWebhookEvent($storeId, 'bigcommerce', $externalId, $eventType)) {
+            http_response_code(200);
+            echo json_encode(['status' => 'already_processed']);
+            return;
+        }
+
+        $this->ingestBigCommerceOrder($store, $externalId);
+
+        http_response_code(200);
+        echo json_encode(['status' => 'ok']);
+    }
+
+    private function ingestBigCommerceOrder(array $store, string $externalId): void
+    {
+        $db = Database::getConnection();
+        $defaultWarehouse = $this->warehouseModel->getDefault((int) $store['id']);
+
+        $check = $db->prepare("SELECT id FROM orders WHERE external_bc_order_id = ? AND store_id = ?");
+        $check->execute([$externalId, $store['id']]);
+        if ($check->fetch()) {
+            return;
+        }
+
+        $apiUrl = 'https://api.bigcommerce.com/stores/' . $store['bigcommerce_store_hash'] . "/v2/orders/{$externalId}";
+        $ch = curl_init($apiUrl);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['X-Auth-Token: ' . $store['bigcommerce_access_token'], 'Accept: application/json']);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        $response = curl_exec($ch);
+        curl_close($ch);
+
+        $order = json_decode($response, true);
+        if (!$order) {
+            return;
+        }
+
+        $productsUrl = 'https://api.bigcommerce.com/stores/' . $store['bigcommerce_store_hash'] . "/v2/orders/{$externalId}/products";
+        $pch = curl_init($productsUrl);
+        curl_setopt($pch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($pch, CURLOPT_HTTPHEADER, ['X-Auth-Token: ' . $store['bigcommerce_access_token'], 'Accept: application/json']);
+        curl_setopt($pch, CURLOPT_TIMEOUT, 15);
+        $productsResponse = curl_exec($pch);
+        curl_close($pch);
+
+        $lineItems = json_decode($productsResponse, true) ?? [];
+        $firstItem = $lineItems[0] ?? [];
+
+        $productName = $firstItem['name'] ?? 'Unknown product';
+        $quantity = (int) ($firstItem['quantity'] ?? 1);
+        $price = (float) ($order['total_inc_tax'] ?? 0);
+
+        $billing = $order['billing_address'] ?? [];
+        $customerName = trim(($billing['first_name'] ?? '') . ' ' . ($billing['last_name'] ?? ''));
+        if ($customerName === '') {
+            $customerName = $billing['email'] ?? ('Order #' . $externalId);
+        }
+
+        $productId = $this->productModel->findOrCreate((int) $store['id'], $productName, $price);
+
+        $result = $this->inventoryService->reserve($productId, null, (int) $defaultWarehouse['id'], $quantity, 'bigcommerce_webhook', "external:{$externalId}", 'webhook');
+        $stockWarning = $result['ok'] ? 0 : 1;
+
+        $stmt = $db->prepare(
+            "INSERT INTO orders (store_id, customer_name, product_name, quantity, price, source, external_bc_order_id, status, product_id, warehouse_id, stock_warning)
+             VALUES (?, ?, ?, ?, ?, 'bigcommerce_pull', ?, 'processing', ?, ?, ?)"
+        );
+        $stmt->execute([$store['id'], $customerName, $productName, $quantity, $price, $externalId, $productId, $defaultWarehouse['id'], $stockWarning]);
+    }
+
+    // ---------- Wix Webhook ----------
+
+    public function wix(): void
+    {
+        $storeId = (int) ($_GET['store_id'] ?? 0);
+        $store = $this->storeModel->find($storeId);
+
+        if (!$store) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Unknown store.']);
+            return;
+        }
+
+        $rawBody = trim(file_get_contents('php://input'));
+
+        // Wix webhooks JWT format mein aate hain (header.payload.signature).
+        // JWT payload ka "data" field JSON-string hai, aur uske andar bhi
+        // ek "data" field hota hai jo AGAIN JSON-string hai — 2 baar nested.
+        // Sirf tab jaake genuine order (entityId + createdEvent) milta hai.
+        $jwtParts = explode('.', $rawBody);
+        $order = null;
+        $externalId = '';
+
+        if (count($jwtParts) === 3) {
+            $b64 = strtr($jwtParts[1], '-_', '+/');
+            $remainder = strlen($b64) % 4;
+            if ($remainder > 0) {
+                $b64 .= str_repeat('=', 4 - $remainder);
+            }
+            $payload = json_decode(base64_decode($b64), true);
+
+            if (is_array($payload) && isset($payload['data'])) {
+                $level1 = json_decode($payload['data'], true);
+                $level2 = (is_array($level1) && isset($level1['data']))
+                    ? json_decode($level1['data'], true)
+                    : $level1;
+
+                if (is_array($level2)) {
+                    $order = $level2['createdEvent']['entity'] ?? null;
+                    $externalId = (string) ($level2['entityId'] ?? $order['id'] ?? '');
+                }
+            }
+        } else {
+            // Fallback: agar kabhi plain JSON bhi aa jaye (jaisa manual curl test)
+            $data = json_decode($rawBody, true);
+            $order = $data['createdEvent']['entity'] ?? null;
+            $externalId = (string) ($data['entityId'] ?? $order['id'] ?? '');
+        }
+
+        if (!$order || $externalId === '') {
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid payload.']);
+            return;
+        }
+
+        if (!$this->recordWebhookEvent($storeId, 'wix', $externalId, 'OrderCreated')) {
+            http_response_code(200);
+            echo json_encode(['status' => 'already_processed']);
+            return;
+        }
+
+        $this->ingestWixOrderFromPayload($store, $order, $externalId);
+
+        http_response_code(200);
+        echo json_encode(['status' => 'ok']);
+    }
+
+    private function ingestWixOrderFromPayload(array $store, array $order, string $externalId): void
+    {
+        $db = Database::getConnection();
+        $defaultWarehouse = $this->warehouseModel->getDefault((int) $store['id']);
+
+        $check = $db->prepare("SELECT id FROM orders WHERE external_wix_order_id = ? AND store_id = ?");
+        $check->execute([$externalId, $store['id']]);
+        if ($check->fetch()) {
+            return;
+        }
+
+        $lineItems = $order['lineItems'][0] ?? [];
+        $productName = $lineItems['productName']['original'] ?? 'Unknown product';
+        $quantity = (int) ($lineItems['quantity'] ?? 1);
+        $price = (float) ($order['priceSummary']['total']['amount'] ?? 0);
+
+        $billingInfo = $order['billingInfo']['contactDetails'] ?? [];
+        $customerName = trim(($billingInfo['firstName'] ?? '') . ' ' . ($billingInfo['lastName'] ?? ''));
+        if ($customerName === '') {
+            $customerName = $order['buyerInfo']['email'] ?? ('Order #' . $externalId);
+        }
+
+        $productId = $this->productModel->findOrCreate((int) $store['id'], $productName, $price);
+
+        $reserveResult = $this->inventoryService->reserve($productId, null, (int) $defaultWarehouse['id'], $quantity, 'wix_webhook', "external:{$externalId}", 'webhook');
+        $stockWarning = $reserveResult['ok'] ? 0 : 1;
+
+        $stmt = $db->prepare(
+            "INSERT INTO orders (store_id, customer_name, product_name, quantity, price, source, external_wix_order_id, status, product_id, warehouse_id, stock_warning)
+             VALUES (?, ?, ?, ?, ?, 'wix_pull', ?, 'processing', ?, ?, ?)"
+        );
+        $stmt->execute([$store['id'], $customerName, $productName, $quantity, $price, $externalId, $productId, $defaultWarehouse['id'], $stockWarning]);
     }
 
     // ---------- Custom Bridge Webhook ----------
@@ -248,7 +439,6 @@ class WebhookController extends Controller
             echo json_encode(['status' => 'already_processed']);
             return;
         }
-
         $this->ingestBridgeOrder($store, $data, $externalId);
 
         http_response_code(200);
@@ -280,7 +470,6 @@ class WebhookController extends Controller
         if ($check->fetch()) {
             return;
         }
-
         $customerName = $order['customer_name'] ?? 'Unknown';
         $externalProductId = (string) ($order['product_id'] ?? '');
         $quantity = (int) ($order['quantity'] ?? 1);

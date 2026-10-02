@@ -1,25 +1,88 @@
 <?php
 require_once __DIR__ . '/../../libraries/fpdf/fpdf.php';
 
+/**
+ * FPDF ka chhota sa extension — sirf rounded boxes draw karne ke liye.
+ */
+if (!class_exists('InvoicePdf')) {
+    class InvoicePdf extends FPDF
+    {
+        public function RoundedRect(float $x, float $y, float $w, float $h, float $r, string $style = ''): void
+        {
+            $k = $this->k;
+            $hp = $this->h;
+            $op = $style === 'F' ? 'f' : (($style === 'FD' || $style === 'DF') ? 'B' : 'S');
+            $arc = 4 / 3 * (M_SQRT2 - 1);
+
+            $this->_out(sprintf('%.2F %.2F m', ($x + $r) * $k, ($hp - $y) * $k));
+            $xc = $x + $w - $r; $yc = $y + $r;
+            $this->_out(sprintf('%.2F %.2F l', $xc * $k, ($hp - $y) * $k));
+            $this->arc($xc + $r * $arc, $yc - $r, $xc + $r, $yc - $r * $arc, $xc + $r, $yc);
+            $xc = $x + $w - $r; $yc = $y + $h - $r;
+            $this->_out(sprintf('%.2F %.2F l', ($x + $w) * $k, ($hp - $yc) * $k));
+            $this->arc($xc + $r, $yc + $r * $arc, $xc + $r * $arc, $yc + $r, $xc, $yc + $r);
+            $xc = $x + $r; $yc = $y + $h - $r;
+            $this->_out(sprintf('%.2F %.2F l', $xc * $k, ($hp - ($y + $h)) * $k));
+            $this->arc($xc - $r * $arc, $yc + $r, $xc - $r, $yc + $r * $arc, $xc - $r, $yc);
+            $xc = $x + $r; $yc = $y + $r;
+            $this->_out(sprintf('%.2F %.2F l', $x * $k, ($hp - $yc) * $k));
+            $this->arc($xc - $r, $yc - $r * $arc, $xc - $r * $arc, $yc - $r, $xc, $yc - $r);
+            $this->_out($op);
+        }
+
+        private function arc(float $x1, float $y1, float $x2, float $y2, float $x3, float $y3): void
+        {
+            $h = $this->h;
+            $this->_out(sprintf(
+                '%.2F %.2F %.2F %.2F %.2F %.2F c',
+                $x1 * $this->k, ($h - $y1) * $this->k,
+                $x2 * $this->k, ($h - $y2) * $this->k,
+                $x3 * $this->k, ($h - $y3) * $this->k
+            ));
+        }
+    }
+}
+
 class InvoiceService
 {
     private string $currency = 'Rs.';
 
+    /** Store ka brand color [r, g, b] — store ke naam se automatically chuna jata hai */
+    private array $accent = [29, 78, 216];
+
+    /** Har store ko in mein se ek color milta hai (naam ke hisaab se, hamesha same) */
+    private array $palette = [
+        [29, 78, 216],   // blue
+        [4, 120, 87],    // green
+        [124, 58, 237],  // purple
+        [190, 24, 93],   // pink
+        [194, 65, 12],   // orange
+        [14, 116, 144],  // teal
+        [67, 56, 202],   // indigo
+        [15, 23, 42],    // slate
+    ];
+
+    private const LEFT = 14;
+    private const RIGHT = 196;
+    private const WIDTH = 182;
+
     public function generate(array $order): void
     {
         $this->currency = $order['currency'] ?? 'Rs.';
+        $this->accent = $this->accentFor((string) ($order['store_name'] ?? 'Finovo'));
 
-        $pdf = new FPDF('P', 'mm', 'A4');
-        $pdf->SetMargins(14, 14, 14);
+        $pdf = new InvoicePdf('P', 'mm', 'A4');
+        $pdf->SetMargins(self::LEFT, 14, self::LEFT);
         $pdf->SetAutoPageBreak(true, 16);
         $pdf->AddPage();
 
         $this->drawHeader($pdf, $order);
+        $this->drawMetaRow($pdf, $order);
         $this->drawCustomerBlocks($pdf, $order);
         $this->drawItemsTable($pdf, $order['items'] ?? []);
         $this->drawTotals($pdf, $order);
         $this->drawPayment($pdf, $order);
-        $this->drawFooter($pdf);
+        $this->drawFooter($pdf, $order);
 
         $filename = preg_replace('/[^A-Za-z0-9_-]/', '-', (string) ($order['invoice_number'] ?? 'invoice')) . '.pdf';
 
@@ -27,143 +90,218 @@ class InvoiceService
         exit;
     }
 
-    private function drawHeader(FPDF $pdf, array $order): void
+    // ------------------------------------------------------------------
+    // Header: store ke brand color ki patti, store ka naam aur initials
+    // ------------------------------------------------------------------
+    private function drawHeader(InvoicePdf $pdf, array $order): void
     {
-        $pdf->SetFillColor(20, 24, 32);
-        $pdf->Rect(14, 14, 13, 13, 'F');
+        [$r, $g, $b] = $this->accent;
+        $storeName = $this->clean((string) ($order['store_name'] ?? 'Finovo'));
+
+        // Colored band across the top
+        $pdf->SetFillColor($r, $g, $b);
+        $pdf->Rect(0, 0, 210, 44, 'F');
+
+        // Store initials "logo"
+        $pdf->SetFillColor(255, 255, 255);
+        $pdf->RoundedRect(self::LEFT, 12, 18, 18, 3.5, 'F');
+        $pdf->SetTextColor($r, $g, $b);
+        $pdf->SetFont('Arial', 'B', 13);
+        $pdf->SetXY(self::LEFT, 12);
+        $pdf->Cell(18, 18, $this->initials($storeName), 0, 0, 'C');
+
+        // Store name
         $pdf->SetTextColor(255, 255, 255);
-        $pdf->SetFont('Arial', 'B', 10);
-        $pdf->SetXY(14, 14);
-        $pdf->Cell(13, 13, 'F', 0, 0, 'C');
+        $pdf->SetFont('Arial', 'B', 17);
+        $pdf->SetXY(self::LEFT + 23, 12.5);
+        $pdf->Cell(100, 9, $this->truncate($storeName, 32), 0, 1);
 
-        $pdf->SetTextColor(17, 24, 39);
-        $pdf->SetFont('Arial', 'B', 18);
-        $pdf->SetXY(31, 14);
-        $pdf->Cell(70, 8, 'FINOVO', 0, 1);
+        $pdf->SetFont('Arial', '', 9);
+        $pdf->SetTextColor(226, 232, 240);
+        $pdf->SetX(self::LEFT + 23);
+        $pdf->Cell(100, 5, 'Sales Invoice', 0, 1);
 
-        $pdf->SetTextColor(107, 114, 128);
-        $pdf->SetFont('Arial', '', 8.5);
-        $pdf->SetX(31);
-        $pdf->Cell(85, 5, $this->clean($order['store_name'] ?? 'OMS / WMS'), 0, 1);
+        // INVOICE title + number on the right
+        $pdf->SetTextColor(255, 255, 255);
+        $pdf->SetFont('Arial', 'B', 24);
+        $pdf->SetXY(120, 11);
+        $pdf->Cell(76, 11, 'INVOICE', 0, 1, 'R');
 
-        $pdf->SetTextColor(17, 24, 39);
-        $pdf->SetFont('Arial', 'B', 23);
-        $pdf->SetXY(135, 14);
-        $pdf->Cell(61, 9, 'INVOICE', 0, 1, 'R');
+        $pdf->SetFont('Arial', '', 9.5);
+        $pdf->SetTextColor(226, 232, 240);
+        $pdf->SetXY(120, 22);
+        $pdf->Cell(76, 6, $this->clean((string) ($order['invoice_number'] ?? '-')), 0, 1, 'R');
 
-        $pdf->SetFont('Arial', 'B', 8.5);
-        $pdf->SetTextColor(107, 114, 128);
-        $pdf->SetXY(135, 25);
-        $pdf->Cell(25, 5, 'INVOICE NO.', 0, 0, 'R');
-        $pdf->SetTextColor(17, 24, 39);
-        $pdf->Cell(36, 5, $this->clean($order['invoice_number'] ?? '-'), 0, 1, 'R');
-
-        $pdf->SetTextColor(107, 114, 128);
-        $pdf->SetX(135);
-        $pdf->Cell(25, 5, 'ORDER NO.', 0, 0, 'R');
-        $pdf->SetTextColor(17, 24, 39);
-        $pdf->Cell(36, 5, $this->clean($order['order_number'] ?? '-'), 0, 1, 'R');
-
-        $pdf->SetTextColor(107, 114, 128);
-        $pdf->SetX(135);
-        $pdf->Cell(25, 5, 'DATE', 0, 0, 'R');
-        $pdf->SetTextColor(17, 24, 39);
-        $pdf->Cell(36, 5, $this->formatDate($order['order_date'] ?? null), 0, 1, 'R');
-
-        $pdf->SetDrawColor(229, 231, 235);
-        $pdf->Line(14, 43, 196, 43);
-        $pdf->SetY(49);
+        $pdf->SetY(52);
     }
 
-    private function drawCustomerBlocks(FPDF $pdf, array $order): void
+    // ------------------------------------------------------------------
+    // 4 chhote boxes: Invoice No, Order No, Date, Payment status
+    // ------------------------------------------------------------------
+    private function drawMetaRow(InvoicePdf $pdf, array $order): void
+    {
+        $y = 52;
+        $gap = 4;
+        $w = (self::WIDTH - 3 * $gap) / 4;
+
+        $status = strtolower((string) ($order['payment_status'] ?? 'pending'));
+        $isPaid = $status === 'paid';
+
+        $boxes = [
+            ['INVOICE NO.', $this->clean((string) ($order['invoice_number'] ?? '-')), null],
+            ['ORDER NO.', $this->clean((string) ($order['order_number'] ?? '-')), null],
+            ['INVOICE DATE', $this->formatDate($order['order_date'] ?? null), null],
+            ['PAYMENT', $isPaid ? 'PAID' : strtoupper($this->clean((string) ($order['payment_status'] ?? 'Pending'))), $isPaid ? [22, 163, 74] : [220, 38, 38]],
+        ];
+
+        foreach ($boxes as $i => [$label, $value, $color]) {
+            $x = self::LEFT + $i * ($w + $gap);
+
+            $pdf->SetFillColor(248, 250, 252);
+            $pdf->SetDrawColor(226, 232, 240);
+            $pdf->RoundedRect($x, $y, $w, 17, 2.5, 'FD');
+
+            $pdf->SetXY($x + 4, $y + 3);
+            $pdf->SetFont('Arial', 'B', 7);
+            $pdf->SetTextColor(100, 116, 139);
+            $pdf->Cell($w - 8, 4, $label, 0, 2);
+
+            $pdf->SetX($x + 4);
+            $pdf->SetFont('Arial', 'B', 10);
+            if ($color) {
+                $pdf->SetTextColor($color[0], $color[1], $color[2]);
+            } else {
+                $pdf->SetTextColor(15, 23, 42);
+            }
+            $pdf->Cell($w - 8, 7, $this->truncate($value, 20), 0, 0);
+        }
+
+        $pdf->SetY($y + 25);
+    }
+
+    // ------------------------------------------------------------------
+    // Bill To / Ship To
+    // ------------------------------------------------------------------
+    private function drawCustomerBlocks(InvoicePdf $pdf, array $order): void
     {
         $customer = $order['customer'] ?? [];
+        $y = $pdf->GetY();
+        $w = (self::WIDTH - 6) / 2;
 
-        $this->sectionLabel($pdf, 'BILL TO', 14, 49);
-        $this->sectionLabel($pdf, 'SHIP TO', 108, 49);
+        foreach ([['BILL TO', self::LEFT], ['SHIP TO', self::LEFT + $w + 6]] as [$label, $x]) {
+            $this->sectionLabel($pdf, $label, $x, $y);
+        }
 
+        // Bill to
+        $pdf->SetXY(self::LEFT, $y + 6);
         $pdf->SetFont('Arial', 'B', 11);
-        $pdf->SetTextColor(17, 24, 39);
-        $pdf->SetXY(14, 56);
-        $pdf->Cell(82, 6, $this->clean($customer['name'] ?? 'Customer'), 0, 1);
+        $pdf->SetTextColor(15, 23, 42);
+        $pdf->Cell($w, 6, $this->clean((string) ($customer['name'] ?? 'Customer')), 0, 1);
 
         $pdf->SetFont('Arial', '', 8.8);
-        $pdf->SetTextColor(75, 85, 99);
-        $pdf->SetX(14);
-        $pdf->Cell(82, 5, $this->clean($customer['email'] ?? '-'), 0, 1);
-        $pdf->SetX(14);
-        $pdf->Cell(82, 5, $this->clean($customer['phone'] ?? '-'), 0, 1);
-        $pdf->SetX(14);
-        $pdf->MultiCell(82, 4.7, $this->clean($order['billing_address'] ?? '-'));
+        $pdf->SetTextColor(71, 85, 105);
+        $pdf->SetX(self::LEFT);
+        $pdf->Cell($w, 5, $this->clean((string) ($customer['email'] ?? '-')), 0, 1);
+        $pdf->SetX(self::LEFT);
+        $pdf->Cell($w, 5, $this->clean((string) ($customer['phone'] ?? '-')), 0, 1);
+        $pdf->SetX(self::LEFT);
+        $pdf->MultiCell($w, 4.7, $this->clean((string) ($order['billing_address'] ?? '-')));
+        $billBottom = $pdf->GetY();
 
-        $pdf->SetXY(108, 56);
+        // Ship to
+        $shipX = self::LEFT + $w + 6;
+        $pdf->SetXY($shipX, $y + 6);
         $pdf->SetFont('Arial', 'B', 11);
-        $pdf->SetTextColor(17, 24, 39);
-        $pdf->Cell(88, 6, $this->clean($customer['name'] ?? 'Customer'), 0, 1);
+        $pdf->SetTextColor(15, 23, 42);
+        $pdf->Cell($w, 6, $this->clean((string) ($customer['name'] ?? 'Customer')), 0, 1);
 
         $pdf->SetFont('Arial', '', 8.8);
-        $pdf->SetTextColor(75, 85, 99);
-        $pdf->SetX(108);
-        $pdf->MultiCell(88, 4.7, $this->clean($order['shipping_address'] ?? '-'));
+        $pdf->SetTextColor(71, 85, 105);
+        $pdf->SetX($shipX);
+        $pdf->MultiCell($w, 4.7, $this->clean((string) ($order['shipping_address'] ?? '-')));
+        $shipBottom = $pdf->GetY();
 
-        $pdf->SetY(max($pdf->GetY(), 82));
-        $pdf->Ln(4);
+        $pdf->SetY(max($billBottom, $shipBottom, $y + 30) + 6);
     }
 
-    private function drawItemsTable(FPDF $pdf, array $items): void
+    // ------------------------------------------------------------------
+    // Items table — header store ke color mein, halki zebra rows
+    // ------------------------------------------------------------------
+    private function drawItemsTable(InvoicePdf $pdf, array $items): void
     {
-        $widths = [45, 24, 31, 14, 32, 36];
+        $widths = [52, 26, 30, 14, 28, 32];
         $headers = ['PRODUCT', 'SKU', 'VARIANT', 'QTY', 'UNIT PRICE', 'LINE TOTAL'];
         $aligns = ['L', 'L', 'L', 'C', 'R', 'R'];
 
-        $pdf->SetFillColor(245, 246, 248);
-        $pdf->SetTextColor(75, 85, 99);
-        $pdf->SetDrawColor(229, 231, 235);
-        $pdf->SetFont('Arial', 'B', 8);
+        $this->tableHeader($pdf, $widths, $headers, $aligns);
 
-        foreach ($headers as $i => $header) {
-            $pdf->Cell($widths[$i], 8, $header, 1, $i === count($headers) - 1 ? 1 : 0, $aligns[$i], true);
-        }
-
-        $pdf->SetFont('Arial', '', 8.5);
-        $pdf->SetTextColor(31, 41, 55);
+        $pdf->SetFont('Arial', '', 8.8);
 
         if (empty($items)) {
-            $pdf->Cell(array_sum($widths), 11, 'No order items found.', 1, 1, 'C');
+            $pdf->SetTextColor(100, 116, 139);
+            $pdf->Cell(array_sum($widths), 12, 'No order items found.', 'B', 1, 'C');
+            $pdf->Ln(6);
             return;
         }
 
+        $zebra = false;
         foreach ($items as $item) {
             if ($pdf->GetY() > 255) {
                 $pdf->AddPage();
-                $pdf->SetFillColor(245, 246, 248);
-                $pdf->SetTextColor(75, 85, 99);
-                $pdf->SetDrawColor(229, 231, 235);
-                $pdf->SetFont('Arial', 'B', 8);
-                foreach ($headers as $i => $header) {
-                    $pdf->Cell($widths[$i], 8, $header, 1, $i === count($headers) - 1 ? 1 : 0, $aligns[$i], true);
-                }
-                $pdf->SetFont('Arial', '', 8.5);
-                $pdf->SetTextColor(31, 41, 55);
+                $this->tableHeader($pdf, $widths, $headers, $aligns);
+                $pdf->SetFont('Arial', '', 8.8);
             }
 
-            $pdf->Cell($widths[0], 9, $this->truncate($item['product_name'] ?? '-', 28), 1, 0, 'L');
-            $pdf->Cell($widths[1], 9, $this->truncate($item['sku'] ?? '-', 14), 1, 0, 'L');
-            $pdf->Cell($widths[2], 9, $this->truncate($item['variant'] ?? '-', 18), 1, 0, 'L');
-            $pdf->Cell($widths[3], 9, (string) ((int) ($item['quantity'] ?? 1)), 1, 0, 'C');
-            $pdf->Cell($widths[4], 9, $this->money((float) ($item['unit_price'] ?? 0)), 1, 0, 'R');
-            $pdf->Cell($widths[5], 9, $this->money((float) ($item['line_total'] ?? 0)), 1, 1, 'R');
+            $pdf->SetFillColor(248, 250, 252);
+            $pdf->SetDrawColor(226, 232, 240);
+            $pdf->SetTextColor(15, 23, 42);
+
+            $pdf->SetFont('Arial', 'B', 8.8);
+            $pdf->Cell($widths[0], 10, '  ' . $this->truncate((string) ($item['product_name'] ?? '-'), 30), 'B', 0, 'L', $zebra);
+            $pdf->SetFont('Arial', '', 8.8);
+            $pdf->SetTextColor(71, 85, 105);
+            $pdf->Cell($widths[1], 10, $this->truncate((string) ($item['sku'] ?? '-'), 14), 'B', 0, 'L', $zebra);
+            $pdf->Cell($widths[2], 10, $this->truncate((string) ($item['variant'] ?? '-'), 17), 'B', 0, 'L', $zebra);
+            $pdf->SetTextColor(15, 23, 42);
+            $pdf->Cell($widths[3], 10, (string) ((int) ($item['quantity'] ?? 1)), 'B', 0, 'C', $zebra);
+            $pdf->Cell($widths[4], 10, $this->money((float) ($item['unit_price'] ?? 0)), 'B', 0, 'R', $zebra);
+            $pdf->SetFont('Arial', 'B', 8.8);
+            $pdf->Cell($widths[5], 10, $this->money((float) ($item['line_total'] ?? 0)) . '  ', 'B', 1, 'R', $zebra);
+
+            $zebra = !$zebra;
         }
 
-        $pdf->Ln(8);
+        $pdf->Ln(6);
     }
 
-    private function drawTotals(FPDF $pdf, array $order): void
+    private function tableHeader(InvoicePdf $pdf, array $widths, array $headers, array $aligns): void
     {
-        $labelX = 122;
-        $valueX = 158;
-        $labelW = 34;
-        $valueW = 38;
+        [$r, $g, $b] = $this->accent;
+        $pdf->SetFillColor($r, $g, $b);
+        $pdf->SetTextColor(255, 255, 255);
+        $pdf->SetFont('Arial', 'B', 7.8);
+
+        foreach ($headers as $i => $header) {
+            $text = $header;
+            if ($i === 0) { $text = '  ' . $header; }
+            if ($i === count($headers) - 1) { $text = $header . '  '; }
+            $pdf->Cell($widths[$i], 9, $text, 0, $i === count($headers) - 1 ? 1 : 0, $aligns[$i], true);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Totals — Grand Total store ke color wale box mein
+    // ------------------------------------------------------------------
+    private function drawTotals(InvoicePdf $pdf, array $order): void
+    {
+        if ($pdf->GetY() > 225) {
+            $pdf->AddPage();
+        }
+
+        $boxX = 112;
+        $boxW = self::RIGHT - $boxX;
+        $labelW = 40;
+        $valueW = $boxW - $labelW - 6;
 
         $rows = [
             ['Subtotal', (float) ($order['subtotal'] ?? 0)],
@@ -174,74 +312,135 @@ class InvoiceService
 
         $pdf->SetFont('Arial', '', 9);
         foreach ($rows as [$label, $amount]) {
-            $pdf->SetX($labelX);
-            $pdf->SetTextColor(107, 114, 128);
-            $pdf->Cell($labelW, 6.5, $label, 0, 0, 'R');
-            $pdf->SetTextColor(31, 41, 55);
+            $pdf->SetX($boxX);
+            $pdf->SetTextColor(100, 116, 139);
+            $pdf->Cell($labelW, 6.5, $label, 0, 0, 'L');
+            $pdf->SetTextColor(15, 23, 42);
             $pdf->Cell($valueW, 6.5, $this->money($amount), 0, 1, 'R');
         }
 
-        $pdf->SetDrawColor(229, 231, 235);
-        $pdf->Line($labelX + 4, $pdf->GetY() + 1, 196, $pdf->GetY() + 1);
-        $pdf->Ln(4);
+        $pdf->Ln(2);
+        $y = $pdf->GetY();
+        [$r, $g, $b] = $this->accent;
+        $pdf->SetFillColor($r, $g, $b);
+        $pdf->RoundedRect($boxX, $y, $boxW, 13, 2.5, 'F');
 
-        $pdf->SetX($labelX);
-        $pdf->SetFont('Arial', 'B', 11.5);
-        $pdf->SetTextColor(17, 24, 39);
-        $pdf->Cell($labelW, 8, 'Grand Total', 0, 0, 'R');
-        $pdf->Cell($valueW, 8, $this->money((float) ($order['grand_total'] ?? 0)), 0, 1, 'R');
+        $pdf->SetXY($boxX + 4, $y);
+        $pdf->SetFont('Arial', 'B', 10);
+        $pdf->SetTextColor(255, 255, 255);
+        $pdf->Cell($labelW - 4, 13, 'Grand Total', 0, 0, 'L');
+        $pdf->SetFont('Arial', 'B', 13);
+        $pdf->Cell($valueW, 13, $this->money((float) ($order['grand_total'] ?? 0)), 0, 1, 'R');
 
-        $pdf->Ln(7);
+        $pdf->SetY($y + 21);
     }
 
-    private function drawPayment(FPDF $pdf, array $order): void
+    // ------------------------------------------------------------------
+    // Payment details
+    // ------------------------------------------------------------------
+    private function drawPayment(InvoicePdf $pdf, array $order): void
     {
-        if ($pdf->GetY() > 248) {
+        if ($pdf->GetY() > 245) {
             $pdf->AddPage();
         }
 
         $y = $pdf->GetY();
-        $pdf->SetFillColor(248, 249, 250);
-        $pdf->SetDrawColor(229, 231, 235);
-        $pdf->Rect(14, $y, 182, 26, 'FD');
+        [$r, $g, $b] = $this->accent;
 
-        $pdf->SetXY(20, $y + 5);
-        $pdf->SetFont('Arial', 'B', 8);
-        $pdf->SetTextColor(107, 114, 128);
-        $pdf->Cell(44, 5, 'PAYMENT METHOD', 0, 0);
-        $pdf->Cell(44, 5, 'PAYMENT STATUS', 0, 0);
-        $pdf->Cell(44, 5, 'ORDER SOURCE', 0, 1);
+        $pdf->SetFillColor(248, 250, 252);
+        $pdf->SetDrawColor(226, 232, 240);
+        $pdf->RoundedRect(self::LEFT, $y, self::WIDTH, 24, 3, 'FD');
 
-        $pdf->SetX(20);
-        $pdf->SetFont('Arial', 'B', 9.5);
-        $pdf->SetTextColor(31, 41, 55);
-        $pdf->Cell(44, 7, $this->truncate($order['payment_method'] ?? 'Not specified', 20), 0, 0);
-        $pdf->Cell(44, 7, $this->truncate($order['payment_status'] ?? 'Pending', 20), 0, 0);
-        $pdf->Cell(70, 7, $this->sourceLabel($order['source'] ?? 'manual'), 0, 1);
+        // Accent strip on the left of the box
+        $pdf->SetFillColor($r, $g, $b);
+        $pdf->Rect(self::LEFT, $y + 4, 1.4, 16, 'F');
+
+        $colW = (self::WIDTH - 12) / 3;
+
+        $pdf->SetXY(self::LEFT + 7, $y + 5);
+        $pdf->SetFont('Arial', 'B', 7.5);
+        $pdf->SetTextColor(100, 116, 139);
+        $pdf->Cell($colW, 5, 'PAYMENT METHOD', 0, 0);
+        $pdf->Cell($colW, 5, 'PAYMENT STATUS', 0, 0);
+        $pdf->Cell($colW, 5, 'ORDER SOURCE', 0, 1);
+
+        $pdf->SetX(self::LEFT + 7);
+        $pdf->SetFont('Arial', 'B', 10);
+        $pdf->SetTextColor(15, 23, 42);
+        $pdf->Cell($colW, 8, $this->truncate((string) ($order['payment_method'] ?? 'Not specified'), 22), 0, 0);
+
+        $status = strtolower((string) ($order['payment_status'] ?? 'pending'));
+        if ($status === 'paid') {
+            $pdf->SetTextColor(22, 163, 74);
+        } else {
+            $pdf->SetTextColor(220, 38, 38);
+        }
+        $pdf->Cell($colW, 8, ucfirst($this->truncate((string) ($order['payment_status'] ?? 'Pending'), 22)), 0, 0);
+
+        $pdf->SetTextColor(15, 23, 42);
+        $pdf->Cell($colW, 8, $this->sourceLabel((string) ($order['source'] ?? 'manual')), 0, 1);
 
         $pdf->SetY($y + 32);
     }
 
-    private function drawFooter(FPDF $pdf): void
+    // ------------------------------------------------------------------
+    // Footer — store ka shukriya, neeche chhota sa "Powered by Finovo"
+    // ------------------------------------------------------------------
+    private function drawFooter(InvoicePdf $pdf, array $order): void
     {
-        if ($pdf->GetY() > 270) {
+        if ($pdf->GetY() > 262) {
             $pdf->AddPage();
         }
 
-        $pdf->SetDrawColor(229, 231, 235);
-        $pdf->Line(14, $pdf->GetY(), 196, $pdf->GetY());
-        $pdf->Ln(5);
-        $pdf->SetTextColor(107, 114, 128);
-        $pdf->SetFont('Arial', '', 8.5);
-        $pdf->Cell(182, 5, 'Thank you for your order. This invoice was generated by Finovo OMS/WMS.', 0, 1, 'C');
+        $storeName = $this->clean((string) ($order['store_name'] ?? 'Finovo'));
+        [$r, $g, $b] = $this->accent;
+
+        $pdf->SetDrawColor(226, 232, 240);
+        $pdf->Line(self::LEFT, $pdf->GetY(), self::RIGHT, $pdf->GetY());
+        $pdf->Ln(6);
+
+        $pdf->SetFont('Arial', 'B', 10);
+        $pdf->SetTextColor($r, $g, $b);
+        $pdf->Cell(self::WIDTH, 6, 'Thank you for shopping with ' . $this->truncate($storeName, 40) . '!', 0, 1, 'C');
+
+        $pdf->SetFont('Arial', '', 7.5);
+        $pdf->SetTextColor(148, 163, 184);
+        $pdf->Cell(self::WIDTH, 5, 'This invoice was generated by Finovo OMS/WMS.', 0, 1, 'C');
     }
 
-    private function sectionLabel(FPDF $pdf, string $label, float $x, float $y): void
+    // ------------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------------
+    private function sectionLabel(InvoicePdf $pdf, string $label, float $x, float $y): void
     {
-        $pdf->SetXY($x, $y);
-        $pdf->SetTextColor(107, 114, 128);
-        $pdf->SetFont('Arial', 'B', 8);
+        [$r, $g, $b] = $this->accent;
+        $pdf->SetFillColor($r, $g, $b);
+        $pdf->Rect($x, $y + 0.8, 1.2, 3.6, 'F');
+
+        $pdf->SetXY($x + 3, $y);
+        $pdf->SetTextColor(100, 116, 139);
+        $pdf->SetFont('Arial', 'B', 7.8);
         $pdf->Cell(80, 5, $label, 0, 1);
+    }
+
+    /** Store ke naam se ek fixed brand color — har store ka apna, har baar same */
+    private function accentFor(string $storeName): array
+    {
+        $index = abs(crc32(strtolower(trim($storeName)))) % count($this->palette);
+        return $this->palette[$index];
+    }
+
+    /** "My Store" => "MS", "Finovo" => "F" */
+    private function initials(string $name): string
+    {
+        $parts = preg_split('/\s+/', trim($name)) ?: [];
+        $out = '';
+        foreach (array_slice($parts, 0, 2) as $part) {
+            if ($part !== '') {
+                $out .= strtoupper(substr($part, 0, 1));
+            }
+        }
+        return $out !== '' ? $out : 'F';
     }
 
     private function money(float $value): string

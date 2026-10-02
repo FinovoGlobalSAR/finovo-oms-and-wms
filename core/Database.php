@@ -24,7 +24,13 @@ class Database
                     PDO::ATTR_EMULATE_PREPARES => false,
                 ]);
             } catch (PDOException $e) {
-                die("Database connection failed: " . $e->getMessage());
+                // Asli error server log mein likho; screen pe sirf development mein dikhao,
+                // warna live pe database host/username users ko nazar aa jata.
+                error_log('Database connection failed: ' . $e->getMessage());
+                http_response_code(500);
+                die(appDebug()
+                    ? 'Database connection failed: ' . $e->getMessage()
+                    : 'Database connection failed. Please try again later.');
             }
         }
 

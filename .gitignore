@@ -1,3 +1,10 @@
 vendor/
 .phpunit.result.cache
+
+# Secrets — kabhi commit nahi karne
 .env
+.env.example
+
+# Saari database SQL files (asli data + keys hote hain).
+# Database ki har tabdeeli migrations (database/migrations/*.php) se hoti hai.
+*.sql

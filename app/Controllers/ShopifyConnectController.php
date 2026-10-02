@@ -137,11 +137,7 @@ class ShopifyConnectController extends Controller
 
     private function getBaseUrl(): string
     {
-        if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO'])) {
-            $scheme = $_SERVER['HTTP_X_FORWARDED_PROTO'];
-        } else {
-            $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-        }
-        return $scheme . '://' . $_SERVER['HTTP_HOST'];
+        // .env ke APP_URL se (config/app.php → appUrl())
+        return appUrl();
     }
 }

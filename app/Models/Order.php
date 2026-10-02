@@ -68,8 +68,7 @@ class Order extends Model
         // 1. Order khud Shopify/WooCommerce se pull hua ho, YA
         // 2. Order ke andar jo product hai, uski apni origin Shopify/WooCommerce ho
         //    (chahe order manual/CSV/API push ke through banaya gaya ho)
-        $externalSources = ['shopify_pull', 'woocommerce_pull'];
-        $currency = in_array($main['source'] ?? 'manual', $externalSources, true) ? '$' : 'Rs.';
+        $currency = in_array($main['source'] ?? 'manual', externalOrderSources(), true) ? '$' : 'Rs.';
 
         $items = [];
         $subtotal = 0;

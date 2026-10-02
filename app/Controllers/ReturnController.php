@@ -13,8 +13,6 @@ class ReturnController extends Controller
     private ProductVariant $variantModel;
     private InventoryService $inventoryService;
 
-    private array $externalSources = ['shopify_pull', 'woocommerce_pull', 'bigcommerce_pull', 'prestashop_pull', 'opencart_pull', 'oscommerce_pull'];
-
     public function __construct()
     {
         parent::__construct();
@@ -43,7 +41,7 @@ class ReturnController extends Controller
 
         $returns = $this->returnModel->all((int) $store['id']);
         foreach ($returns as &$r) {
-            $r['currency_symbol'] = in_array($r['order_source'] ?? 'manual', $this->externalSources, true) ? '$' : 'Rs.';
+            $r['currency_symbol'] = in_array($r['order_source'] ?? 'manual', externalOrderSources(), true) ? '$' : 'Rs.';
         }
         unset($r);
 

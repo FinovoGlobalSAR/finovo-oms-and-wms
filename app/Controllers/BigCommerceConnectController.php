@@ -28,10 +28,8 @@ class BigCommerceConnectController extends Controller
 
     private function getBaseUrl(): string
     {
-        $isHttps = (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
-            || (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
-        $scheme = $isHttps ? 'https' : 'http';
-        return $scheme . '://' . $_SERVER['HTTP_HOST'];
+        // .env ke APP_URL se (config/app.php → appUrl())
+        return appUrl();
     }
 
     /**

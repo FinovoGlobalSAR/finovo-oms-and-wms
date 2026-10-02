@@ -17,8 +17,7 @@ class CustomerController extends Controller
 
     private function currencyForOrder(array $order): string
     {
-        $externalSources = ['shopify_pull', 'woocommerce_pull'];
-        $isExternalSource = in_array($order['source'] ?? 'manual', $externalSources, true);
+        $isExternalSource = in_array($order['source'] ?? 'manual', externalOrderSources(), true);
         $isExternalProduct = !empty($order['product_id']) && $this->productModel->isExternal((int) $order['product_id']);
         return ($isExternalSource || $isExternalProduct) ? '$' : 'Rs.';
     }

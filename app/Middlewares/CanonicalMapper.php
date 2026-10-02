@@ -2,8 +2,6 @@
 
 class CanonicalMapper
 {
-    // Yeh Finovo ke apne, standard order statuses hain — sab platforms
-    // ke alag-alag status yahi 6 naamon mein convert honge.
     public const STATUS_PENDING = 'PENDING';
     public const STATUS_READY_TO_FULFILL = 'READY_TO_FULFILL';
     public const STATUS_DISPATCHED = 'DISPATCHED';
@@ -11,9 +9,6 @@ class CanonicalMapper
     public const STATUS_CANCELLED = 'CANCELLED';
     public const STATUS_RETURNED = 'RETURNED';
 
-    /**
-     * Shopify ka fulfillment/financial status Finovo canonical status mein badalta hai.
-     */
     public static function fromShopify(string $fulfillmentStatus, string $financialStatus): string
     {
         if ($fulfillmentStatus === 'fulfilled') {
@@ -28,9 +23,6 @@ class CanonicalMapper
         return self::STATUS_PENDING;
     }
 
-    /**
-     * WooCommerce ka order status Finovo canonical status mein badalta hai.
-     */
     public static function fromWooCommerce(string $wcStatus): string
     {
         return match ($wcStatus) {
@@ -53,10 +45,6 @@ class CanonicalMapper
         };
     }
 
-    /**
-     * Canonical status ko Finovo ke apne internal orders.status column ke
-     * values mein badalta hai (jo already database mein use ho rahe hain).
-     */
     public static function toInternalOrderStatus(string $canonicalStatus): string
     {
         return match ($canonicalStatus) {

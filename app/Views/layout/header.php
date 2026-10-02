@@ -9,7 +9,11 @@ $warehouseAlerts = [];
 
 try {
     $headerStoreModel = new Store();
-    $headerStore = $headerStoreModel->first();
+    // Jo store abhi manage ho raha hai usi ke alerts dikhao (pehle hamesha pehla store aata tha)
+    $headerStore = !empty($_SESSION['current_store_id'])
+        ? $headerStoreModel->find((int) $_SESSION['current_store_id'])
+        : null;
+    $headerStore = $headerStore ?: $headerStoreModel->first();
 
     if ($headerStore) {
         $headerProductModel = new Product();
@@ -59,7 +63,7 @@ $searchablePages = array_values(array_filter($searchablePages, function ($page) 
     return in_array($headerCurrentRole, $page['roles'], true);
 }));
 ?>
-<header class="h-[72px] bg-white border-b border-gray-100 flex items-center justify-between px-5 lg:px-8 sticky top-0 z-30">
+<header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-5 lg:px-8 sticky top-0 z-30">
 
     <div class="flex items-center gap-4">
 
@@ -86,7 +90,7 @@ $searchablePages = array_values(array_filter($searchablePages, function ($page) 
 
         <div class="hidden sm:flex items-center">
 
-            <div class="relative w-[260px] lg:w-[320px]">
+            <div class="relative w-[260px] lg:w-[340px]">
 
                 <svg
                     class="absolute left-3.5 top-1/2 -translate-y-1/2 w-[17px] h-[17px] text-gray-400"
@@ -107,7 +111,8 @@ $searchablePages = array_values(array_filter($searchablePages, function ($page) 
                     type="text"
                     placeholder="Search anything..."
                     autocomplete="off"
-                    class="w-full h-10 pl-10 pr-14 bg-gray-50 border border-transparent rounded-xl text-sm text-gray-700 placeholder-gray-400 outline-none transition focus:bg-white focus:border-gray-200 focus:ring-2 focus:ring-gray-100"
+                    aria-label="Search pages"
+                    class="w-full h-[38px] pl-10 pr-14 bg-slate-50 border border-gray-200 rounded-[9px] text-[13px] text-slate-800 placeholder-slate-400 outline-none transition focus:bg-white focus:border-blue-300 focus:ring-[3px] focus:ring-blue-100"
                 >
 
                 <span
@@ -133,8 +138,9 @@ $searchablePages = array_values(array_filter($searchablePages, function ($page) 
 
         <button
             type="button"
-            class="hidden md:flex w-10 h-10 items-center justify-center rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition"
+            class="hidden md:flex w-10 h-10 items-center justify-center rounded-xl text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition"
             title="Help"
+            aria-label="Help"
         >
             <svg
                 class="w-[19px] h-[19px]"
@@ -169,7 +175,8 @@ $searchablePages = array_values(array_filter($searchablePages, function ($page) 
             <button
                 id="notificationButton"
                 type="button"
-                class="relative w-10 h-10 flex items-center justify-center rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition"
+                aria-label="Stock alerts"
+                class="relative w-10 h-10 flex items-center justify-center rounded-xl text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition"
             >
 
                 <svg
@@ -194,7 +201,7 @@ $searchablePages = array_values(array_filter($searchablePages, function ($page) 
 
                 <?php if ($lowStockCountForBell > 0): ?>
                     <span
-                        class="absolute top-1 right-1 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-semibold ring-2 ring-white"
+                        class="absolute top-1 right-1 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-red-600 text-white text-[10px] font-semibold ring-2 ring-white"
                     ><?= $lowStockCountForBell > 9 ? '9+' : $lowStockCountForBell ?></span>
                 <?php endif; ?>
 
@@ -257,7 +264,7 @@ $searchablePages = array_values(array_filter($searchablePages, function ($page) 
 
                 </div>
 
-                <a href="/warehouses" class="block text-center text-[13px] font-medium text-gray-700 py-2.5 border-t border-gray-100 hover:bg-gray-50">
+                <a href="/warehouses" class="block text-center text-[13px] font-semibold text-blue-700 py-2.5 border-t border-gray-100 hover:bg-blue-50">
                     View all warehouses
                 </a>
             </div>
@@ -265,7 +272,7 @@ $searchablePages = array_values(array_filter($searchablePages, function ($page) 
         </div>
 
 
-        <div class="h-8 w-px bg-gray-100 mx-2"></div>
+        <div class="h-8 w-px bg-gray-200 mx-2"></div>
 
 
         <button
@@ -275,9 +282,9 @@ $searchablePages = array_values(array_filter($searchablePages, function ($page) 
         >
 
             <div
-                class="w-9 h-9 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center"
+                class="w-[34px] h-[34px] rounded-full bg-slate-800 flex items-center justify-center"
             >
-                <span class="text-sm font-semibold text-blue-600">
+                <span class="text-[12px] font-semibold text-white">
                     <?= htmlspecialchars(strtoupper(substr($_SESSION['user']['name'] ?? 'U', 0, 1))) ?>
                 </span>
             </div>
@@ -285,12 +292,12 @@ $searchablePages = array_values(array_filter($searchablePages, function ($page) 
 
             <div class="hidden sm:block text-left leading-tight">
 
-                <p class="text-[13px] font-semibold text-gray-800">
+                <p class="text-[13px] font-semibold text-slate-900">
                     <?= htmlspecialchars($_SESSION['user']['name'] ?? 'User') ?>
                 </p>
 
-                <p class="text-[11px] text-gray-400 mt-0.5">
-                    <?= htmlspecialchars(ucfirst($_SESSION['user']['role'] ?? '')) ?>
+                <p class="text-[11px] text-slate-500 mt-0.5">
+                    <?= htmlspecialchars(ucwords($_SESSION['user']['role'] ?? '')) ?>
                 </p>
 
             </div>

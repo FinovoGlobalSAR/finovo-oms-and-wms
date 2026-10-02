@@ -4,7 +4,7 @@
  * request bhejta hai, dekhta hai kitna time lagta hai aur kitne fail hote hain.
  */
 $url = 'http://localhost:8000/login';
-$totalRequests = 100000;
+$totalRequests = 2000;
 $concurrency = 100;
 
 $successCount = 0;

@@ -5,9 +5,6 @@ require_once __DIR__ . '/../Models/Product.php';
 
 class DashboardController extends Controller
 {
-    // In sources se aane wale orders ($) — baki sab manual/Rs.
-    private array $externalSources = ['shopify_pull', 'woocommerce_pull', 'bigcommerce_pull', 'prestashop_pull', 'opencart_pull', 'oscommerce_pull'];
-
     public function __construct()
     {
         parent::__construct();
@@ -44,7 +41,7 @@ class DashboardController extends Controller
         $recentOrders = $recentOrdersStmt->fetchAll();
 
         foreach ($recentOrders as &$ro) {
-            $isExternalSource = in_array($ro['source'] ?? 'manual', $this->externalSources, true);
+            $isExternalSource = in_array($ro['source'] ?? 'manual', externalOrderSources(), true);
             $isExternalProduct = !empty($ro['product_id']) && $productModel->isExternal((int) $ro['product_id']);
             $ro['currency_symbol'] = ($isExternalSource || $isExternalProduct) ? '$' : 'Rs.';
         }
@@ -180,7 +177,7 @@ class DashboardController extends Controller
      */
     private function splitRevenueByCurrency(PDO $db, int $storeId, Product $productModel): array
     {
-        $sourcesList = "'" . implode("','", $this->externalSources) . "'";
+        $sourcesList = "'" . implode("','", externalOrderSources()) . "'";
 
         $stmt = $db->prepare(
             "SELECT o.source, o.price, o.quantity,
@@ -197,7 +194,7 @@ class DashboardController extends Controller
         $pkrTotal = 0.0;
 
         foreach ($rows as $row) {
-            $isExternalSource = in_array($row['source'] ?? 'manual', $this->externalSources, true);
+            $isExternalSource = in_array($row['source'] ?? 'manual', externalOrderSources(), true);
             $isExternalProduct = !empty($row['external_product_id'])
                 || !empty($row['external_wc_product_id'])
                 || !empty($row['external_bc_product_id'])

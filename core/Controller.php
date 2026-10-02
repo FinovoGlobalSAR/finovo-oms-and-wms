@@ -1,11 +1,28 @@
 <?php
 require_once __DIR__ . '/../config/app.php';
 
+/**
+ * Jab koi sync background (auto-sync / worker.php) se chalta hai, to browser nahi hota,
+ * is liye "redirect + exit" ki jagah yeh exception phenka jata hai — taake worker band
+ * na ho aur redirect ke URL (jaise "/orders?synced=3") se pata chal jaye kya hua.
+ */
+class CliRedirect extends Exception
+{
+    public string $location;
+
+    public function __construct(string $location)
+    {
+        parent::__construct('Redirect to ' . $location);
+        $this->location = $location;
+    }
+}
+
 abstract class Controller
 {
     public function __construct()
     {
-        if (session_status() === PHP_SESSION_NONE) {
+        // Background sync (worker) mein browser/cookie nahi hota, is liye wahan asli session start nahi karte
+        if (session_status() === PHP_SESSION_NONE && !defined('FINOVO_BACKGROUND_SYNC')) {
             session_start();
         }
     }
@@ -21,7 +38,20 @@ abstract class Controller
 
     protected function redirect(string $path): void
     {
-        header("Location: {$path}");
+        $this->stopAndGo($path);
+    }
+
+    /**
+     * Browser mein: header + exit (pehle jaisa).
+     * Background sync (StoreSyncRunner) mein: CliRedirect exception, taake worker chalta rahe.
+     */
+    private function stopAndGo(string $location): void
+    {
+        if (defined('FINOVO_BACKGROUND_SYNC')) {
+            throw new CliRedirect($location);
+        }
+
+        header("Location: {$location}");
         exit;
     }
 
@@ -46,8 +76,7 @@ abstract class Controller
     {
         if (empty($_SESSION['user']['id'])) {
             $_SESSION['error'] = 'Please login first.';
-            header('Location: /login');
-            exit;
+            $this->stopAndGo('/login');
         }
     }
 
@@ -60,8 +89,7 @@ abstract class Controller
 
         if (!in_array($role, $allowed, true)) {
             $_SESSION['error'] = 'You do not have permission to access that page.';
-            header('Location: /dashboard');
-            exit;
+            $this->stopAndGo('/dashboard');
         }
     }
 
@@ -74,8 +102,7 @@ abstract class Controller
 
         if (empty($_SESSION['store_context_active'])) {
             $_SESSION['error'] = 'Please select a store to manage first.';
-            header('Location: /stores');
-            exit;
+            $this->stopAndGo('/stores');
         }
     }
 

@@ -1,73 +1,93 @@
 <?php $currentPage = 'orders'; ?>
 
-<div class="breadcrumb">Finovo <i class="bi bi-chevron-right"></i> Orders <i class="bi bi-chevron-right"></i> Add Order</div>
-
-<div class="page-header-row">
-    <h1>Add New Order</h1>
+<div class="ui-head">
+    <div class="ui-head-left">
+        <div class="breadcrumb">Finovo <i class="bi bi-chevron-right"></i> <a href="/orders" style="color:inherit; text-decoration:none;">Orders</a> <i class="bi bi-chevron-right"></i> <span class="current">Add Order</span></div>
+        <h1>Add New Order</h1>
+        <p>Add one or more products (or product variants) from your warehouse stock.</p>
+    </div>
+    <div class="ui-head-right">
+        <a href="/orders" class="ui-btn"><i class="bi bi-arrow-left"></i> Back to Orders</a>
+    </div>
 </div>
-<p class="page-subtitle">Add one or more products (or product variants) from your warehouse stock.</p>
 
-<div class="card" style="max-width: 720px; overflow: visible;">
+<div style="display:grid; grid-template-columns:minmax(0, 1fr) 320px; gap:20px; align-items:start;" class="order-create-grid">
+
+<div class="ui-card" style="overflow: visible; margin-bottom:0;">
 
     <?php if (!empty($error)): ?>
-        <div style="margin: 20px 20px 0; padding: 12px 16px; border-radius: 8px; background: #fee2e2; color: #991b1b; font-size: 13px; display: flex; align-items: flex-start; gap: 8px;">
-            <i class="bi bi-exclamation-triangle-fill" style="margin-top: 2px;"></i>
+        <div class="banner banner-error" style="margin: 20px 22px 0;">
+            <i class="bi bi-exclamation-triangle-fill"></i>
             <span><?= htmlspecialchars($error) ?></span>
         </div>
     <?php endif; ?>
 
-    <form method="POST" action="/orders/create" style="padding: 24px;">
+    <form method="POST" action="/orders/create" style="padding: 20px 22px 22px;">
 
-        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border-color);">
-            <div style="width: 36px; height: 36px; border-radius: 10px; background: #eef2ff; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                <i class="bi bi-bag-plus" style="color: #4338ca; font-size: 16px;"></i>
+        <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:16px; margin-bottom:18px; border-bottom:1px solid var(--border-soft);">
+            <div class="ui-card-title">
+                <div class="ui-card-title-icon"><i class="bi bi-bag-plus"></i></div>
+                <div>
+                    <h2 style="margin:0; font-size:15px; font-weight:700;">Order details</h2>
+                    <div style="font-size:12.5px; color:#475569;">Only in-stock products / variants appear in the list below</div>
+                </div>
             </div>
-            <div>
-                <div style="font-size: 14px; font-weight: 600; color: var(--text-dark);">Order details</div>
-                <div style="font-size: 12px; color: var(--text-muted);">Only in-stock products / variants appear in the list below</div>
-            </div>
+            <span class="ui-tag ui-pill-blue">New order</span>
         </div>
 
-        <div class="form-group">
-            <label><i class="bi bi-person" style="margin-right: 4px; color: var(--text-muted);"></i>Customer Name</label>
-            <input type="text" name="customer_name" placeholder="e.g. Ali Khan" required>
+        <div class="ui-row" style="margin-bottom:18px;">
+            <label class="ui-field">
+                <span>Customer Name</span>
+                <span class="ui-input">
+                    <i class="bi bi-person"></i>
+                    <input type="text" name="customer_name" placeholder="e.g. Ali Khan" required>
+                </span>
+            </label>
+            <label class="ui-field">
+                <span>Payment Method</span>
+                <span class="ui-input">
+                    <i class="bi bi-credit-card"></i>
+                    <select name="payment_method">
+                        <?php foreach ($paymentMethods as $pm): ?>
+                            <option value="<?= htmlspecialchars($pm) ?>"><?= htmlspecialchars($pm) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </span>
+            </label>
         </div>
 
-        <div class="form-group">
-            <label><i class="bi bi-credit-card" style="margin-right: 4px; color: var(--text-muted);"></i>Payment Method</label>
-            <select name="payment_method" style="width:100%; border:1px solid var(--border-color); border-radius:8px; padding:8px 10px; font-size:14px; font-family:'Inter',sans-serif;">
-                <?php foreach ($paymentMethods as $pm): ?>
-                    <option value="<?= htmlspecialchars($pm) ?>"><?= htmlspecialchars($pm) ?></option>
-                <?php endforeach; ?>
-            </select>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-size:12.5px; font-weight:600; color:var(--text-body);">Products</span>
+            <span style="font-size:12px; color:var(--text-muted);">Product · Qty · Line total</span>
         </div>
-
-        <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--text-dark);">
-            <i class="bi bi-box-seam" style="margin-right: 4px; color: var(--text-muted);"></i>Products
-        </label>
 
         <?php if (empty($products)): ?>
-            <div style="padding: 14px; background: #fef3c7; color: #92400e; border-radius: 8px; font-size: 13px; margin-bottom: 16px;">
-                <i class="bi bi-exclamation-triangle"></i> No products have stock available right now. Receive stock into a warehouse first.
+            <div class="ui-alert" style="margin-bottom:16px;">
+                <div class="ui-tip-icon"><i class="bi bi-exclamation-triangle"></i></div>
+                <div class="ui-alert-body">
+                    <strong>No stock available</strong>
+                    <span>No products have stock available right now. Receive stock into a warehouse first.</span>
+                </div>
+                <a href="/warehouses" class="ui-btn ui-btn-sm" style="border-color:#fde68a; background:#fff;">Warehouses <i class="bi bi-arrow-right"></i></a>
             </div>
         <?php endif; ?>
 
         <div id="orderItemsContainer" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px;"></div>
 
-        <button type="button" onclick="addOrderRow()" class="toolbar-btn" style="margin-bottom: 20px;" <?= empty($products) ? 'disabled' : '' ?>>
+        <button type="button" onclick="addOrderRow()" class="ui-btn ui-btn-soft" style="margin-bottom: 20px;" <?= empty($products) ? 'disabled' : '' ?>>
             <i class="bi bi-plus-lg"></i> Add another product
         </button>
 
-        <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #f9fafb; border-radius: 8px; margin-bottom: 20px;">
-            <span style="font-size: 13px; color: var(--text-muted);">Order total</span>
-            <span id="orderTotalDisplay" style="font-size: 16px; font-weight: 700; color: var(--text-dark);">Rs. 0.00</span>
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: var(--primary-light); border: 1px solid var(--primary-border); border-radius: 10px; margin-bottom: 20px;">
+            <span style="font-size: 13px; font-weight:600; color: var(--primary-dark);">Order total</span>
+            <span id="orderTotalDisplay" style="font-size: 18px; font-weight: 700; color: var(--primary-dark);">Rs. 0.00</span>
         </div>
 
         <div style="display: flex; gap: 10px;">
-            <a href="/orders" class="btn-secondary" style="flex: 1; text-align: center; text-decoration: none; display: flex; align-items: center; justify-content: center;">
+            <a href="/orders" class="ui-btn" style="flex: 1; height:48px; border-radius:10px;">
                 Cancel
             </a>
-            <button type="submit" class="btn-primary" style="flex: 2; display: flex; align-items: center; justify-content: center; gap: 6px;" <?= empty($products) ? 'disabled' : '' ?>>
+            <button type="submit" class="ui-btn ui-btn-primary" style="flex: 2; height:48px; border-radius:10px; font-size:14px;" <?= empty($products) ? 'disabled' : '' ?>>
                 <i class="bi bi-check-lg"></i> Create Order
             </button>
         </div>
@@ -76,41 +96,71 @@
 
 </div>
 
+<div style="display:flex; flex-direction:column; gap:16px;">
+    <div class="ui-info" style="width:auto;">
+        <div class="ui-info-icon"><i class="bi bi-info-lg"></i></div>
+        <div>
+            <strong>How stock works</strong>
+            <span>Creating the order takes stock from this store's linked warehouses automatically.</span>
+        </div>
+    </div>
+    <div class="ui-tip">
+        <div class="ui-tip-icon"><i class="bi bi-lightbulb"></i></div>
+        <div>
+            <strong>Tip</strong>
+            <span>Keep $ and Rs. products in separate orders so the total stays in one currency.</span>
+        </div>
+    </div>
+</div>
+
+</div>
+
 <style>
+@media (max-width: 1000px) { .order-create-grid { grid-template-columns: minmax(0, 1fr) !important; } }
 .order-item-row {
     display: grid;
-    grid-template-columns: 2fr 90px 130px 36px;
+    grid-template-columns: 2fr 90px 130px 38px;
     gap: 8px;
     align-items: center;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: #f8fafc;
 }
 .order-item-row select,
 .order-item-row input[type="number"] {
     width: 100%;
+    height: 40px;
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    padding: 8px 10px;
+    padding: 0 10px;
     font-size: 13px;
-    font-family: 'Inter', sans-serif;
+    font-family: inherit;
+    background: #ffffff;
     transition: border-color 0.15s, background 0.15s;
 }
+.order-item-row select:focus,
+.order-item-row input[type="number"]:focus { outline: none; border-color: #93b4f5; box-shadow: 0 0 0 3px rgba(29,78,216,0.12); }
 .order-row-price {
     font-size: 13px;
-    color: var(--text-muted);
+    font-weight: 600;
+    color: var(--text-body);
     text-align: right;
     white-space: nowrap;
 }
 .remove-row-btn {
-    border: 1px solid var(--border-color);
-    background: var(--bg-white);
+    border: 1px solid #fecaca;
+    background: #fff;
     border-radius: 8px;
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
     cursor: pointer;
     color: var(--red);
     display: flex;
     align-items: center;
     justify-content: center;
 }
+.remove-row-btn:hover { background: #fee2e2; }
 </style>
 
 <script>

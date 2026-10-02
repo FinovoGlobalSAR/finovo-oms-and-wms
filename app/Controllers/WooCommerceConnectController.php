@@ -50,9 +50,7 @@ class WooCommerceConnectController extends Controller
         header('Location: ' . $authorizeUrl);
         exit;
     }
-
-    // Step 2 — WooCommerce yahan automatically Consumer Key/Secret POST karta hai.
-    // Session ki zaroorat nahi — turant chhod dete hain, taaki koi lock wait na ho.
+    
     public function callback(): void
     {
         if (session_status() === PHP_SESSION_ACTIVE) {
@@ -90,11 +88,6 @@ class WooCommerceConnectController extends Controller
 
     private function getBaseUrl(): string
     {
-        if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO'])) {
-            $scheme = $_SERVER['HTTP_X_FORWARDED_PROTO'];
-        } else {
-            $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-        }
-        return $scheme . '://' . $_SERVER['HTTP_HOST'];
+        return appUrl();
     }
 }

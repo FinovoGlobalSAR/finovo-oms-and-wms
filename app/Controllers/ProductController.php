@@ -8,6 +8,9 @@ require_once __DIR__ . '/../Models/Warehouse.php';
 require_once __DIR__ . '/../Models/ProductVariant.php';
 require_once __DIR__ . '/../Models/FieldMapping.php';
 require_once __DIR__ . '/../Models/JobQueue.php';
+require_once __DIR__ . '/../Connectors/WixConnector.php';
+require_once __DIR__ . '/../Connectors/EbayConnector.php';
+require_once __DIR__ . '/../Connectors/CjDropshippingConnector.php';
 require_once __DIR__ . '/../Services/IntegrationErrorService.php';
 
 class ProductController extends Controller
@@ -32,9 +35,6 @@ class ProductController extends Controller
         $this->fieldMappingModel = new FieldMapping();
     }
 
-    // OpenCart/osCommerce ke external MySQL databases se connect karne ke
-    // liye — .env se credentials leta hai, taaki live server pe sirf .env
-    // badalna pade, code kahin change na karna pade.
     private function externalDbConnection(string $dbName): PDO
     {
         $host = $_ENV['DB_EXTERNAL_HOST'] ?? 'localhost';
@@ -313,15 +313,53 @@ class ProductController extends Controller
         $this->redirect('/products?synced=' . $importedCount);
     }
 
-    // ---------- Shopify: Async Sync (Queue-Based) ----------
+    // ---------- Async Sync (Queue-Based) — all platforms ----------
 
     public function syncShopifyAsync(): void
     {
         $store = $this->getCurrentStore();
-
         $jobQueue = new JobQueue();
         $jobId = $jobQueue->push('shopify_products_sync', (int) $store['id']);
+        $this->redirect('/products?queued=' . $jobId);
+    }
 
+    public function syncWooCommerceAsync(): void
+    {
+        $store = $this->getCurrentStore();
+        $jobQueue = new JobQueue();
+        $jobId = $jobQueue->push('woocommerce_products_sync', (int) $store['id']);
+        $this->redirect('/products?queued=' . $jobId);
+    }
+
+    public function syncBigCommerceAsync(): void
+    {
+        $store = $this->getCurrentStore();
+        $jobQueue = new JobQueue();
+        $jobId = $jobQueue->push('bigcommerce_products_sync', (int) $store['id']);
+        $this->redirect('/products?queued=' . $jobId);
+    }
+
+    public function syncPrestaShopAsync(): void
+    {
+        $store = $this->getCurrentStore();
+        $jobQueue = new JobQueue();
+        $jobId = $jobQueue->push('prestashop_products_sync', (int) $store['id']);
+        $this->redirect('/products?queued=' . $jobId);
+    }
+
+    public function syncOpenCartAsync(): void
+    {
+        $store = $this->getCurrentStore();
+        $jobQueue = new JobQueue();
+        $jobId = $jobQueue->push('opencart_products_sync', (int) $store['id']);
+        $this->redirect('/products?queued=' . $jobId);
+    }
+
+    public function syncOsCommerceAsync(): void
+    {
+        $store = $this->getCurrentStore();
+        $jobQueue = new JobQueue();
+        $jobId = $jobQueue->push('oscommerce_products_sync', (int) $store['id']);
         $this->redirect('/products?queued=' . $jobId);
     }
 
@@ -391,7 +429,7 @@ class ProductController extends Controller
 
         $this->redirect('/products?exported=1');
     }
-
+    
     // ---------- WooCommerce: Products Pull ----------
 
     public function syncWooCommerce(): void
@@ -426,7 +464,7 @@ class ProductController extends Controller
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_USERPWD, $auth);
         curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, curlVerifySsl());
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
@@ -473,7 +511,7 @@ class ProductController extends Controller
                 curl_setopt($vch, CURLOPT_RETURNTRANSFER, true);
                 curl_setopt($vch, CURLOPT_USERPWD, $auth);
                 curl_setopt($vch, CURLOPT_TIMEOUT, 15);
-                curl_setopt($vch, CURLOPT_SSL_VERIFYPEER, false);
+                curl_setopt($vch, CURLOPT_SSL_VERIFYPEER, curlVerifySsl());
                 $vResponse = curl_exec($vch);
                 curl_close($vch);
 
@@ -649,7 +687,7 @@ class ProductController extends Controller
         $ch = curl_init($apiUrl);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, curlVerifySsl());
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
@@ -690,7 +728,7 @@ class ProductController extends Controller
                 $sch = curl_init($stockUrl);
                 curl_setopt($sch, CURLOPT_RETURNTRANSFER, true);
                 curl_setopt($sch, CURLOPT_TIMEOUT, 10);
-                curl_setopt($sch, CURLOPT_SSL_VERIFYPEER, false);
+                curl_setopt($sch, CURLOPT_SSL_VERIFYPEER, curlVerifySsl());
                 $stockResponse = curl_exec($sch);
                 curl_close($sch);
 
@@ -706,7 +744,7 @@ class ProductController extends Controller
         $this->storeModel->markHealthy((int) $store['id']);
         $this->redirect('/products?synced=' . $importedCount);
     }
-
+    
     // ---------- OpenCart: Products Pull (direct DB read) ----------
 
     public function syncOpenCart(): void
@@ -827,6 +865,161 @@ class ProductController extends Controller
         $this->redirect('/products?synced=' . $importedCount);
     }
 
+    // ---------- Wix: Products Pull ----------
+
+    public function syncWix(): void
+    {
+        $store = $this->getCurrentStore();
+        $defaultWarehouse = $this->warehouseModel->getDefault($store['id']);
+
+        if (empty($store['wix_site_id']) || empty($store['wix_api_key'])) {
+            $this->redirect('/products?error=' . urlencode('Please save this store\'s Wix Site ID and API Key first.'));
+            return;
+        }
+
+        $connector = new WixConnector($store['wix_api_key'], $store['wix_site_id']);
+        $result = $connector->fetchProducts();
+
+        if (!$result['ok']) {
+            $this->errorService->logFailure((int) $store['id'], 'wix', 'sync_products', null, null, 0, $result['message']);
+            $this->storeModel->markUnhealthy((int) $store['id'], $result['message']);
+            $this->redirect('/products?error=' . urlencode($result['message']));
+            return;
+        }
+
+        $db = Database::getConnection();
+        $importedCount = 0;
+
+        foreach ($result['products'] as $wp) {
+            $externalId = (string) ($wp['id'] ?? '');
+            if ($externalId === '') continue;
+
+            $check = $db->prepare("SELECT id FROM products WHERE store_id = ? AND external_wix_product_id = ?");
+            $check->execute([$store['id'], $externalId]);
+            if ($check->fetch()) continue;
+
+            $name = $wp['name'] ?? 'Unknown product';
+            $price = (float) ($wp['actualPriceRange']['minValue']['amount'] ?? $wp['basePrice']['price']['amount'] ?? 0);
+            $sku = $wp['physicalProperties']['sku'] ?? null;
+
+            $stmt = $db->prepare("INSERT INTO products (store_id, name, sku, price, external_wix_product_id) VALUES (?, ?, ?, ?, ?)");
+            $stmt->execute([$store['id'], $name, $sku, $price, $externalId]);
+            $productId = (int) $db->lastInsertId();
+            $importedCount++;
+
+            $stock = (int) ($wp['inventory']['availableQuantity'] ?? $wp['stock']['quantity'] ?? 0);
+            $this->productModel->setWarehouseStock($productId, $defaultWarehouse['id'], $stock);
+        }
+
+        $this->errorService->markResolved((int) $store['id'], 'wix', 'sync_products', null);
+        $this->storeModel->markHealthy((int) $store['id']);
+        $this->redirect('/products?synced=' . $importedCount);
+    }
+
+    // ---------- eBay: Products Pull ----------
+
+    public function syncEbay(): void
+    {
+        $store = $this->getCurrentStore();
+        $defaultWarehouse = $this->warehouseModel->getDefault($store['id']);
+
+        require_once __DIR__ . '/../Services/EbayAuthService.php';
+
+        // Connect eBay (OAuth) wala token khud refresh hota hai; purana manual token bhi chalta hai
+        $token = EbayAuthService::getValidAccessToken($store);
+
+        if ($token === null) {
+            $this->redirect('/products?error=' . urlencode('This store is not connected to eBay. Use "Connect eBay" on the Stores page (or save an eBay User Token).'));
+            return;
+        }
+
+        $connector = new EbayConnector($token);
+        $result = $connector->fetchProducts();
+
+        if (!$result['ok']) {
+            $this->errorService->logFailure((int) $store['id'], 'ebay', 'sync_products', null, null, 0, $result['message']);
+            $this->storeModel->markUnhealthy((int) $store['id'], $result['message']);
+            $this->redirect('/products?error=' . urlencode($result['message']));
+            return;
+        }
+
+        $db = Database::getConnection();
+        $importedCount = 0;
+
+        foreach ($result['products'] as $ep) {
+            $externalId = (string) ($ep['sku'] ?? '');
+            if ($externalId === '') continue;
+
+            $check = $db->prepare("SELECT id FROM products WHERE store_id = ? AND external_ebay_product_id = ?");
+            $check->execute([$store['id'], $externalId]);
+            if ($check->fetch()) continue;
+
+            $name = $ep['product']['title'] ?? 'Unknown product';
+            $price = (float) ($ep['product']['aspects']['price'][0] ?? 0);
+            $stock = (int) ($ep['availability']['shipToLocationAvailability']['quantity'] ?? 0);
+
+            $stmt = $db->prepare("INSERT INTO products (store_id, name, sku, price, external_ebay_product_id) VALUES (?, ?, ?, ?, ?)");
+            $stmt->execute([$store['id'], $name, $externalId, $price, $externalId]);
+            $productId = (int) $db->lastInsertId();
+            $importedCount++;
+
+            $this->productModel->setWarehouseStock($productId, $defaultWarehouse['id'], $stock);
+        }
+
+        $this->errorService->markResolved((int) $store['id'], 'ebay', 'sync_products', null);
+        $this->storeModel->markHealthy((int) $store['id']);
+        $this->redirect('/products?synced=' . $importedCount);
+    }
+
+    // ---------- CJdropshipping: Products Pull ----------
+
+    public function syncCj(): void
+    {
+        $store = $this->getCurrentStore();
+        $defaultWarehouse = $this->warehouseModel->getDefault($store['id']);
+
+        if (empty($store['cj_email']) || empty($store['cj_api_key'])) {
+            $this->redirect('/products?error=' . urlencode('Please save this store\'s CJdropshipping Email and API Key first.'));
+            return;
+        }
+
+        $connector = new CjDropshippingConnector($store['cj_email'], $store['cj_api_key'], (int) $store['id']);
+        $result = $connector->fetchProducts();
+
+        if (!$result['ok']) {
+            $this->errorService->logFailure((int) $store['id'], 'cj', 'sync_products', null, null, 0, $result['message']);
+            $this->storeModel->markUnhealthy((int) $store['id'], $result['message']);
+            $this->redirect('/products?error=' . urlencode($result['message']));
+            return;
+        }
+
+        $db = Database::getConnection();
+        $importedCount = 0;
+
+        foreach ($result['products'] as $cp) {
+            $externalId = (string) ($cp['pid'] ?? '');
+            if ($externalId === '') continue;
+
+            $check = $db->prepare("SELECT id FROM products WHERE store_id = ? AND external_cj_product_id = ?");
+            $check->execute([$store['id'], $externalId]);
+            if ($check->fetch()) continue;
+
+            $name = $cp['productNameEn'] ?? $cp['productName'] ?? 'Unknown product';
+            $price = (float) ($cp['sellPrice'] ?? 0);
+
+            $stmt = $db->prepare("INSERT INTO products (store_id, name, price, external_cj_product_id) VALUES (?, ?, ?, ?)");
+            $stmt->execute([$store['id'], $name, $price, $externalId]);
+            $productId = (int) $db->lastInsertId();
+            $importedCount++;
+
+            $this->productModel->setWarehouseStock($productId, $defaultWarehouse['id'], 0);
+        }
+
+        $this->errorService->markResolved((int) $store['id'], 'cj', 'sync_products', null);
+        $this->storeModel->markHealthy((int) $store['id']);
+        $this->redirect('/products?synced=' . $importedCount);
+    }
+
     // ---------- WooCommerce: Product Push ----------
 
     public function exportToWooCommerce(): void
@@ -868,7 +1061,7 @@ class ProductController extends Controller
         curl_setopt($ch, CURLOPT_USERPWD, $auth);
         curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
         curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, curlVerifySsl());
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);

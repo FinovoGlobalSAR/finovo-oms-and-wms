@@ -54,6 +54,13 @@ class StoreController extends Controller
         $psApiKey = trim($_POST['prestashop_api_key'] ?? '');
         $ocStoreUrl = trim($_POST['opencart_store_url'] ?? '');
         $oscStoreUrl = trim($_POST['oscommerce_store_url'] ?? '');
+        $wixSiteId = trim($_POST['wix_site_id'] ?? '');
+        $wixApiKey = trim($_POST['wix_api_key'] ?? '');
+        $ebayUserToken = trim($_POST['ebay_user_token'] ?? '');
+        $cjEmail = trim($_POST['cj_email'] ?? '');
+        $cjApiKey = trim($_POST['cj_api_key'] ?? '');
+        $magentoUrl = trim($_POST['magento_store_url'] ?? '');
+        $magentoToken = trim($_POST['magento_access_token'] ?? '');
         $warehouseIds = array_map('intval', $_POST['warehouse_ids'] ?? []);
 
         if ($name === '') {
@@ -87,6 +94,22 @@ class StoreController extends Controller
             $this->storeModel->updateOsCommerceCredentials($storeId, $oscStoreUrl, '', '');
         }
 
+        if ($wixSiteId !== '') {
+            $this->storeModel->updateWixCredentials($storeId, $wixSiteId, $wixApiKey);
+        }
+
+        if ($ebayUserToken !== '') {
+            $this->storeModel->updateEbayCredentials($storeId, $ebayUserToken);
+        }
+
+        if ($cjEmail !== '' || $cjApiKey !== '') {
+            $this->storeModel->updateCjCredentials($storeId, $cjEmail, $cjApiKey);
+        }
+
+        if ($magentoUrl !== '' || $magentoToken !== '') {
+            $this->storeModel->updateMagentoCredentials($storeId, $magentoUrl, $magentoToken);
+        }
+
         foreach ($warehouseIds as $index => $warehouseId) {
             if ($warehouseId <= 0) continue;
             $this->warehouseModel->linkToStore($warehouseId, $storeId, $index === 0);
@@ -113,6 +136,13 @@ class StoreController extends Controller
         $psApiKey = trim($_POST['prestashop_api_key'] ?? '');
         $ocStoreUrl = trim($_POST['opencart_store_url'] ?? '');
         $oscStoreUrl = trim($_POST['oscommerce_store_url'] ?? '');
+        $wixSiteId = trim($_POST['wix_site_id'] ?? '');
+        $wixApiKey = trim($_POST['wix_api_key'] ?? '');
+        $ebayUserToken = trim($_POST['ebay_user_token'] ?? '');
+        $cjEmail = trim($_POST['cj_email'] ?? '');
+        $cjApiKey = trim($_POST['cj_api_key'] ?? '');
+        $magentoUrl = trim($_POST['magento_store_url'] ?? '');
+        $magentoToken = trim($_POST['magento_access_token'] ?? '');
         $warehouseIds = array_map('intval', $_POST['warehouse_ids'] ?? []);
 
         if ($id <= 0 || $name === '' || !$this->storeModel->find($id)) {
@@ -127,6 +157,14 @@ class StoreController extends Controller
         $this->storeModel->updatePrestaShopCredentials($id, $psStoreUrl, $psApiKey);
         $this->storeModel->updateOpenCartCredentials($id, $ocStoreUrl, '', '');
         $this->storeModel->updateOsCommerceCredentials($id, $oscStoreUrl, '', '');
+        $this->storeModel->updateWixCredentials($id, $wixSiteId, $wixApiKey);
+        if ($ebayUserToken !== '') {
+            $this->storeModel->updateEbayCredentials($id, $ebayUserToken);
+        }
+        if ($cjEmail !== '' || $cjApiKey !== '') {
+            $this->storeModel->updateCjCredentials($id, $cjEmail, $cjApiKey);
+        }
+        $this->storeModel->updateMagentoCredentials($id, $magentoUrl, $magentoToken);
 
         $current = $this->warehouseModel->allByStore($id);
         $currentIds = array_map(fn($w) => (int) $w['id'], $current);

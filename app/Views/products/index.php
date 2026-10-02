@@ -49,17 +49,30 @@ $platform = $store['platform'] ?? 'manual';
 
             <?php if ($platform === 'shopify'): ?>
                 <a href="/products/sync-shopify" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Pull from Shopify</a>
-                <a href="/products/sync-shopify-async" class="toolbar-btn"><i class="bi bi-lightning"></i> Sync (Async/Queue)</a>
+                <a href="/products/sync-shopify-async" class="toolbar-btn"><i class="bi bi-lightning"></i> Sync (Async)</a>
             <?php elseif ($platform === 'woocommerce'): ?>
                 <a href="/products/sync-woocommerce" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Pull from WooCommerce</a>
+                <a href="/products/sync-woocommerce-async" class="toolbar-btn"><i class="bi bi-lightning"></i> Sync (Async)</a>
             <?php elseif ($platform === 'bigcommerce'): ?>
                 <a href="/products/sync-bigcommerce" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync BigCommerce</a>
+                <a href="/products/sync-bigcommerce-async" class="toolbar-btn"><i class="bi bi-lightning"></i> Sync (Async)</a>
             <?php elseif ($platform === 'prestashop'): ?>
                 <a href="/products/sync-prestashop" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync PrestaShop</a>
+                <a href="/products/sync-prestashop-async" class="toolbar-btn"><i class="bi bi-lightning"></i> Sync (Async)</a>
             <?php elseif ($platform === 'opencart'): ?>
                 <a href="/products/sync-opencart" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync OpenCart</a>
+                <a href="/products/sync-opencart-async" class="toolbar-btn"><i class="bi bi-lightning"></i> Sync (Async)</a>
             <?php elseif ($platform === 'oscommerce'): ?>
                 <a href="/products/sync-oscommerce" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync osCommerce</a>
+                <a href="/products/sync-oscommerce-async" class="toolbar-btn"><i class="bi bi-lightning"></i> Sync (Async)</a>
+            <?php elseif ($platform === 'wix'): ?>
+                <a href="/products/sync-wix" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync Wix</a>
+            <?php elseif ($platform === 'ebay'): ?>
+                <a href="/products/sync-ebay" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync eBay</a>
+            <?php elseif ($platform === 'cj'): ?>
+                <a href="/products/sync-cj" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync CJ</a>
+            <?php elseif ($platform === 'magento'): ?>
+                <a href="/products/sync-magento" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync Magento</a>
             <?php elseif ($platform === 'custom'): ?>
                 <a href="/products/sync-custom-bridge" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync Custom Store</a>
             <?php endif; ?>
@@ -96,7 +109,11 @@ $platform = $store['platform'] ?? 'manual';
                         || !empty($product['external_bc_product_id'])
                         || !empty($product['external_ps_product_id'])
                         || !empty($product['external_ocart_product_id'])
-                        || !empty($product['external_osc_product_id']);
+                        || !empty($product['external_osc_product_id'])
+                        || !empty($product['external_wix_product_id'])
+                        || !empty($product['external_ebay_product_id'])
+                        || !empty($product['external_cj_product_id'])
+                        || !empty($product['external_magento_product_id']);
                     $currencySymbol = $isExternal ? '$' : 'Rs.';
 
                     $stock = (int) ($product['stock_quantity'] ?? 0);
@@ -309,7 +326,6 @@ document.addEventListener('click', function() {
     document.querySelectorAll('.row-menu.show').forEach(m => m.classList.remove('show'));
 });
 
-// ---------- Auto-Refresh (Client-Side Scheduled Reconciliation) ----------
 let autoRefreshInterval = null;
 
 function toggleAutoRefresh() {

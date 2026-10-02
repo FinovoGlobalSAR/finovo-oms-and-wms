@@ -100,6 +100,65 @@ class Store extends Model
         );
     }
 
+    public function updateWixCredentials(int $id, string $siteId, string $apiKey): void
+    {
+        $this->query(
+            "UPDATE stores SET wix_site_id = ?, wix_api_key = ? WHERE id = ?",
+            [$siteId, $apiKey, $id]
+        );
+    }
+
+    public function updateEbayCredentials(int $id, string $userToken): void
+    {
+        $this->query(
+            "UPDATE stores SET ebay_user_token = ?, ebay_refresh_token = NULL, ebay_token_expires_at = NULL, ebay_refresh_expires_at = NULL WHERE id = ?",
+            [$userToken, $id]
+        );
+    }
+
+    /**
+     * "Connect eBay" (OAuth) ke baad tokens save karo.
+     */
+    public function updateEbayOAuthTokens(int $id, string $accessToken, int $expiresIn, string $refreshToken, int $refreshExpiresIn): void
+    {
+        $this->query(
+            "UPDATE stores SET ebay_user_token = ?, ebay_token_expires_at = ?, ebay_refresh_token = ?, ebay_refresh_expires_at = ? WHERE id = ?",
+            [
+                $accessToken,
+                date('Y-m-d H:i:s', time() + $expiresIn),
+                $refreshToken,
+                $refreshExpiresIn > 0 ? date('Y-m-d H:i:s', time() + $refreshExpiresIn) : null,
+                $id,
+            ]
+        );
+    }
+
+    /**
+     * Woh stores jo eBay se connected hain (webhook ke liye).
+     */
+    public function allEbayConnected(): array
+    {
+        return $this->query(
+            "SELECT * FROM stores WHERE (ebay_refresh_token IS NOT NULL AND ebay_refresh_token <> '') OR (ebay_user_token IS NOT NULL AND ebay_user_token <> '')"
+        )->fetchAll();
+    }
+
+    public function updateCjCredentials(int $id, string $email, string $apiKey): void
+    {
+        $this->query(
+            "UPDATE stores SET cj_email = ?, cj_api_key = ?, cj_access_token = NULL, cj_token_expires_at = NULL WHERE id = ?",
+            [$email, $apiKey, $id]
+        );
+    }
+
+    public function updateMagentoCredentials(int $id, string $storeUrl, string $accessToken): void
+    {
+        $this->query(
+            "UPDATE stores SET magento_store_url = ?, magento_access_token = ? WHERE id = ?",
+            [$storeUrl !== '' ? rtrim($storeUrl, '/') : null, $accessToken !== '' ? $accessToken : null, $id]
+        );
+    }
+
     public function markHealthy(int $id): void
     {
         $this->query(

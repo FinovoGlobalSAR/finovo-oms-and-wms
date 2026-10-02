@@ -1,11 +1,21 @@
 RewriteEngine On
 
-RewriteRule ^(app|core|config|database|routes|libraries)(/.*)?$ - [F,L]
-RewriteRule ^\.env$ - [F,L]
-RewriteRule ^migrate\.php$ - [F,L]
+# ---- Ye folders browser se kabhi na khulein ----
+RewriteRule ^(app|core|config|database|routes|libraries|vendor|tests|\.git)(/.*)?$ - [F,L]
 
-RewriteCond %{REQUEST_FILENAME} !-f
+# ---- Secret / setup / command-line wali files block ----
+RewriteRule ^\.env(\..*)?$ - [F,L]
+RewriteRule ^\.(gitignore|htaccess|phpunit\.result\.cache)$ - [F,L]
+RewriteRule ^(migrate|worker|auto-sync|auto-sync-and-process|register-webhooks|ebay-notifications-setup|load-test|create-admin)\.php$ - [F,L]
+RewriteRule ^(composer\.json|composer\.lock|phpunit\.xml|README\.md)$ - [F,L]
+
+# ---- public/ ke andar ki asli files (images, css, js) seedha do ----
+# (pehle ye rule image ko public/ tak bhejta tha, lekin aakhri rule use phir
+#  index.php pe bhej deta tha — is liye login page ki image 404 aati thi)
+RewriteRule ^public/.+\.(png|jpe?g|gif|svg|webp|ico|css|js|woff2?|ttf|map)$ - [L,NC]
+
 RewriteCond %{DOCUMENT_ROOT}/public%{REQUEST_URI} -f
 RewriteRule ^(.*)$ public/$1 [L]
 
+# ---- Baaki sab request app ke router pe ----
 RewriteRule ^(.*)$ public/index.php [L]

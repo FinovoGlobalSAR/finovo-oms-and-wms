@@ -1,6 +1,9 @@
 <?php
+require_once __DIR__ . '/../config/app.php';
+
 error_reporting(E_ALL);
-ini_set('display_errors', 1);
+ini_set('display_errors', appDebug() ? '1' : '0');
+ini_set('log_errors', '1');
 
 session_start();
 
@@ -19,9 +22,9 @@ require_once __DIR__ . '/../routes/web.php';
 
 $requestUri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 
-$basePath = '/finovo-oms-and-wms/public';
+$basePath = env('APP_BASE_PATH', '/finovo-oms-and-wms/public');
 
-if (str_starts_with($requestUri, $basePath)) {
+if ($basePath !== '' && str_starts_with($requestUri, $basePath)) {
     $requestUri = substr($requestUri, strlen($basePath));
 }
 
