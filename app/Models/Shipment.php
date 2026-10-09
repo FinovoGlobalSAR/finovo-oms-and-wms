@@ -22,8 +22,14 @@ class Shipment extends Model
         return $stmt->fetchAll();
     }
 
-    public function find(int $id): ?array
+    /** $storeId do to sirf usi store ki shipment (doosre store ki id bhej kar nahi chhed sakte) */
+    public function find(int $id, ?int $storeId = null): ?array
     {
+        if ($storeId !== null) {
+            $stmt = $this->query("SELECT * FROM shipments WHERE id = ? AND store_id = ?", [$id, $storeId]);
+            $row = $stmt->fetch();
+            return $row ?: null;
+        }
         $stmt = $this->query("SELECT * FROM shipments WHERE id = ?", [$id]);
         $row = $stmt->fetch();
         return $row ?: null;
@@ -67,7 +73,7 @@ class Shipment extends Model
                     COUNT(*) as item_count,
                     GROUP_CONCAT(product_name SEPARATOR ', ') as products
              FROM orders
-             WHERE store_id = ? AND shipment_id IS NULL AND picking_status = 'packed'
+             WHERE store_id = ? AND shipment_id IS NULL AND picking_status = 'packed' AND status != 'cancelled'
              GROUP BY unit_key
              ORDER BY first_id DESC",
             [$storeId]
@@ -75,14 +81,21 @@ class Shipment extends Model
         return $stmt->fetchAll();
     }
 
-    public function assignOrderUnit(int $shipmentId, string $unitKey): void
+    /**
+     * Order (ya poora order group) shipment mein daalo — sirf shipment ke apne store ke, abhi tak
+     * kisi shipment mein na gaye, aur cancel na hue orders. (Pehle cancelled item bhi parcel mein chala jata tha.)
+     * @return int kitni order rows shipment mein gayin
+     */
+    public function assignOrderUnit(int $shipmentId, string $unitKey): int
     {
+        $guard = "shipment_id IS NULL AND status != 'cancelled' AND store_id = (SELECT store_id FROM shipments WHERE id = ?)";
         if (str_starts_with($unitKey, 'single-')) {
             $orderId = (int) substr($unitKey, 7);
-            $this->query("UPDATE orders SET shipment_id = ? WHERE id = ?", [$shipmentId, $orderId]);
+            $stmt = $this->query("UPDATE orders SET shipment_id = ? WHERE id = ? AND {$guard}", [$shipmentId, $orderId, $shipmentId]);
         } else {
-            $this->query("UPDATE orders SET shipment_id = ? WHERE order_group = ?", [$shipmentId, $unitKey]);
+            $stmt = $this->query("UPDATE orders SET shipment_id = ? WHERE order_group = ? AND {$guard}", [$shipmentId, $unitKey, $shipmentId]);
         }
+        return $stmt->rowCount();
     }
 
     public function ordersForShipment(int $shipmentId): array
@@ -118,9 +131,11 @@ class Shipment extends Model
             'returned' => 'cancelled',
             default => 'pending',
         };
-                // Shipment "returned" → order cancelled → us ka stock warehouse mein wapas (OrderStockService)
+        // Shipment "returned" → order cancelled → us ka stock warehouse mein wapas (OrderStockService).
+        // Pehle se cancel hui rows ko shipment nahi chhedti — warna "delivered" pe cancelled order dobara
+        // khul jata aur us ka stock dobara kat jata.
         require_once __DIR__ . '/../Services/OrderStockService.php';
-        (new OrderStockService())->changeStatusWhere('shipment_id = ?', [$id], $orderStatus, null, $_SESSION['user']['name'] ?? 'shipment');
+        (new OrderStockService())->changeStatusWhere("shipment_id = ? AND status != 'cancelled'", [$id], $orderStatus, null, $_SESSION['user']['name'] ?? 'shipment');
     }
 
     public function shipmentsByOrderIds(array $orderIds): array
@@ -164,7 +179,7 @@ class Shipment extends Model
     {
         $stmt = $this->query(
             "SELECT s.*, COUNT(o.id) as item_count, MIN(o.customer_name) as customer_name,
-                    COALESCE(SUM(o.price * o.quantity), 0) as order_total
+                    COALESCE(SUM(CASE WHEN o.status != 'cancelled' THEN o.price * o.quantity ELSE 0 END), 0) as order_total
              FROM shipments s
              LEFT JOIN orders o ON o.shipment_id = s.id
              WHERE s.store_id = ? AND s.handover_status = 'handed_over'
@@ -175,14 +190,15 @@ class Shipment extends Model
         return $stmt->fetchAll();
     }
 
-    public function updateRemittance(int $id, string $status, ?float $amount): void
+    public function updateRemittance(int $id, string $status, ?float $amount, int $storeId): void
     {
         $status = in_array($status, ['not_remitted', 'remitted'], true) ? $status : 'not_remitted';
         $remittedAt = $status === 'remitted' ? date('Y-m-d H:i:s') : null;
+        $amount = $amount === null ? null : max(0.0, $amount);   // remittance minus nahi ho sakti
 
         $this->query(
-            "UPDATE shipments SET remittance_status = ?, remittance_amount = ?, remitted_at = COALESCE(?, remitted_at) WHERE id = ?",
-            [$status, $amount, $remittedAt, $id]
+            "UPDATE shipments SET remittance_status = ?, remittance_amount = ?, remitted_at = COALESCE(?, remitted_at) WHERE id = ? AND store_id = ?",
+            [$status, $amount, $remittedAt, $id, $storeId]
         );
     }
 }

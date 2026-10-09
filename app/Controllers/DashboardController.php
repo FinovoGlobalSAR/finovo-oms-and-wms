@@ -50,7 +50,7 @@ class DashboardController extends Controller
         $trendStmt = $db->prepare(
             "SELECT DATE(created_at) as d, COUNT(*) as c, COALESCE(SUM(price * quantity), 0) as revenue
              FROM orders
-             WHERE store_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 6 DAY)
+             WHERE store_id = ? AND status != 'cancelled' AND created_at >= DATE_SUB(NOW(), INTERVAL 6 DAY)
              GROUP BY DATE(created_at)
              ORDER BY d ASC"
         );
@@ -91,7 +91,7 @@ class DashboardController extends Controller
             $data['ordersBySource'] = $sourceStmt->fetchAll();
 
             $topProductsStmt = $db->prepare(
-                "SELECT product_name, SUM(quantity) as qty FROM orders WHERE store_id = ? GROUP BY product_name ORDER BY qty DESC LIMIT 5"
+                "SELECT product_name, SUM(quantity) as qty FROM orders WHERE store_id = ? AND status != 'cancelled' GROUP BY product_name ORDER BY qty DESC LIMIT 5"           
             );
             $topProductsStmt->execute([$storeId]);
             $data['topProducts'] = $topProductsStmt->fetchAll();
@@ -156,7 +156,7 @@ class DashboardController extends Controller
         if ($role === 'sales staff') {
             $monthRevenueStmt = $db->prepare(
                 "SELECT COALESCE(SUM(price * quantity), 0) as total FROM orders
-                 WHERE store_id = ? AND MONTH(created_at) = MONTH(NOW()) AND YEAR(created_at) = YEAR(NOW())"
+                WHERE store_id = ? AND status != 'cancelled' AND MONTH(created_at) = MONTH(NOW()) AND YEAR(created_at) = YEAR(NOW())"
             );
             $monthRevenueStmt->execute([$storeId]);
             $data['monthRevenue'] = (float) $monthRevenueStmt->fetch()['total'];
@@ -179,7 +179,7 @@ class DashboardController extends Controller
                     p.external_ps_product_id, p.external_ocart_product_id, p.external_osc_product_id
              FROM orders o
              LEFT JOIN products p ON p.id = o.product_id
-             WHERE o.store_id = ?"
+             WHERE o.store_id = ? AND o.status != 'cancelled'"
         );
         $stmt->execute([$storeId]);
         $rows = $stmt->fetchAll();

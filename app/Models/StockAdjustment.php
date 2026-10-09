@@ -6,9 +6,10 @@ class StockAdjustment extends Model
     public function all(int $storeId): array
     {
         $stmt = $this->query(
-            "SELECT sa.*, p.name as product_name, w.name as warehouse_name
+            "SELECT sa.*, CONCAT(p.name, COALESCE(CONCAT(' — ', pv.label), '')) as product_name, w.name as warehouse_name
              FROM stock_adjustments sa
              INNER JOIN products p ON p.id = sa.product_id
+             LEFT JOIN product_variants pv ON pv.id = sa.variant_id
              INNER JOIN warehouses w ON w.id = sa.warehouse_id
              INNER JOIN store_warehouses sw ON sw.warehouse_id = sa.warehouse_id AND sw.store_id = ?
              ORDER BY sa.id DESC LIMIT 50",

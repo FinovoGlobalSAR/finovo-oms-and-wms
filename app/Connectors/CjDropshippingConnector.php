@@ -125,12 +125,28 @@ class CjDropshippingConnector
 
     // ------------------------------------------------------------- Products
 
+        /**
+     * CJ products — saare pages (pehle sirf pehla page, yaani 50 products aate the).
+     * CJ ki catalog bohat badi hai aur CJ 1 second mein 1 request leta hai, is liye zyada se zyada
+     * CJ_PRODUCT_PAGES pages (.env, default 20 = 1000 products) — warna sync ghanton chalta.
+     */
     public function fetchProducts(): array
     {
+        $maxPages = max(1, (int) env('CJ_PRODUCT_PAGES', 20));
+        $size = 50;
+        $products = [];
+
         // Naya endpoint (listV2)
-        $result = $this->request('GET', '/product/listV2?page=1&size=50');
-        if ($result['ok']) {
-            $products = [];
+        for ($page = 1; $page <= $maxPages; $page++) {
+            $result = $this->request('GET', "/product/listV2?page={$page}&size={$size}");
+            if (!$result['ok']) {
+                if ($page === 1) {
+                    return $this->fetchProductsOld($maxPages, $size, $result);
+                }
+                break;   // beech ka page fail → jo aa gaya wahi
+            }
+
+            $count = 0;
             foreach (($result['data']['content'] ?? []) as $block) {
                 foreach (($block['productList'] ?? []) as $p) {
                     $products[] = [
@@ -138,18 +154,40 @@ class CjDropshippingConnector
                         'productNameEn' => $p['nameEn'] ?? '',
                         'sellPrice' => $p['sellPrice'] ?? 0,
                     ];
+                    $count++;
                 }
             }
-            return ['ok' => true, 'products' => $products];
+
+            $total = (int) ($result['data']['totalRecords'] ?? 0);
+            if ($count < $size || ($total > 0 && count($products) >= $total)) {
+                break;   // aakhri page
+            }
         }
 
-        // Purana endpoint (backup)
-        $old = $this->request('GET', '/product/list?pageNum=1&pageSize=50');
-        if (!$old['ok']) {
-            return $result;
-        }
+        return ['ok' => true, 'products' => $products];
+    }
 
-        return ['ok' => true, 'products' => $old['data']['list'] ?? []];
+    /** Purana endpoint (backup) — wahi pages wala tareeqa */
+    private function fetchProductsOld(int $maxPages, int $size, array $firstError): array
+    {
+        $products = [];
+        for ($page = 1; $page <= $maxPages; $page++) {
+            $old = $this->request('GET', "/product/list?pageNum={$page}&pageSize={$size}");
+            if (!$old['ok']) {
+                if ($page === 1) {
+                    return $firstError;
+                }
+                break;
+            }
+            $list = $old['data']['list'] ?? [];
+            array_push($products, ...$list);
+
+            $total = (int) ($old['data']['total'] ?? 0);
+            if (count($list) < $size || ($total > 0 && count($products) >= $total)) {
+                break;
+            }
+        }
+        return ['ok' => true, 'products' => $products];
     }
 
     /**

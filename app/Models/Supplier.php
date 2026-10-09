@@ -25,8 +25,15 @@ class Supplier extends Model
         return (int) $this->db->lastInsertId();
     }
 
-    public function delete(int $id): void
+    /** Sirf isi store ka supplier delete */
+    public function delete(int $id, int $storeId): void
     {
-        $this->query("DELETE FROM suppliers WHERE id = ?", [$id]);
+        $this->query("DELETE FROM suppliers WHERE id = ? AND store_id = ?", [$id, $storeId]);
+    }
+
+    /** Is supplier ke kitne Purchase Orders hain (supplier delete hone pe yeh sab bhi mit jate — database CASCADE) */
+    public function purchaseOrderCount(int $id): int
+    {
+        return (int) $this->query("SELECT COUNT(*) FROM purchase_orders WHERE supplier_id = ?", [$id])->fetchColumn();
     }
 }

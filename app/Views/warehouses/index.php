@@ -20,7 +20,10 @@ foreach ($warehouses as $w) {
         <p>Manage warehouse locations. A warehouse can serve one or more stores.</p>
     </div>
     <div class="ui-head-right">
-        <button type="button" class="ui-btn ui-btn-primary" onclick="openModal('createWarehouseModal')"><i class="bi bi-plus-lg"></i> Add Warehouse</button>
+        <?php if (in_array(strtolower(trim($_SESSION['user']['role'] ?? '')), ['admin', 'manager'], true)): ?>
+            <!-- Naya warehouse sirf Admin / Manager -->
+            <button type="button" class="ui-btn ui-btn-primary" onclick="openModal('createWarehouseModal')"><i class="bi bi-plus-lg"></i> Add Warehouse</button>
+        <?php endif; ?>    
     </div>
 </div>
 

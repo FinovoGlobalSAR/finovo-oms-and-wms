@@ -45,7 +45,7 @@ $searchablePages = [
     ['label' => 'Dashboard', 'url' => '/dashboard', 'icon' => 'bi-grid'],
     ['label' => 'Orders', 'url' => '/orders', 'icon' => 'bi-bag-check', 'roles' => ['admin', 'manager', 'sales staff']],
     ['label' => 'Add Order', 'url' => '/orders/create', 'icon' => 'bi-plus-circle', 'roles' => ['admin', 'manager', 'sales staff']],
-    ['label' => 'Order Settings', 'url' => '/orders/settings', 'icon' => 'bi-gear', 'roles' => ['admin', 'manager', 'sales staff']],
+    ['label' => 'Order Settings', 'url' => '/orders/settings', 'icon' => 'bi-gear', 'roles' => ['admin', 'manager']],
     ['label' => 'Products', 'url' => '/products', 'icon' => 'bi-box-seam', 'roles' => ['admin', 'manager', 'warehouse staff']],
     ['label' => 'Warehouses', 'url' => '/warehouses', 'icon' => 'bi-building', 'roles' => ['admin', 'manager', 'warehouse staff']],
     ['label' => 'Shipments', 'url' => '/shipments', 'icon' => 'bi-truck', 'roles' => ['admin', 'manager', 'warehouse staff']],

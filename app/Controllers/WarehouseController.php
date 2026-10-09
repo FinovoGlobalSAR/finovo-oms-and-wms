@@ -5,6 +5,8 @@ require_once __DIR__ . '/../Models/Warehouse.php';
 require_once __DIR__ . '/../Models/Product.php';
 require_once __DIR__ . '/../Models/ProductVariant.php';
 require_once __DIR__ . '/../Models/Store.php';
+require_once __DIR__ . '/../../core/Paginator.php';
+require_once __DIR__ . '/../Services/InventoryService.php';
 
 class WarehouseController extends Controller
 {
@@ -51,6 +53,12 @@ class WarehouseController extends Controller
 
     public function create(): void
     {
+        // Naya warehouse banana (aur store se jodna) sirf Admin / Manager
+        if (!$this->isAdminOrManager()) {
+            $this->redirect('/warehouses?error=' . urlencode('Only Admin or Manager can create warehouses.'));
+            return;
+        }
+
         $name = trim($_POST['name'] ?? '');
         $location = trim($_POST['location'] ?? '');
         $storeIds = array_map('intval', $_POST['store_ids'] ?? []);
@@ -62,9 +70,11 @@ class WarehouseController extends Controller
 
         $id = $this->warehouseModel->create($name, $location ?: null);
 
-        foreach ($storeIds as $index => $storeId) {
-            if ($storeId <= 0) continue;
-            $this->warehouseModel->linkToStore($id, $storeId, $index === 0);
+        // Naya warehouse store ka default TABHI banta hai jab store ka koi default na ho (linkToStore khud dekhta hai).
+        // Pehle pehle store ka default seedha badal jata tha → us store ke naye orders khaali warehouse se stock maangte.
+        foreach ($storeIds as $storeId) {
+            if ($storeId <= 0 || !$this->storeModel->find($storeId)) continue;
+            $this->warehouseModel->linkToStore($id, $storeId);
         }
 
         $this->redirect('/warehouses?created=1');
@@ -80,16 +90,39 @@ class WarehouseController extends Controller
             exit;
         }
 
-        $products = $this->productModel->productsInWarehouse($id);
-        foreach ($products as &$p) {
-            $p['has_variants'] = $this->productModel->hasVariants((int) $p['id']);
+        $allProducts = $this->productModel->productsInWarehouse($id);
+        // Variant counts ek hi query mein (pehle har product pe alag query)
+        $variantCounts = $this->productModel->variantCountsForProducts(array_map(fn($p) => (int) $p['id'], $allProducts));
+        foreach ($allProducts as &$p) {
+            $p['has_variants'] = !empty($variantCounts[(int) $p['id']]);
         }
         unset($p);
+
+        // Search (?q=) + stock level (?level=) server pe, phir 25-25 ke pages
+        $search = trim((string) ($_GET['q'] ?? ''));
+        $levelFilter = in_array($_GET['level'] ?? '', ['ok', 'low', 'out', 'variants'], true) ? $_GET['level'] : '';
+        $needle = mb_strtolower($search);
+        $filtered = array_filter($allProducts, function ($p) use ($needle, $levelFilter) {
+            if ($needle !== '' && !str_contains(mb_strtolower($p['name'] . ' ' . ($p['sku'] ?? '')), $needle)) {
+                return false;
+            }
+            if ($levelFilter === '') {
+                return true;
+            }
+            $stock = (int) $p['warehouse_stock'];
+            $level = $p['has_variants'] ? 'variants' : ($stock <= 0 ? 'out' : ($stock <= 5 ? 'low' : 'ok'));
+            return $level === $levelFilter;
+        });
+        $pager = Paginator::make($filtered);
 
         $this->view('warehouses/view', [
             'warehouse' => $warehouse,
             'linkedStores' => $this->warehouseModel->storesLinkedTo($id),
-            'products' => $products,
+            'products' => $pager['items'],
+            'allProducts' => $allProducts,
+            'pager' => $pager,
+            'search' => $search,
+            'levelFilter' => $levelFilter,
             'received' => $_GET['received'] ?? null,
             'error' => $_GET['error'] ?? null,
         ]);
@@ -101,12 +134,18 @@ class WarehouseController extends Controller
         $warehouseId = (int) ($_POST['warehouse_id'] ?? 0);
         $quantity = (int) ($_POST['quantity'] ?? 0);
 
-        if ($productId <= 0 || $warehouseId <= 0 || $quantity <= 0) {
+        if ($productId <= 0 || $warehouseId <= 0 || $quantity <= 0 || !$this->warehouseModel->find($warehouseId) || !$this->productModel->find($productId)) {
             $this->redirect('/warehouses/view?id=' . $warehouseId . '&error=' . urlencode('Please select a product and enter a valid quantity.'));
             return;
         }
+        // Variant wale product ka stock variant pe hota hai — product level pe daalne se hisaab bigadta
+        if ($this->productModel->hasVariants($productId)) {
+            $this->redirect('/warehouses/view?id=' . $warehouseId . '&error=' . urlencode('This product has variants — use "Manage variants" to add stock to a specific variant.'));
+            return;
+        }
 
-        $this->productModel->receiveStock($productId, $warehouseId, $quantity);
+        // InventoryService: row lock + ledger entry (pehle history mein kuch nahi likha jata tha)
+        (new InventoryService())->release($productId, null, $warehouseId, $quantity, 'warehouse_receive', "warehouse:{$warehouseId}", $_SESSION['user']['name'] ?? 'system');
         $this->redirect('/warehouses/view?id=' . $warehouseId . '&received=1');
     }
 
@@ -137,10 +176,12 @@ class WarehouseController extends Controller
     {
         $productId = (int) ($_POST['product_id'] ?? 0);
         $warehouseId = (int) ($_POST['warehouse_id'] ?? 0);
-        $quantity = (int) ($_POST['stock_quantity'] ?? 0);
+        $quantity = max(0, (int) ($_POST['stock_quantity'] ?? 0));
 
-        if ($productId > 0 && $warehouseId > 0) {
-            $this->productModel->setWarehouseStock($productId, $warehouseId, $quantity);
+        // Variant wale product ka stock yahan se nahi (har variant ka alag form hai)
+        if ($productId > 0 && $warehouseId > 0 && $this->warehouseModel->find($warehouseId)
+            && $this->productModel->find($productId) && !$this->productModel->hasVariants($productId)) {
+            (new InventoryService())->setStock($productId, null, $warehouseId, $quantity, 'manual_set', "warehouse:{$warehouseId}", $_SESSION['user']['name'] ?? 'system');
         }
 
         $this->redirect('/warehouses/product-stock?product_id=' . $productId . '&updated=1');
@@ -150,11 +191,14 @@ class WarehouseController extends Controller
     {
         $variantId = (int) ($_POST['variant_id'] ?? 0);
         $warehouseId = (int) ($_POST['warehouse_id'] ?? 0);
-        $quantity = (int) ($_POST['stock_quantity'] ?? 0);
+        $quantity = max(0, (int) ($_POST['stock_quantity'] ?? 0));
         $productId = (int) ($_POST['product_id'] ?? 0);
 
-        if ($variantId > 0 && $warehouseId > 0) {
-            $this->variantModel->setWarehouseStock($variantId, $warehouseId, $quantity);
+        // Variant isi product ka ho (product id form se aata hai — us pe bharosa nahi, variant se nikalte hain)
+        $variant = $this->variantModel->find($variantId);
+        if ($variant && $warehouseId > 0 && $this->warehouseModel->find($warehouseId)) {
+            $productId = (int) $variant['product_id'];
+            (new InventoryService())->setStock($productId, $variantId, $warehouseId, $quantity, 'manual_set', "warehouse:{$warehouseId}", $_SESSION['user']['name'] ?? 'system');
         }
 
         $this->redirect('/warehouses/product-stock?product_id=' . $productId . '&updated=1');

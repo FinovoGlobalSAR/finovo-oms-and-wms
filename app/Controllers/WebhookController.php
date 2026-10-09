@@ -63,16 +63,7 @@ class WebhookController extends Controller
         $externalId = (string) $data['id'];
         $eventType = $_SERVER['HTTP_X_SHOPIFY_TOPIC'] ?? 'orders/create';
 
-        if (!$this->recordWebhookEvent($storeId, 'shopify', $externalId, $eventType)) {
-            http_response_code(200);
-            echo json_encode(['status' => 'already_processed']);
-            return;
-        }
-
-        $this->ingestShopifyOrder($store, $data, $externalId);
-
-        http_response_code(200);
-        echo json_encode(['status' => 'ok']);
+        $this->processEvent($storeId, 'shopify', $externalId, $eventType, fn() => $this->ingestShopifyOrder($store, $data, $externalId));
     }
 
     private function verifyShopifySignature(string $rawBody, string $signature, string $secret): bool
@@ -86,7 +77,15 @@ class WebhookController extends Controller
 
     private function ingestShopifyOrder(array $store, array $order, string $externalId): void
     {
+        // Pehle se aaya order (orders/updated, orders/cancelled) → status update, Sync jaisa hi qaida.
+        // Pehle yahan kuch nahi hota tha — Shopify pe cancel hua order Finovo mein stock pakde rehta tha.
         if ($this->importer->exists((int) $store['id'], 'shopify_pull', $externalId)) {
+            $financialStatus = $order['financial_status'] ?? 'pending';
+            $status = CanonicalMapper::toInternalOrderStatus(CanonicalMapper::fromShopify($order['fulfillment_status'] ?? 'pending', $financialStatus));
+            if (!empty($order['cancelled_at'])) {
+                $status = 'cancelled';
+            }
+            $this->importer->updateStatus((int) $store['id'], 'shopify_pull', $externalId, $status, CanonicalMapper::paymentStatusFromShopify($financialStatus));
             return;
         }
 
@@ -136,16 +135,7 @@ class WebhookController extends Controller
         $externalId = (string) $data['id'];
         $eventType = $_SERVER['HTTP_X_WC_WEBHOOK_TOPIC'] ?? 'order.created';
 
-        if (!$this->recordWebhookEvent($storeId, 'woocommerce', $externalId, $eventType)) {
-            http_response_code(200);
-            echo json_encode(['status' => 'already_processed']);
-            return;
-        }
-
-        $this->ingestWooOrder($store, $data, $externalId);
-
-        http_response_code(200);
-        echo json_encode(['status' => 'ok']);
+        $this->processEvent($storeId, 'woocommerce', $externalId, $eventType, fn() => $this->ingestWooOrder($store, $data, $externalId));
     }
 
     private function verifyWooSignature(string $rawBody, string $signature, string $secret): bool
@@ -156,9 +146,19 @@ class WebhookController extends Controller
         $computed = base64_encode(hash_hmac('sha256', $rawBody, $secret, true));
         return hash_equals($computed, $signature);
     }
+
     private function ingestWooOrder(array $store, array $order, string $externalId): void
     {
+        // Pehle se aaya order (order.updated) → status update, Sync jaisa hi qaida
         if ($this->importer->exists((int) $store['id'], 'woocommerce_pull', $externalId)) {
+            $wcStatus = $order['status'] ?? 'pending';
+            $this->importer->updateStatus(
+                (int) $store['id'],
+                'woocommerce_pull',
+                $externalId,
+                CanonicalMapper::toInternalOrderStatus(CanonicalMapper::fromWooCommerce($wcStatus)),
+                CanonicalMapper::paymentStatusFromWooCommerce($wcStatus)
+            );
             return;
         }
 
@@ -202,16 +202,7 @@ class WebhookController extends Controller
         $externalId = (string) $data['data']['id'];
         $eventType = $data['scope'] ?? 'store/order/created';
 
-        if (!$this->recordWebhookEvent($storeId, 'bigcommerce', $externalId, $eventType)) {
-            http_response_code(200);
-            echo json_encode(['status' => 'already_processed']);
-            return;
-        }
-
-        $this->ingestBigCommerceOrder($store, $externalId);
-
-        http_response_code(200);
-        echo json_encode(['status' => 'ok']);
+        $this->processEvent($storeId, 'bigcommerce', $externalId, $eventType, fn() => $this->ingestBigCommerceOrder($store, $externalId));
     }
 
     private function ingestBigCommerceOrder(array $store, string $externalId): void
@@ -273,6 +264,21 @@ class WebhookController extends Controller
 
         $rawBody = trim(file_get_contents('php://input'));
 
+        // Hifazat: (1) .env mein WIX_WEBHOOK_PUBLIC_KEY ho to JWT ka signature check (RS256).
+        // (2) Hamesha: webhook sirf order ka ID deta hai — asli order Wix API se store ki apni key se
+        //     laate hain. Pehle webhook ka data seedha maan liya jata tha, is liye koi bhi
+        //     /webhooks/wix?store_id=1 pe fake order bhej kar stock kata sakta tha.
+        if (!$this->verifyWixJwt($rawBody)) {
+            http_response_code(401);
+            echo json_encode(['error' => 'Invalid signature.']);
+            return;
+        }
+        if (empty($store['wix_api_key']) || empty($store['wix_site_id'])) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Wix is not connected for this store.']);
+            return;
+        }
+
         // Wix webhooks JWT format mein aate hain (header.payload.signature).
         // JWT payload ka "data" field JSON-string hai, aur uske andar bhi
         // ek "data" field hota hai jo AGAIN JSON-string hai — 2 baar nested.
@@ -300,29 +306,43 @@ class WebhookController extends Controller
                     $externalId = (string) ($level2['entityId'] ?? $order['id'] ?? '');
                 }
             }
-        } else {
-            // Fallback: agar kabhi plain JSON bhi aa jaye (jaisa manual curl test)
-            $data = json_decode($rawBody, true);
-            $order = $data['createdEvent']['entity'] ?? null;
-            $externalId = (string) ($data['entityId'] ?? $order['id'] ?? '');
         }
 
-        if (!$order || $externalId === '') {
+        if ($externalId === '') {
             http_response_code(400);
             echo json_encode(['error' => 'Invalid payload.']);
             return;
         }
 
-        if (!$this->recordWebhookEvent($storeId, 'wix', $externalId, 'OrderCreated')) {
-            http_response_code(200);
-            echo json_encode(['status' => 'already_processed']);
+        // Asli order Wix se (webhook wala $order sirf ID ke liye tha)
+        $fetched = (new WixConnector($store['wix_api_key'], $store['wix_site_id']))->fetchOrder($externalId);
+        if (!$fetched['ok']) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Order not found on Wix.']);
             return;
         }
+        $order = $fetched['order'];
 
-        $this->ingestWixOrderFromPayload($store, $order, $externalId);
+        $this->processEvent($storeId, 'wix', $externalId, 'OrderCreated', fn() => $this->ingestWixOrderFromPayload($store, $order, $externalId));
+    }
 
-        http_response_code(200);
-        echo json_encode(['status' => 'ok']);
+    /**
+     * Wix JWT (RS256) ka signature — sirf tab check jab .env mein WIX_WEBHOOK_PUBLIC_KEY ho
+     * (Wix app dashboard → Webhooks → "Public key"). Key na ho to true (phir bhi order Wix API se hi aata hai).
+     */
+    private function verifyWixJwt(string $rawBody): bool
+    {
+        $publicKey = trim((string) env('WIX_WEBHOOK_PUBLIC_KEY', ''));
+        if ($publicKey === '') {
+            return true;
+        }
+        $parts = explode('.', $rawBody);
+        if (count($parts) !== 3) {
+            return false;
+        }
+        $signature = base64_decode(strtr($parts[2], '-_', '+/') . str_repeat('=', (4 - strlen($parts[2]) % 4) % 4));
+        $key = openssl_pkey_get_public(str_replace('\\n', "\n", $publicKey));
+        return $key !== false && openssl_verify($parts[0] . '.' . $parts[1], $signature, $key, OPENSSL_ALGO_SHA256) === 1;
     }
 
     private function ingestWixOrderFromPayload(array $store, array $order, string $externalId): void
@@ -376,20 +396,13 @@ class WebhookController extends Controller
         $externalId = (string) $data['order_id'];
         $eventType = 'order.created';
 
-        if (!$this->recordWebhookEvent($storeId, 'custom_bridge', $externalId, $eventType)) {
-            http_response_code(200);
-            echo json_encode(['status' => 'already_processed']);
-            return;
-        }
-        $this->ingestBridgeOrder($store, $data, $externalId);
-
-        http_response_code(200);
-        echo json_encode(['status' => 'ok']);
+        $this->processEvent($storeId, 'custom_bridge', $externalId, $eventType, fn() => $this->ingestBridgeOrder($store, $data, $externalId));
     }
 
     private function verifyBridgeSignature(array $store, string $apiKey, string $timestamp, string $nonce, string $signature, string $rawBody): bool
     {
-        if ($apiKey === '' || $apiKey !== $store['bridge_api_key']) {
+        // hash_equals: time-safe compare (seedha !== se key ka andaza lagaya ja sakta hai)
+        if ($apiKey === '' || !hash_equals((string) $store['bridge_api_key'], $apiKey)) {
             return false;
         }
 
@@ -420,6 +433,58 @@ class WebhookController extends Controller
     }
 
     // ---------- Shared: Idempotency / Replay Protection ----------
+
+    /**
+     * Webhook ka kaam ek jagah:
+     *   - Order pehle se Finovo mein hai (status update wala event) → seedha update. Status update dobara chale
+     *     to bhi koi nuqsan nahi; pehle "orders/updated" ek dafa record hone ke baad us order ke AGLE saare
+     *     updates (jaise baad mein cancel) "already processed" keh kar chhoot jate the.
+     *   - Naya order → event record (platform ka duplicate retry ruk jaye), phir import.
+     *     Import mein error aaye → record hata kar 500 (platform dobara bhejega).
+     *     Order import na ho saka (product / stock nahi) → record hata do, taake product sync ke baad
+     *     agla event ya retry is order ko la sake. Pehle record pehle hota tha aur fail hone pe order hamesha ke liye ruk jata.
+     */
+    private function processEvent(int $storeId, string $source, string $externalId, string $eventType, callable $ingest): void
+    {
+        $pullSource = $source . '_pull';
+
+        if ($this->importer->exists($storeId, $pullSource, $externalId)) {
+            $ingest();
+            http_response_code(200);
+            echo json_encode(['status' => 'ok']);
+            return;
+        }
+
+        if (!$this->recordWebhookEvent($storeId, $source, $externalId, $eventType)) {
+            http_response_code(200);
+            echo json_encode(['status' => 'already_processed']);
+            return;
+        }
+
+        try {
+            $ingest();
+        } catch (Throwable $e) {
+            $this->forgetWebhookEvent($storeId, $source, $externalId, $eventType);
+            error_log("Webhook {$source} order {$externalId} failed: " . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['error' => 'Order could not be processed. Please retry.']);
+            return;
+        }
+
+        if (!$this->importer->exists($storeId, $pullSource, $externalId)) {
+            $this->forgetWebhookEvent($storeId, $source, $externalId, $eventType);
+        }
+
+        http_response_code(200);
+        echo json_encode(['status' => 'ok']);
+    }
+
+    private function forgetWebhookEvent(int $storeId, string $source, string $externalId, string $eventType): void
+    {
+        Database::getConnection()
+            ->prepare("DELETE FROM webhook_events WHERE store_id = ? AND source = ? AND external_id = ? AND event_type = ?")
+            ->execute([$storeId, $source, $externalId, $eventType]);
+    }
 
     private function recordWebhookEvent(int $storeId, string $source, string $externalId, string $eventType): bool
     {

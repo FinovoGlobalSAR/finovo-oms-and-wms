@@ -136,15 +136,22 @@ foreach ($allPurchaseOrders as $po) {
                                 </span>
                             </td>
                             <td>
-                                <form method="POST" action="/purchase-orders/update-status" style="display:flex; gap:6px; margin:0;">
-                                    <input type="hidden" name="id" value="<?= $po['id'] ?>">
-                                    <select name="status" class="ui-select" style="flex:1;" aria-label="New status for PO #<?= (int) $po['id'] ?>">
-                                        <?php foreach ($statuses as $st): ?>
-                                            <option value="<?= $st ?>" <?= $po['status'] === $st ? 'selected' : '' ?>><?= ucfirst($st) ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                    <button type="submit" class="ui-btn ui-btn-soft ui-btn-icon" title="Save status" aria-label="Save status"><i class="bi bi-check-lg"></i></button>
-                                </form>
+                                <?php if ($po['status'] === 'received'): ?>
+                                    <!-- Received aakhri hai — maal stock mein aa chuka, status ab nahi badalta -->
+                                    <span style="color:var(--text-muted); font-size:12.5px;"><i class="bi bi-lock"></i> Stock added</span>
+                                <?php else: ?>
+                                    <form method="POST" action="/purchase-orders/update-status" style="display:flex; gap:6px; margin:0;">
+                                        <input type="hidden" name="id" value="<?= $po['id'] ?>">
+                                        <select name="status" class="ui-select" style="flex:1;" aria-label="New status for PO #<?= (int) $po['id'] ?>">
+                                            <?php foreach ($statuses as $st): ?>
+                                                <?php if (PurchaseOrder::canMove($po['status'], $st)): ?>
+                                                    <option value="<?= $st ?>" <?= $po['status'] === $st ? 'selected' : '' ?>><?= ucfirst($st) ?></option>
+                                                <?php endif; ?>
+                                            <?php endforeach; ?>
+                                        </select>
+                                        <button type="submit" class="ui-btn ui-btn-soft ui-btn-icon" title="Save status" aria-label="Save status" onclick="return this.form.status.value !== 'received' || confirm('Mark as received? The stock will be added to the warehouse and this cannot be undone.');"><i class="bi bi-check-lg"></i></button>
+                                    </form>
+                                <?php endif; ?>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -217,7 +224,12 @@ foreach ($allPurchaseOrders as $po) {
 </style>
 
 <script>
-const poProducts = <?= json_encode($products) ?>;
+const poProducts = <?= json_encode($products, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+
+// Product ke naam platform / CSV se aate hain — HTML mein daalne se pehle escape (warna naam mein chhupa code chal jata)
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[ch]));
+}
 
 function openModal(id) { document.getElementById(id).classList.add('show'); }
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
@@ -225,7 +237,7 @@ function closeModal(id) { document.getElementById(id).classList.remove('show'); 
 function poProductOptions() {
     let opts = '<option value="">Select product...</option>';
     poProducts.forEach(p => {
-        opts += `<option value="${p.id}">${p.name}</option>`;
+        opts += `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`;
     });
     return opts;
 }

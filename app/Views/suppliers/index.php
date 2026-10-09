@@ -1,15 +1,24 @@
 <div class="breadcrumb">Finovo <i class="bi bi-chevron-right"></i> Suppliers</div>
 
 <div class="page-header-row">
-    <h1>Suppliers <span class="count-badge"><?= count($suppliers) ?></span></h1>
+    <h1>Suppliers <span class="count-badge"><?= (int) ($totalSuppliers ?? count($suppliers)) ?></span></h1>
 </div>
 <p class="page-subtitle">Manage the suppliers you order stock from.</p>
 
 <?php if (!empty($created)): ?><div class="banner banner-success">Supplier added.</div><?php endif; ?>
+<?php if (!empty($deleted)): ?><div class="banner banner-success">Supplier deleted.</div><?php endif; ?>
 <?php if (!empty($error)): ?><div class="banner banner-error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
 <div class="card">
     <div class="filter-row">
+        <!-- Search server pe (har page ka result sahi) -->
+        <form method="GET" action="/suppliers" style="display:flex; gap:8px; align-items:center; flex:1 1 260px;">
+            <input type="text" name="q" value="<?= htmlspecialchars($search ?? '') ?>" placeholder="Search name, contact, email or phone..." aria-label="Search suppliers" style="flex:1; max-width:340px; height:36px; border:1px solid var(--border-color); border-radius:8px; padding:0 12px; font:inherit; font-size:13px;">
+            <button type="submit" class="toolbar-btn">Search</button>
+            <?php if (($search ?? '') !== ''): ?>
+                <a href="/suppliers" class="toolbar-btn">Clear</a>
+            <?php endif; ?>
+        </form>
         <div class="push-right" style="margin-left:0;">
             <a href="/purchase-orders" class="toolbar-btn"><i class="bi bi-clipboard-check"></i> Purchase Orders</a>
             <button type="button" class="toolbar-btn btn-dark" onclick="openModal('createSupplierModal')"><i class="bi bi-plus-lg"></i> Add supplier</button>
@@ -28,7 +37,7 @@
         </thead>
         <tbody>
             <?php if (empty($suppliers)): ?>
-                <tr><td colspan="5" style="text-align:center; color:#6b7280; padding:30px;">No suppliers yet.</td></tr>
+                <tr><td colspan="5" style="text-align:center; color:#6b7280; padding:30px;"><?= ($search ?? '') !== '' ? 'No suppliers match your search.' : 'No suppliers yet.' ?></td></tr>
             <?php else: ?>
                 <?php foreach ($suppliers as $s): ?>
                     <tr>
@@ -37,16 +46,22 @@
                         <td><?= htmlspecialchars($s['email'] ?? '-') ?></td>
                         <td><?= htmlspecialchars($s['phone'] ?? '-') ?></td>
                         <td>
-                            <a href="#" class="action-link" style="color:var(--red);" onclick="if(confirm('Delete this supplier?')){document.getElementById('delSup<?= $s['id'] ?>').submit();} return false;"><i class="bi bi-trash"></i></a>
-                            <form id="delSup<?= $s['id'] ?>" action="/suppliers/delete" method="POST" style="display:none;">
-                                <input type="hidden" name="id" value="<?= $s['id'] ?>">
-                            </form>
+                            <?php if (!empty($canDelete)): ?>
+                                <!-- Supplier delete sirf Admin / Manager -->
+                                <a href="#" class="action-link" style="color:var(--red);" aria-label="Delete supplier <?= htmlspecialchars($s['name']) ?>" onclick="if(confirm('Delete this supplier?')){document.getElementById('delSup<?= $s['id'] ?>').submit();} return false;"><i class="bi bi-trash"></i></a>
+                                <form id="delSup<?= $s['id'] ?>" action="/suppliers/delete" method="POST" style="display:none;">
+                                    <input type="hidden" name="id" value="<?= $s['id'] ?>">
+                                </form>
+                            <?php else: ?>
+                                <span style="color:#94a3b8;">—</span>
+                            <?php endif; ?>
                         </td>
                     </tr>
                 <?php endforeach; ?>
             <?php endif; ?>
         </tbody>
     </table>
+    <?php if (isset($pager)) { $pagerLabel = 'suppliers'; require __DIR__ . '/../partials/pagination.php'; } ?>
 </div>
 
 <div class="modal-backdrop" id="createSupplierModal">

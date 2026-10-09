@@ -259,12 +259,17 @@ function testShopifyConnection() {
     .then(res => res.json())
     .then(data => {
         resultDiv.innerHTML = data.ok
-            ? '<span style="color:#15803d;"><i class="bi bi-check-circle"></i> ' + data.message + '</span>'
-            : '<span style="color:#991b1b;"><i class="bi bi-x-circle"></i> ' + data.message + '</span>';
+            ? '<span style="color:#15803d;"><i class="bi bi-check-circle"></i> ' + escapeHtml(data.message) + '</span>'
+            : '<span style="color:#991b1b;"><i class="bi bi-x-circle"></i> ' + escapeHtml(data.message) + '</span>';
     })
     .catch(() => {
         resultDiv.innerHTML = '<span style="color:#991b1b;">Test failed — network error.</span>';
     });
+}
+
+// Platform ka jawab HTML mein daalne se pehle escape (warna jawab mein chhupa code page pe chal jata)
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[ch]));
 }
 
 function testWooCommerceConnection() {
@@ -283,8 +288,8 @@ function testWooCommerceConnection() {
     .then(res => res.json())
     .then(data => {
         resultDiv.innerHTML = data.ok
-            ? '<span style="color:#15803d;"><i class="bi bi-check-circle"></i> ' + data.message + '</span>'
-            : '<span style="color:#991b1b;"><i class="bi bi-x-circle"></i> ' + data.message + '</span>';
+            ? '<span style="color:#15803d;"><i class="bi bi-check-circle"></i> ' + escapeHtml(data.message) + '</span>'
+            : '<span style="color:#991b1b;"><i class="bi bi-x-circle"></i> ' + escapeHtml(data.message) + '</span>';
     })
     .catch(() => {
         resultDiv.innerHTML = '<span style="color:#991b1b;">Test failed — network error.</span>';

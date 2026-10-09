@@ -164,12 +164,17 @@
 </style>
 
 <script>
-const orderProducts = <?= json_encode($products ?? []) ?>;
+const orderProducts = <?= json_encode($products ?? [], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+
+// Product ke naam platform / CSV se aate hain — HTML mein daalne se pehle escape (warna naam mein chhupa code chal jata)
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[ch]));
+}
 
 function buildOptions() {
     let opts = '<option value="">Select a product...</option>';
     orderProducts.forEach(p => {
-        opts += `<option value="${p.product_id}|${p.variant_id}" data-price="${p.price}" data-stock="${p.stock}" data-currency="${p.currency}">${p.currency} ${p.label} (${p.stock} in stock)</option>`;
+        opts += `<option value="${escapeHtml(p.product_id)}|${escapeHtml(p.variant_id)}" data-price="${escapeHtml(p.price)}" data-stock="${escapeHtml(p.stock)}" data-currency="${escapeHtml(p.currency)}">${escapeHtml(p.currency)} ${escapeHtml(p.label)} (${escapeHtml(p.stock)} in stock)</option>`;
     });
     return opts;
 }

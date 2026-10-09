@@ -57,7 +57,10 @@ class DhlConnector
             'delivered' => 'delivered',
             'transit' => 'in_transit',
             'pre-transit' => 'dispatched',
-            'failure', 'returned' => 'returned',
+            // "failure" = delivery ki koshish nakaam (ghar band, ghalat pata) — parcel abhi courier ke paas hai,
+            // wapas nahi aaya. Pehle isse "returned" maana jata tha → order cancel aur stock wapas, jabke maal raste mein tha.
+            'failure' => 'in_transit',
+            'returned' => 'returned',
             default => 'dispatched',
         };
     }

@@ -6,9 +6,13 @@ $stateColors = [
     'disabled' => ['bg' => '#f1f5f9', 'text' => '#334155'],
 ];
 
-// ---------- Summary numbers (sirf display ke liye, $mappings se hi) ----------
+$allMappings = $allMappings ?? $mappings;
+$search = $search ?? '';
+$stateFilter = $stateFilter ?? '';
+
+// ---------- Summary numbers: POORI list se (sirf is page se nahi) ----------
 $stateCounts = ['mapped' => 0, 'unmapped' => 0, 'conflict' => 0, 'disabled' => 0];
-foreach ($mappings as $m) {
+foreach ($allMappings as $m) {
     if (isset($stateCounts[$m['mapping_state']])) { $stateCounts[$m['mapping_state']]++; }
 }
 ?>
@@ -16,7 +20,7 @@ foreach ($mappings as $m) {
 <div class="ui-head">
     <div class="ui-head-left">
         <div class="breadcrumb">Finovo <i class="bi bi-chevron-right"></i> Integration Settings <i class="bi bi-chevron-right"></i> <span class="current">SKU Mappings</span></div>
-        <h1>SKU Mappings <span class="count-badge"><?= count($mappings) ?></span></h1>
+        <h1>SKU Mappings <span class="count-badge"><?= count($allMappings) ?></span></h1>
         <p>Map your internal products to external store product IDs, SKUs, and barcodes.</p>
     </div>
 </div>
@@ -39,7 +43,7 @@ foreach ($mappings as $m) {
         <div class="ui-stat-icon"><i class="bi bi-link-45deg"></i></div>
         <div>
             <div class="ui-stat-label">Total Mappings</div>
-            <div class="ui-stat-value"><b><?= count($mappings) ?></b><span class="ui-pill ui-pill-blue">All</span></div>
+            <div class="ui-stat-value"><b><?= count($allMappings) ?></b><span class="ui-pill ui-pill-blue">All</span></div>
         </div>
     </div>
     <div class="ui-stat">
@@ -71,17 +75,22 @@ foreach ($mappings as $m) {
 
 <div class="ui-card" style="overflow: visible;">
     <div class="sku-toolbar">
-        <label class="ui-search sku-search">
-            <i class="bi bi-search"></i>
-            <input type="text" id="skuSearch" placeholder="Search product, external ID, SKU or barcode..." aria-label="Search mappings">
-        </label>
-        <select id="skuStateFilter" class="ui-btn" aria-label="Filter by state" style="padding-right:10px;">
-            <option value="">All states</option>
-            <option value="mapped">Mapped</option>
-            <option value="unmapped">Unmapped</option>
-            <option value="conflict">Conflict</option>
-            <option value="disabled">Disabled</option>
-        </select>
+        <!-- Search / state filter server pe (har page ka result sahi) -->
+        <form method="GET" action="/sku-mappings" style="display:flex; gap:8px; align-items:center; flex:1 1 auto; min-width:0;">
+            <label class="ui-search sku-search">
+                <i class="bi bi-search"></i>
+                <input type="text" name="q" value="<?= htmlspecialchars($search) ?>" placeholder="Search product, external ID, SKU or barcode..." aria-label="Search mappings">
+            </label>
+            <select name="state" class="ui-btn" aria-label="Filter by state" style="padding-right:10px;" onchange="this.form.submit()">
+                <?php foreach (['' => 'All states', 'mapped' => 'Mapped', 'unmapped' => 'Unmapped', 'conflict' => 'Conflict', 'disabled' => 'Disabled'] as $value => $label): ?>
+                    <option value="<?= $value ?>" <?= $stateFilter === $value ? 'selected' : '' ?>><?= $label ?></option>
+                <?php endforeach; ?>
+            </select>
+            <button type="submit" class="ui-btn">Search</button>
+            <?php if ($search !== '' || $stateFilter !== ''): ?>
+                <a href="/sku-mappings" class="ui-btn">Clear</a>
+            <?php endif; ?>
+        </form>
         <div class="sku-toolbar-actions">
             <a href="/field-mappings" class="ui-btn"><i class="bi bi-sliders"></i> Field Mapping</a>
             <button type="button" class="ui-btn ui-btn-primary" onclick="openModal('createMappingModal')"><i class="bi bi-plus-lg"></i> Add Mapping</button>
@@ -102,7 +111,11 @@ foreach ($mappings as $m) {
             </thead>
             <tbody>
                 <?php if (empty($mappings)): ?>
-                    <tr><td colspan="6" class="ui-empty"><i class="bi bi-link-45deg"></i>No mappings yet. Click "Add Mapping" to link a product to its external store ID.</td></tr>
+                    <?php if ($search !== '' || $stateFilter !== ''): ?>
+                        <tr><td colspan="6" class="ui-empty"><i class="bi bi-search"></i>No mappings match your search.</td></tr>
+                    <?php else: ?>
+                        <tr><td colspan="6" class="ui-empty"><i class="bi bi-link-45deg"></i>No mappings yet. Click "Add Mapping" to link a product to its external store ID.</td></tr>
+                    <?php endif; ?>
                 <?php else: ?>
                     <?php foreach ($mappings as $m):
                         $color = $stateColors[$m['mapping_state']] ?? ['bg' => '#f1f5f9', 'text' => '#334155'];
@@ -125,15 +138,12 @@ foreach ($mappings as $m) {
                             <td style="color:#334155;"><?= htmlspecialchars($m['mapped_by'] ?? '-') ?></td>
                         </tr>
                     <?php endforeach; ?>
-                    <tr id="skuNoMatch" style="display:none;"><td colspan="6" class="ui-empty"><i class="bi bi-search"></i>No mappings match your search.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
     </div>
 
-    <div class="pagination-bar">
-        <span id="skuShowing">Showing <?= count($mappings) ?> of <?= count($mappings) ?> mappings</span>
-    </div>
+    <?php $pagerLabel = 'mappings'; require __DIR__ . '/../partials/pagination.php'; ?>
 </div>
 
 <div class="modal-backdrop" id="createMappingModal">
@@ -183,25 +193,4 @@ td.sku-code { color: #334155; font-family: ui-monospace, 'Cascadia Code', Consol
 <script>
 function openModal(id) { document.getElementById(id).classList.add('show'); }
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
-
-(function () {
-    var input = document.getElementById('skuSearch');
-    var filter = document.getElementById('skuStateFilter');
-    var rows = Array.prototype.slice.call(document.querySelectorAll('.sku-row'));
-    function apply() {
-        var q = input.value.trim().toLowerCase();
-        var st = filter.value;
-        var shown = 0;
-        rows.forEach(function (r) {
-            var ok = (q === '' || r.dataset.search.indexOf(q) !== -1) && (st === '' || r.dataset.state === st);
-            r.style.display = ok ? '' : 'none';
-            if (ok) { shown++; }
-        });
-        var nm = document.getElementById('skuNoMatch');
-        if (nm) { nm.style.display = shown === 0 ? '' : 'none'; }
-        document.getElementById('skuShowing').textContent = 'Showing ' + shown + ' of ' + rows.length + ' mappings';
-    }
-    input.addEventListener('input', apply);
-    filter.addEventListener('change', apply);
-})();
 </script>

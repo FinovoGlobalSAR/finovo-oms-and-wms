@@ -33,14 +33,23 @@ class InventoryService
     }
 
     /**
-     * Stock reserve/deduct karneе se pahle validate karta hai. Agar kam hai,
+     * Stock reserve/deduct karne se pahle validate karta hai. Agar kam hai,
      * structured error return karta hai (koi silent/galat deduction nahi hota).
      *
      * @return array{ok: bool, available?: int, requested?: int, sku?: string}
      */
     public function reserve(int $productId, ?int $variantId, int $warehouseId, int $quantity, string $source, ?string $reference = null, ?string $actor = null): array
     {
-        $this->db->beginTransaction();
+        // 0 ya minus quantity "reserve" karna asal mein stock BADHANA hota — kabhi allow nahi
+        if ($quantity <= 0) {
+            return ['ok' => false, 'code' => 'INVALID_QUANTITY', 'requested' => $quantity, 'available' => 0];
+        }
+
+        // Bahar pehle se transaction chal rahi ho (jaise Return complete) to usi ke andar kaam — apni nahi kholte
+        $own = !$this->db->inTransaction();
+        if ($own) {
+            $this->db->beginTransaction();
+        }
 
         try {
             // Row lock — do simultaneous orders same stock ke liye compete na karein
@@ -56,7 +65,9 @@ class InventoryService
             $sku = $row['sku'] ?? null;
 
             if ($available < $quantity) {
-                $this->db->rollBack();
+                if ($own) {
+                    $this->db->rollBack();
+                }
                 return [
                     'ok' => false,
                     'code' => 'INVENTORY_UNAVAILABLE',
@@ -80,12 +91,16 @@ class InventoryService
 
             $this->refreshTotals($productId, $variantId);
 
-            $this->db->commit();
+            if ($own) {
+                $this->db->commit();
+            }
             // Stock badla → store ke platform pe bhi (request ke aakhir mein, StockPushService)
             StockPushService::queue($productId);
             return ['ok' => true, 'available' => $newQuantity];
         } catch (Throwable $e) {
-            $this->db->rollBack();
+            if ($own && $this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
             throw $e;
         }
     }
@@ -140,7 +155,7 @@ class InventoryService
 
         // Step 2: Ab actual reserve karo, warehouse-by-warehouse. Agar beech
         // mein koi step fail ho jaye (race condition — kisi aur order ne
-        // isी waqt stock le liya), to jo already reserve ho chuka hai usse
+        // isi waqt stock le liya), to jo already reserve ho chuka hai usse
         // wapas release karke poori tarah rollback karo.
         $committed = [];
 
@@ -171,7 +186,15 @@ class InventoryService
      */
     public function release(int $productId, ?int $variantId, int $warehouseId, int $quantity, string $source, ?string $reference = null, ?string $actor = null): void
     {
-        $this->db->beginTransaction();
+        // 0 ya minus "wapas" karna asal mein stock KAATNA hota — kuch nahi karte
+        if ($quantity <= 0 || $warehouseId <= 0) {
+            return;
+        }
+
+        $own = !$this->db->inTransaction();
+        if ($own) {
+            $this->db->beginTransaction();
+        }
 
         try {
             if ($variantId) {
@@ -202,10 +225,67 @@ class InventoryService
 
             $this->refreshTotals($productId, $variantId);
 
-            $this->db->commit();
+            if ($own) {
+                $this->db->commit();
+            }
             StockPushService::queue($productId);
         } catch (Throwable $e) {
-            $this->db->rollBack();
+            if ($own && $this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * Kisi warehouse ka stock seedha ek number pe set karo (Warehouse → Product stock page).
+     * Farq (naya − purana) ledger mein likha jata hai — pehle seedha UPDATE hota tha, history mein kuch nahi.
+     * @return int purana stock
+     */
+    public function setStock(int $productId, ?int $variantId, int $warehouseId, int $newQuantity, string $source, ?string $reference = null, ?string $actor = null): int
+    {
+        $newQuantity = max(0, $newQuantity);
+        $own = !$this->db->inTransaction();
+        if ($own) {
+            $this->db->beginTransaction();
+        }
+
+        try {
+            if ($variantId) {
+                $stmt = $this->db->prepare("SELECT stock_quantity FROM variant_warehouse_stock WHERE variant_id = ? AND warehouse_id = ? FOR UPDATE");
+                $stmt->execute([$variantId, $warehouseId]);
+            } else {
+                $stmt = $this->db->prepare("SELECT stock_quantity FROM product_warehouse_stock WHERE product_id = ? AND warehouse_id = ? FOR UPDATE");
+                $stmt->execute([$productId, $warehouseId]);
+            }
+            $before = (int) ($stmt->fetch(PDO::FETCH_ASSOC)['stock_quantity'] ?? 0);
+
+            if ($variantId) {
+                $this->db->prepare(
+                    "INSERT INTO variant_warehouse_stock (variant_id, warehouse_id, stock_quantity) VALUES (?, ?, ?)
+                     ON DUPLICATE KEY UPDATE stock_quantity = VALUES(stock_quantity)"
+                )->execute([$variantId, $warehouseId, $newQuantity]);
+            } else {
+                $this->db->prepare(
+                    "INSERT INTO product_warehouse_stock (product_id, warehouse_id, stock_quantity) VALUES (?, ?, ?)
+                     ON DUPLICATE KEY UPDATE stock_quantity = VALUES(stock_quantity)"
+                )->execute([$productId, $warehouseId, $newQuantity]);
+            }
+
+            if ($newQuantity !== $before) {
+                $this->logLedger($productId, $variantId, $warehouseId, $before, $newQuantity - $before, $newQuantity, $source, $reference, $actor);
+            }
+            $this->refreshTotals($productId, $variantId);
+
+            if ($own) {
+                $this->db->commit();
+            }
+            StockPushService::queue($productId);
+            return $before;
+        } catch (Throwable $e) {
+            if ($own && $this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
             throw $e;
         }
     }

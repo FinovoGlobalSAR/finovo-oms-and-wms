@@ -1,11 +1,15 @@
 <?php
 $currentPage = 'warehouses';
 
-// ---------- Summary numbers (sirf display ke liye, $products se hi) ----------
+$allProducts = $allProducts ?? $products;
+$search = $search ?? '';
+$levelFilter = $levelFilter ?? '';
+
+// ---------- Summary numbers: POORI list se (sirf is page se nahi) ----------
 $unitsHere = 0;
 $lowCount = 0;
 $outCount = 0;
-foreach ($products as $p) {
+foreach ($allProducts as $p) {
     if (!empty($p['has_variants'])) { continue; }
     $st = (int) $p['warehouse_stock'];
     $unitsHere += $st;
@@ -60,7 +64,7 @@ foreach ($products as $p) {
         <div class="ui-stat-icon"><i class="bi bi-box-seam"></i></div>
         <div>
             <div class="ui-stat-label">Products</div>
-            <div class="ui-stat-value"><b><?= count($products) ?></b><span class="ui-pill ui-pill-blue">In linked stores</span></div>
+            <div class="ui-stat-value"><b><?= count($allProducts) ?></b><span class="ui-pill ui-pill-blue">In linked stores</span></div>
         </div>
     </div>
     <div class="ui-stat">
@@ -99,22 +103,24 @@ foreach ($products as $p) {
                 <div class="sub">Add received quantity directly from a row, or use "Receive Stock".</div>
             </div>
         </div>
-        <div class="ui-card-tools">
-            <select id="whvFilter" class="ui-btn" aria-label="Filter by stock level" style="padding-right:10px;">
-                <option value="">All stock levels</option>
-                <option value="ok">In stock</option>
-                <option value="low">Low stock</option>
-                <option value="out">Out of stock</option>
-                <option value="variants">Has variants</option>
-            </select>
-        </div>
     </div>
-    <div class="ui-card-search">
-        <label class="ui-search">
+    <!-- Search / stock level filter server pe (har page ka result sahi) -->
+    <form method="GET" action="/warehouses/view" class="ui-card-search" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+        <input type="hidden" name="id" value="<?= (int) $warehouse['id'] ?>">
+        <label class="ui-search" style="flex:1 1 240px;">
             <i class="bi bi-search"></i>
-            <input type="text" id="whvSearch" placeholder="Search by product name or SKU..." aria-label="Search products">
+            <input type="text" name="q" value="<?= htmlspecialchars($search) ?>" placeholder="Search by product name or SKU..." aria-label="Search products">
         </label>
-    </div>
+        <select name="level" class="ui-btn" aria-label="Filter by stock level" style="padding-right:10px;" onchange="this.form.submit()">
+            <?php foreach (['' => 'All stock levels', 'ok' => 'In stock', 'low' => 'Low stock', 'out' => 'Out of stock', 'variants' => 'Has variants'] as $value => $label): ?>
+                <option value="<?= $value ?>" <?= $levelFilter === $value ? 'selected' : '' ?>><?= $label ?></option>
+            <?php endforeach; ?>
+        </select>
+        <button type="submit" class="ui-btn">Search</button>
+        <?php if ($search !== '' || $levelFilter !== ''): ?>
+            <a href="/warehouses/view?id=<?= (int) $warehouse['id'] ?>" class="ui-btn ui-btn-soft">Clear</a>
+        <?php endif; ?>
+    </form>
 
     <div style="overflow-x:auto;">
         <table class="data-table">
@@ -130,7 +136,13 @@ foreach ($products as $p) {
             </thead>
             <tbody>
                 <?php if (empty($products)): ?>
-                    <tr><td colspan="6" class="ui-empty"><i class="bi bi-box-seam"></i>No products in linked store(s) yet.</td></tr>
+                    <tr><td colspan="6" class="ui-empty">
+                        <?php if ($search !== '' || $levelFilter !== ''): ?>
+                            <i class="bi bi-search"></i>No products match your search.
+                        <?php else: ?>
+                            <i class="bi bi-box-seam"></i>No products in linked store(s) yet.
+                        <?php endif; ?>
+                    </td></tr>
                 <?php else: ?>
                     <?php foreach ($products as $p):
                         $hasVariants = !empty($p['has_variants']);
@@ -181,15 +193,12 @@ foreach ($products as $p) {
                             </td>
                         </tr>
                     <?php endforeach; ?>
-                    <tr id="whvNoMatch" style="display:none;"><td colspan="6" class="ui-empty"><i class="bi bi-search"></i>No products match your search.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
     </div>
 
-    <div class="pagination-bar">
-        <span id="whvShowing">Showing <?= count($products) ?> of <?= count($products) ?> products</span>
-    </div>
+    <?php $pagerLabel = 'products'; require __DIR__ . '/../partials/pagination.php'; ?>
 </div>
 
 <div class="modal-backdrop" id="receiveStockModal">
@@ -205,7 +214,7 @@ foreach ($products as $p) {
                 <label>Product</label>
                 <select name="product_id" required style="width:100%; border:1px solid var(--border-color); border-radius:9px; padding:9px 12px; font-size:13.5px; font-family:inherit; background:#f8fafc;">
                     <option value="">Select a product...</option>
-                    <?php foreach ($products as $p): ?>
+                    <?php foreach ($allProducts as $p): ?>
                         <?php if (empty($p['has_variants'])): ?>
                             <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['name']) ?> (currently <?= (int) $p['warehouse_stock'] ?>)</option>
                         <?php endif; ?>
@@ -227,25 +236,4 @@ foreach ($products as $p) {
 <script>
 function openModal(id) { document.getElementById(id).classList.add('show'); }
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
-
-(function () {
-    var input = document.getElementById('whvSearch');
-    var filter = document.getElementById('whvFilter');
-    var rows = Array.prototype.slice.call(document.querySelectorAll('.whv-row'));
-    function apply() {
-        var q = input.value.trim().toLowerCase();
-        var lv = filter.value;
-        var shown = 0;
-        rows.forEach(function (r) {
-            var ok = (q === '' || r.dataset.search.indexOf(q) !== -1) && (lv === '' || r.dataset.level === lv);
-            r.style.display = ok ? '' : 'none';
-            if (ok) { shown++; }
-        });
-        var nm = document.getElementById('whvNoMatch');
-        if (nm) { nm.style.display = shown === 0 ? '' : 'none'; }
-        document.getElementById('whvShowing').textContent = 'Showing ' + shown + ' of ' + rows.length + ' products';
-    }
-    if (input) { input.addEventListener('input', apply); }
-    if (filter) { filter.addEventListener('change', apply); }
-})();
 </script>

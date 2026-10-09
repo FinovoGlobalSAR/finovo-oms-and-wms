@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/../../core/Controller.php';
+require_once __DIR__ . '/../../core/Paginator.php';
 require_once __DIR__ . '/../Models/Supplier.php';
+require_once __DIR__ . '/../Services/AuditLogService.php';
 
 class SupplierController extends Controller
 {
@@ -17,9 +19,23 @@ class SupplierController extends Controller
     public function index(): void
     {
         $store = $this->getCurrentStore();
+        $allSuppliers = $this->supplierModel->all((int) $store['id']);
+
+        // Search (?q=) server pe, phir 25-25 ke pages
+        $search = trim((string) ($_GET['q'] ?? ''));
+        $needle = mb_strtolower($search);
+        $filtered = array_filter($allSuppliers, fn($s) => $needle === ''
+            || str_contains(mb_strtolower($s['name'] . ' ' . ($s['contact_person'] ?? '') . ' ' . ($s['email'] ?? '') . ' ' . ($s['phone'] ?? '')), $needle));
+        $pager = Paginator::make($filtered);
+
         $this->view('suppliers/index', [
-            'suppliers' => $this->supplierModel->all((int) $store['id']),
+            'suppliers' => $pager['items'],
+            'totalSuppliers' => count($allSuppliers),
+            'pager' => $pager,
+            'search' => $search,
+            'canDelete' => $this->isAdminOrManager(),
             'created' => $_GET['created'] ?? null,
+            'deleted' => $_GET['deleted'] ?? null,
             'error' => $_GET['error'] ?? null,
         ]);
     }
@@ -36,6 +52,10 @@ class SupplierController extends Controller
             $this->redirect('/suppliers?error=' . urlencode('Supplier name is required.'));
             return;
         }
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->redirect('/suppliers?error=' . urlencode('Please enter a valid email address.'));
+            return;
+        }
 
         $this->supplierModel->create((int) $store['id'], $name, $contactPerson ?: null, $email ?: null, $phone ?: null);
         $this->redirect('/suppliers?created=1');
@@ -43,10 +63,32 @@ class SupplierController extends Controller
 
     public function delete(): void
     {
-        $id = (int) ($_POST['id'] ?? 0);
-        if ($id > 0) {
-            $this->supplierModel->delete($id);
+        // Supplier delete sirf Admin / Manager
+        if (!$this->isAdminOrManager()) {
+            $this->redirect('/suppliers?error=' . urlencode('Only Admin or Manager can delete suppliers.'));
+            return;
         }
+
+        $store = $this->getCurrentStore();
+        $id = (int) ($_POST['id'] ?? 0);
+        $supplier = $this->supplierModel->find($id);
+
+        // Sirf isi store ka supplier (pehle kisi bhi store ka id bhej kar delete ho jata tha)
+        if (!$supplier || (int) $supplier['store_id'] !== (int) $store['id']) {
+            $this->redirect('/suppliers?error=' . urlencode('Supplier not found.'));
+            return;
+        }
+
+        // Database mein supplier ke saath us ke saare Purchase Orders bhi mit jate (CASCADE) — is liye rok do
+        $poCount = $this->supplierModel->purchaseOrderCount($id);
+        if ($poCount > 0) {
+            $this->redirect('/suppliers?error=' . urlencode("This supplier has {$poCount} purchase order(s). A supplier with purchase orders cannot be deleted."));
+            return;
+        }
+
+        $this->supplierModel->delete($id, (int) $store['id']);
+        (new AuditLogService())->log((int) $store['id'], 'supplier_deleted', 'supplier', (string) $id, "Supplier \"{$supplier['name']}\" deleted");
+
         $this->redirect('/suppliers?deleted=1');
     }
 }

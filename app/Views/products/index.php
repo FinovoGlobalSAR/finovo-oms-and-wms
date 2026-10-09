@@ -202,9 +202,11 @@ $platform = $store['platform'] ?? 'manual';
                                         <a href="/products/push?id=<?= $product['id'] ?>"><i class="bi bi-box-arrow-up-right"></i> Push to <?= htmlspecialchars($pushTarget['label']) ?></a>
                                     <?php endif; ?>
                                 <?php endif; ?>
-                                <div class="row-menu-divider"></div>
-                                <a href="#" class="row-menu-danger" onclick="if(confirm('Delete this product? This cannot be undone.')){document.getElementById('deleteProductForm<?= $product['id'] ?>').submit();} return false;"><i class="bi bi-trash"></i> Delete</a>
-                            </div>
+                                <?php if (in_array(strtolower(trim($_SESSION['user']['role'] ?? '')), ['admin', 'manager'], true)): ?>
+                                    <!-- Product delete sirf Admin / Manager -->
+                                    <div class="row-menu-divider"></div>
+                                    <a href="#" class="row-menu-danger" onclick="if(confirm('Delete this product? This cannot be undone.')){document.getElementById('deleteProductForm<?= $product['id'] ?>').submit();} return false;"><i class="bi bi-trash"></i> Delete</a>
+                                <?php endif; ?>                            </div>
                             <form id="deleteProductForm<?= $product['id'] ?>" action="/products/delete" method="POST" style="display:none;">
                                 <input type="hidden" name="id" value="<?= $product['id'] ?>">
                             </form>

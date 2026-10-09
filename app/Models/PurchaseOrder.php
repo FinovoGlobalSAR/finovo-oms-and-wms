@@ -19,8 +19,27 @@ class PurchaseOrder extends Model
         return $stmt->fetchAll();
     }
 
-    public function find(int $id): ?array
+    /**
+     * Status sirf aage chalta hai: draft → ordered → received (draft se seedha received bhi theek).
+     * "received" aakhri hai — pehle received → draft → received kar ke maal baar baar stock mein judta tha.
+     */
+    public static function canMove(string $from, string $to): bool
     {
+        $allowed = [
+            'draft'    => ['draft', 'ordered', 'received'],
+            'ordered'  => ['ordered', 'received'],
+            'received' => [],
+        ];
+        return in_array($to, $allowed[$from] ?? [], true);
+    }
+
+    public function find(int $id, ?int $storeId = null): ?array
+    {
+        if ($storeId !== null) {
+            $stmt = $this->query("SELECT * FROM purchase_orders WHERE id = ? AND store_id = ?", [$id, $storeId]);
+            $row = $stmt->fetch();
+            return $row ?: null;
+        }
         $stmt = $this->query("SELECT * FROM purchase_orders WHERE id = ?", [$id]);
         $row = $stmt->fetch();
         return $row ?: null;
@@ -51,7 +70,7 @@ class PurchaseOrder extends Model
     {
         $this->query(
             "INSERT INTO purchase_order_items (purchase_order_id, product_id, quantity, unit_cost) VALUES (?, ?, ?, ?)",
-            [$poId, $productId, $quantity, $unitCost]
+            [$poId, $productId, max(1, $quantity), max(0.0, $unitCost)]
         );
     }
 

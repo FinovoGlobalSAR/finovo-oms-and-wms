@@ -32,6 +32,10 @@ class BigCommerceConnectController extends Controller
         return appUrl();
     }
 
+    /**
+     * Auth Callback — BigCommerce install/authorize hone par yahan redirect
+     * karta hai: ?code=...&scope=...&context=stores/{store_hash}
+     */
     public function authCallback(): void
     {
         $code = $_GET['code'] ?? '';
@@ -86,27 +90,30 @@ class BigCommerceConnectController extends Controller
             return;
         }
 
-        // Kis Finovo store se link karein? Agar yeh store_hash pehle se kisi
-        // store mein save hai to wahi update karo, warna abhi jo store session
-        // mein "current" hai usse link kar do (single-tenant testing ke liye).
+        // Kis Finovo store se link karein?
+        //   1) yeh store_hash pehle se kisi store mein save hai → wahi (app dobara install hui)
+        //   2) Finovo mein login Admin / Manager ka "current" store → us se link
+        //   3) warna KUCH nahi — pehle "pehla store le lo" hota tha, is liye koi bhi bahar wala apni
+        //      BigCommerce shop pe app install kar ke store #1 ki keys badal sakta tha
         $db = Database::getConnection();
         $existing = $db->prepare("SELECT id FROM stores WHERE bigcommerce_store_hash = ?");
         $existing->execute([$storeHash]);
         $matchedStore = $existing->fetch();
 
+        $role = strtolower(trim($_SESSION['user']['role'] ?? ''));
+        $loggedInManager = !empty($_SESSION['user']['id']) && in_array($role, ['admin', 'manager', 'company admin'], true);
+
         if ($matchedStore) {
             $this->storeModel->updateBigCommerceCredentials((int) $matchedStore['id'], $storeHash, $accessToken);
-        } elseif (!empty($_SESSION['current_store_id'])) {
+        } elseif ($loggedInManager && !empty($_SESSION['current_store_id']) && $this->storeModel->find((int) $_SESSION['current_store_id'])) {
             $this->storeModel->updateBigCommerceCredentials((int) $_SESSION['current_store_id'], $storeHash, $accessToken);
         } else {
-            // Koi bhi store linked nahi mila — pehla store le lo (fallback)
-            $first = $db->query("SELECT id FROM stores ORDER BY id ASC LIMIT 1")->fetch();
-            if ($first) {
-                $this->storeModel->updateBigCommerceCredentials((int) $first['id'], $storeHash, $accessToken);
-            }
+            http_response_code(403);
+            echo "<h2>Could not link this BigCommerce store.</h2><p>Log in to Finovo as an Admin or Manager, click \"Manage\" on the store you want to connect, then install the app again from BigCommerce in the same browser.</p>";
+            return;
         }
 
-        echo "<h2>BigCommerce connected successfully!</h2><p>Store Hash: {$storeHash}</p><p>You can close this tab and return to Finovo.</p>";
+        echo "<h2>BigCommerce connected successfully!</h2><p>Store Hash: " . htmlspecialchars($storeHash) . "</p><p>You can close this tab and return to Finovo.</p>";
     }
 
     /**
@@ -116,6 +123,11 @@ class BigCommerceConnectController extends Controller
      */
     public function loadCallback(): void
     {
+        if ($this->verifiedStoreHash() === null) {
+            http_response_code(403);
+            echo "Invalid request.";
+            return;
+        }
         $this->redirect('/stores');
     }
 
@@ -125,8 +137,14 @@ class BigCommerceConnectController extends Controller
      */
     public function uninstallCallback(): void
     {
-        $context = $_GET['context'] ?? '';
-        $storeHash = str_replace('stores/', '', $context);
+        // Store hash sirf BigCommerce ke SIGNED payload se (pehle ?context= se leta tha — store hash
+        // public hota hai, koi bhi kisi store ka connection hata sakta tha)
+        $storeHash = $this->verifiedStoreHash();
+        if ($storeHash === null) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Invalid signed payload.']);
+            return;
+        }
 
         if ($storeHash !== '') {
             $db = Database::getConnection();
@@ -136,5 +154,32 @@ class BigCommerceConnectController extends Controller
 
         http_response_code(200);
         echo json_encode(['status' => 'uninstalled']);
+    }
+
+    /**
+     * BigCommerce load / uninstall callbacks ?signed_payload_jwt= bhejta hai (JWT, HS256, app ke
+     * client secret se sign). Sahi ho to store hash ("stores/abc123" → "abc123"), warna null.
+     */
+    private function verifiedStoreHash(): ?string
+    {
+        $jwt = (string) ($_GET['signed_payload_jwt'] ?? '');
+        $secret = $this->clientSecret();
+        $parts = explode('.', $jwt);
+        if ($secret === '' || count($parts) !== 3) {
+            return null;
+        }
+
+        $b64 = fn(string $raw) => rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
+        $expected = $b64(hash_hmac('sha256', $parts[0] . '.' . $parts[1], $secret, true));
+        if (!hash_equals($expected, $parts[2])) {
+            return null;
+        }
+
+        $payload = json_decode((string) base64_decode(strtr($parts[1], '-_', '+/')), true);
+        if (!is_array($payload) || (isset($payload['exp']) && (int) $payload['exp'] < time() - 300)) {
+            return null;
+        }
+        $hash = str_replace('stores/', '', (string) ($payload['sub'] ?? ''));
+        return $hash !== '' ? $hash : null;
     }
 }

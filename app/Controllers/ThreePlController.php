@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../core/Controller.php';
 require_once __DIR__ . '/../Models/Shipment.php';
+require_once __DIR__ . '/../../core/Paginator.php';
 require_once __DIR__ . '/../Connectors/DhlConnector.php';
 
 class ThreePlController extends Controller
@@ -62,16 +63,33 @@ class ThreePlController extends Controller
     public function remittanceIndex(): void
     {
         $store = $this->getCurrentStore();
-        $shipments = $this->shipmentModel->allForRemittance((int) $store['id']);
+        $allShipments = $this->shipmentModel->allForRemittance((int) $store['id']);
+
+        // Search (?q=) + status (?status=) server pe, phir 25-25 ke pages
+        $search = trim((string) ($_GET['q'] ?? ''));
+        $statusFilter = in_array($_GET['status'] ?? '', ['remitted', 'not_remitted'], true) ? $_GET['status'] : '';
+        $needle = mb_strtolower($search);
+        $filtered = array_filter($allShipments, function ($s) use ($needle, $statusFilter) {
+            if ($statusFilter !== '' && ($s['remittance_status'] ?? '') !== $statusFilter) {
+                return false;
+            }
+            return $needle === '' || str_contains(mb_strtolower($s['tracking_number'] . ' ' . $s['courier_name'] . ' ' . ($s['customer_name'] ?? '')), $needle);
+        });
+        $pager = Paginator::make($filtered);
 
         $this->view('threepl/remittance', [
-            'shipments' => $shipments,
+            'shipments' => $pager['items'],
+            'allShipments' => $allShipments,
+            'pager' => $pager,
+            'search' => $search,
+            'statusFilter' => $statusFilter,
             'updated' => $_GET['updated'] ?? null,
         ]);
     }
 
     public function remittanceUpdate(): void
     {
+        $store = $this->getCurrentStore();
         $id = (int) ($_POST['id'] ?? 0);
         $status = trim($_POST['remittance_status'] ?? '');
         $amount = isset($_POST['remittance_amount']) && $_POST['remittance_amount'] !== ''
@@ -79,7 +97,8 @@ class ThreePlController extends Controller
             : null;
 
         if ($id > 0) {
-            $this->shipmentModel->updateRemittance($id, $status, $amount);
+            // Sirf isi store ki shipment (pehle kisi bhi store ki id se remittance badal sakte the)
+            $this->shipmentModel->updateRemittance($id, $status, $amount, (int) $store['id']);
         }
 
         $this->redirect('/3pl/remittance?updated=1');
@@ -87,8 +106,9 @@ class ThreePlController extends Controller
 
     public function trackShipment(): void
     {
+        $store = $this->getCurrentStore();
         $id = (int) ($_GET['id'] ?? 0);
-        $shipment = $this->shipmentModel->find($id);
+        $shipment = $this->shipmentModel->find($id, (int) $store['id']);
 
         if (!$shipment) {
             $this->redirect('/shipments?error=' . urlencode('Shipment not found.'));

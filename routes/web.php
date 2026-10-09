@@ -20,7 +20,7 @@ $router->post('/employees/delete', ['EmployeeController', 'delete']);
 $router->get('/orders', ['OrderController', 'index']);
 $router->get('/orders/create', ['OrderController', 'showCreateForm']);
 $router->post('/orders/create', ['OrderController', 'handleCreate']);
-$router->post('/api/orders', ['OrderController', 'apiCreate']);
+$router->post('/api/orders', ['ApiOrderController', 'create']);
 $router->get('/orders/edit', ['OrderController', 'editForm']);
 $router->post('/orders/update', ['OrderController', 'update']);
 $router->post('/orders/delete', ['OrderController', 'delete']);

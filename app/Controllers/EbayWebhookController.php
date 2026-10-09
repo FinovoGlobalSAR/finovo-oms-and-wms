@@ -102,9 +102,27 @@ class EbayWebhookController extends Controller
             if (!$result['ok']) continue;
 
             // Duplicate notification (eBay retry) → dobara process mat karo
-            if (!$this->recordWebhookEvent((int) $store['id'], $orderId)) {
+                        $alreadyInFinovo = (new OrderImportService())->exists((int) $store['id'], 'ebay_pull', $orderId);
+
+            // Naya order: duplicate notification (eBay retry) → dobara process mat karo.
+            // Pehle se aaya order: status update har dafa chale (cancel baad mein aa sakta hai).
+            if (!$alreadyInFinovo && !$this->recordWebhookEvent((int) $store['id'], $orderId)) {
                 http_response_code(204);
                 return;
+            }
+
+            try {
+                $imported = (new EbayOrderImporter())->importOrders($store, [$result['order']]);
+            } catch (Throwable $e) {
+                $this->forgetWebhookEvent((int) $store['id'], $orderId);
+                error_log("eBay webhook: order {$orderId} failed: " . $e->getMessage());
+                http_response_code(500);
+                return;
+            }
+
+            // Import na ho saka (product / stock nahi) → record hata do, taake baad mein dobara aa sake
+            if (!$alreadyInFinovo && $imported === 0) {
+                $this->forgetWebhookEvent((int) $store['id'], $orderId);
             }
 
             $imported = (new EbayOrderImporter())->importOrders($store, [$result['order']]);
@@ -242,6 +260,13 @@ class EbayWebhookController extends Controller
         }
 
         return null;
+    }
+
+    private function forgetWebhookEvent(int $storeId, string $orderId): void
+    {
+        Database::getConnection()
+            ->prepare("DELETE FROM webhook_events WHERE store_id = ? AND source = 'ebay' AND external_id = ? AND event_type = 'ORDER_CONFIRMATION'")
+            ->execute([$storeId, $orderId]);
     }
 
     private function recordWebhookEvent(int $storeId, string $orderId): bool

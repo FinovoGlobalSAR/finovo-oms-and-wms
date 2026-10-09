@@ -18,6 +18,8 @@ require_once __DIR__ . '/../Services/ProductPushService.php';
 require_once __DIR__ . '/../Services/PlatformFetcher.php';
 require_once __DIR__ . '/../Services/PlatformStock.php';
 require_once __DIR__ . '/../Services/StockPushService.php';
+require_once __DIR__ . '/../Services/AuditLogService.php';
+require_once __DIR__ . '/../Services/InventoryService.php';
 
 class ProductController extends Controller
 {
@@ -168,7 +170,8 @@ class ProductController extends Controller
 
             $productId = $this->productModel->create($store['id'], $name, $price, $sku ?: null, 0);
             if ($stock > 0) {
-                $this->productModel->setWarehouseStock($productId, $defaultWarehouse['id'], $stock);
+                // Ledger mein bhi likha jaye ke stock CSV se aaya
+                (new InventoryService())->setStock($productId, null, (int) $defaultWarehouse['id'], $stock, 'csv_import', "product:{$productId}", $_SESSION['user']['name'] ?? 'system');
             }
             $importedCount++;
         }
@@ -177,26 +180,43 @@ class ProductController extends Controller
         $this->redirect('/products?imported=' . $importedCount);
     }
 
-    public function updateStock(): void
+        public function updateStock(): void
     {
         $id = (int) ($_POST['id'] ?? 0);
-        $stock = (int) ($_POST['stock_quantity'] ?? 0);
+        $stock = max(0, (int) ($_POST['stock_quantity'] ?? 0));
 
         if ($id > 0) {
-            $product = $this->productModel->find($id);
+            // Sirf is store ke Products page pe dikhne wala product; variant wale ka stock variant pe hota hai
+            $product = $this->findVisibleProduct($id);
             if ($product && !$this->productModel->hasVariants($id)) {
                 $defaultWarehouse = $this->warehouseModel->getDefault((int) $product['store_id']);
-                $this->productModel->setWarehouseStock($id, $defaultWarehouse['id'], $stock);
+                // InventoryService: farq ledger (history) mein likha jata hai
+                (new InventoryService())->setStock($id, null, (int) $defaultWarehouse['id'], $stock, 'manual_set', "product:{$id}", $_SESSION['user']['name'] ?? 'system');
             }
         }
 
         $this->redirect('/products?stock_updated=1');
     }
 
+    /**
+     * Product jo is store ke Products page pe dikhta hai (apna, ya store ke warehouse mein stock wala).
+     * Pehle sirf id se dhoondta tha — kisi bhi store ka product id badal kar edit ho jata tha.
+     */
+    private function findVisibleProduct(int $id): ?array
+    {
+        $store = $this->getCurrentStore();
+        foreach ($this->productModel->all((int) $store['id']) as $p) {
+            if ((int) $p['id'] === $id) {
+                return $p;
+            }
+        }
+        return null;
+    }
+
     public function editForm(): void
     {
         $id = (int) ($_GET['id'] ?? 0);
-        $product = $this->productModel->find($id);
+        $product = $this->findVisibleProduct($id);
 
         if (!$product) {
             echo "Product not found.";
@@ -215,9 +235,10 @@ class ProductController extends Controller
         $name = trim($_POST['name'] ?? '');
         $sku = trim($_POST['sku'] ?? '');
         $price = (float) ($_POST['price'] ?? 0);
-        $threshold = (int) ($_POST['low_stock_threshold'] ?? 5);
+        // Low stock alert ki had minus nahi ho sakti
+        $threshold = max(0, (int) ($_POST['low_stock_threshold'] ?? 5));
 
-        if ($id <= 0 || $name === '' || $price <= 0) {
+        if ($id <= 0 || $name === '' || $price <= 0 || !$this->findVisibleProduct($id)) {
             $this->redirect('/products/edit?id=' . $id . '&error=' . urlencode('Please fill in all fields correctly.'));
             return;
         }
@@ -228,15 +249,44 @@ class ProductController extends Controller
 
     public function delete(): void
     {
-        $id = (int) ($_POST['id'] ?? 0);
-
-        if ($id > 0) {
-            $this->productModel->delete($id);
+        // Product delete sirf Admin / Manager — product ke saath us ka saara stock aur history bhi mit jati hai
+        if (!$this->isAdminOrManager()) {
+            $this->redirect('/products?error=' . urlencode('Only Admin or Manager can delete products.'));
+            return;
         }
+
+        $store = $this->getCurrentStore();
+        $id = (int) ($_POST['id'] ?? 0);
+        $product = $this->productModel->find($id);
+
+        // Sirf isi store ka apna product
+        if (!$product || (int) $product['store_id'] !== (int) $store['id']) {
+            $this->redirect('/products?error=' . urlencode('Product not found.'));
+            return;
+        }
+
+        // Khule orders (cancel / deliver / complete nahi hue) is product ka stock pakde hue hain
+        $open = Database::getConnection()->prepare(
+            "SELECT COUNT(*) FROM orders WHERE product_id = ? AND status NOT IN ('cancelled', 'delivered', 'completed')"
+        );
+        $open->execute([$id]);
+        $openOrders = (int) $open->fetchColumn();
+        if ($openOrders > 0) {
+            $this->redirect('/products?error=' . urlencode("This product has {$openOrders} open order(s). Complete or cancel them before deleting it."));
+            return;
+        }
+
+        $this->productModel->delete($id);
+        (new AuditLogService())->log(
+            (int) $store['id'],
+            'product_deleted',
+            'product',
+            (string) $id,
+            "Product \"{$product['name']}\" deleted (stock was " . (int) ($product['stock_quantity'] ?? 0) . ')'
+        );
 
         $this->redirect('/products?deleted=1');
     }
-
     public function exportCsv(): void
     {
         $store = $this->getCurrentStore();

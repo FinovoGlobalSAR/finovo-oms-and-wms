@@ -227,13 +227,15 @@ class OrderController extends Controller
         $actor = $_SESSION['user']['name'] ?? 'system';
 
         $items = [];
+        // Sirf woh products jo is store ke Products page pe dikhte hain (doosre store ka product id nahi chalega)
+        $allowedProducts = array_map(fn($p) => (int) $p['id'], $this->productModel->all((int) $store['id']));
 
         foreach ($productIds as $i => $productId) {
             $productId = (int) $productId;
             $variantId = (int) ($variantIds[$i] ?? 0);
             $quantity = (int) ($quantities[$i] ?? 0);
 
-            if ($productId <= 0 || $quantity <= 0) {
+            if ($productId <= 0 || $quantity <= 0 || !in_array($productId, $allowedProducts, true)) {
                 continue;
             }
 
@@ -246,7 +248,8 @@ class OrderController extends Controller
 
             if ($variantId > 0) {
                 $variant = $this->variantModel->find($variantId);
-                if (!$variant) {
+                // Variant isi product ka ho
+                if (!$variant || (int) $variant['product_id'] !== $productId) {
                     continue;
                 }
                 $itemPrice = $variant['price'] ?: $product['price'];
@@ -357,120 +360,27 @@ class OrderController extends Controller
 
         $this->redirect('/orders');
     }
+        // apiCreate() ab ApiOrderController mein hai (POST /api/orders) — yeh controller login maangta hai,
+    // is liye bahar ke systems ki API request login page pe chali jati thi.
 
-    public function apiCreate(): void
-    {
-        header('Content-Type: application/json');
-
-        $db = Database::getConnection();
-
-        $rawBody = file_get_contents('php://input');
-        $data = json_decode($rawBody, true);
-
-        if ($data === null) {
-            http_response_code(400);
-            echo json_encode(['error' => 'Invalid JSON.']);
-            return;
-        }
-
-        $apiKey = $data['api_key'] ?? '';
-        $storeId = (int) ($data['store_id'] ?? 0);
-
-        if ($storeId <= 0) {
-            http_response_code(422);
-            echo json_encode(['error' => 'store_id is required.']);
-            return;
-        }
-
-        $store = $this->storeModel->find($storeId);
-
-        if (!$store) {
-            http_response_code(404);
-            echo json_encode(['error' => 'Store not found.']);
-            return;
-        }
-
-        if ($apiKey === '' || $apiKey !== $store['api_key']) {
-            http_response_code(401);
-            echo json_encode(['error' => 'Invalid or missing api_key.']);
-            return;
-        }
-
-        $customerName = trim($data['customer_name'] ?? '');
-        $productName  = trim($data['product_name'] ?? '');
-        $quantity     = (int) ($data['quantity'] ?? 1);
-        $price        = (float) ($data['price'] ?? 0);
-        $paymentMethod = trim($data['payment_method'] ?? '');
-        if (!in_array($paymentMethod, self::$paymentMethods, true)) {
-            $paymentMethod = 'COD';
-        }
-
-        if ($customerName === '' || $productName === '' || $price <= 0) {
-            http_response_code(422);
-            echo json_encode(['error' => 'Missing or invalid order fields.']);
-            return;
-        }
-
-        $defaultWarehouse = $this->warehouseModel->getDefault($store['id']);
-        $existingProduct = $this->productModel->findByName($store['id'], $productName);
-        $productId = $existingProduct ? (int) $existingProduct['id'] : $this->productModel->findOrCreate($store['id'], $productName, $price);
-
-        $result = $this->inventoryService->reserve(
-            $productId,
-            null,
-            (int) $defaultWarehouse['id'],
-            $quantity,
-            'api_push',
-            "store:{$storeId}",
-            'api'
-        );
-
-        if (!$result['ok']) {
-            http_response_code(409);
-            echo json_encode(['error' => 'Product out of stock.', 'requested' => $result['requested'], 'available' => $result['available']]);
-            return;
-        }
-
-        // Customer ki details (optional): customer_email, customer_phone, shipping_address
-        $customerDetails = [
-            'email' => (string) ($data['customer_email'] ?? ''),
-            'phone' => (string) ($data['customer_phone'] ?? ''),
-            'address' => (string) ($data['shipping_address'] ?? ''),
-        ];
-        $customerId = (new Customer())->upsertFromOrder((int) $store['id'], $customerName, $customerDetails, 'api_push');
-
-        $stmt = $db->prepare(
-            "INSERT INTO orders (store_id, customer_name, product_name, quantity, price, source, product_id, warehouse_id, payment_method,
-                                 customer_id, customer_email, customer_phone, shipping_address)
-             VALUES (?, ?, ?, ?, ?, 'api_push', ?, ?, ?, ?, ?, ?, ?)"
-        );
-        $stmt->execute([
-            $store['id'], $customerName, $productName, $quantity, $price, $productId, $defaultWarehouse['id'], $paymentMethod,
-            $customerId,
-            Customer::cleanEmail($customerDetails['email']),
-            mb_substr(trim($customerDetails['phone']), 0, 50) ?: null,
-            trim($customerDetails['address']) ?: null,
-        ]);
-        $orderId = $db->lastInsertId();
-
-        http_response_code(201);
-        echo json_encode([
-            'success' => true,
-            'order_id' => $orderId,
-            'message' => 'Order created successfully.',
-        ]);
-    }
-    
     // ---------- Edit / Delete (CRUD) ----------
+
+    /**
+     * Order sirf ISI store ka mile — pehle sirf id se dhoondta tha, is liye doosre store ka order
+     * id badal kar edit / delete ho sakta tha.
+     */
+    private function findStoreOrder(int $id): ?array
+    {
+        $stmt = Database::getConnection()->prepare("SELECT * FROM orders WHERE id = ? AND store_id = ?");
+        $stmt->execute([$id, (int) $this->getCurrentStore()['id']]);
+        return $stmt->fetch() ?: null;
+    }
 
     public function editForm(): void
     {
-        $db = Database::getConnection();
         $id = (int) ($_GET['id'] ?? 0);
 
-        $stmt = $db->prepare("SELECT * FROM orders WHERE id = ?");
-        $stmt->execute([$id]);
-        $order = $stmt->fetch();
+        $order = $this->findStoreOrder($id);
 
         if (!$order) {
             echo "Order not found.";
@@ -484,7 +394,7 @@ class OrderController extends Controller
         ]);
     }
 
-        public function update(): void
+    public function update(): void
     {
         $db = Database::getConnection();
         $id = (int) ($_POST['id'] ?? 0);
@@ -499,9 +409,7 @@ class OrderController extends Controller
             $paymentMethod = 'COD';
         }
 
-        $stmt = $db->prepare("SELECT * FROM orders WHERE id = ?");
-        $stmt->execute([$id]);
-        $order = $stmt->fetch();
+        $order = $this->findStoreOrder($id);
 
         if (!$order) {
             echo "Order not found.";
@@ -510,6 +418,15 @@ class OrderController extends Controller
 
         if ($newQuantity <= 0) {
             $this->redirect('/orders/edit?id=' . $id . '&error=' . urlencode('Quantity must be at least 1.'));
+            return;
+        }
+
+        // Jitna maal return ho chuka / ho raha hai, quantity us se kam nahi ho sakti
+        $returnStmt = $db->prepare("SELECT COALESCE(SUM(quantity), 0) FROM returns WHERE order_id = ? AND status != 'rejected'");
+        $returnStmt->execute([$id]);
+        $returnedQty = (int) $returnStmt->fetchColumn();
+        if ($newQuantity < $returnedQty) {
+            $this->redirect('/orders/edit?id=' . $id . '&error=' . urlencode("Quantity cannot be less than {$returnedQty} — that much is already returned (or being returned)."));
             return;
         }
 
@@ -599,13 +516,17 @@ class OrderController extends Controller
 
     public function delete(): void
     {
+        // Order delete sirf Admin / Manager — aur har delete Audit Log mein
+        if (!$this->isAdminOrManager()) {
+            $this->redirect('/orders?error=' . urlencode('Only Admin or Manager can delete orders.'));
+            return;
+        }
+
         $db = Database::getConnection();
         $id = (int) ($_POST['id'] ?? 0);
         $actor = $_SESSION['user']['name'] ?? 'system';
 
-        $stmt = $db->prepare("SELECT * FROM orders WHERE id = ?");
-        $stmt->execute([$id]);
-        $order = $stmt->fetch();
+        $order = $this->findStoreOrder($id);
 
         if ($order) {
             $warehouseId = (int) ($order['warehouse_id'] ?? 0);
@@ -614,31 +535,53 @@ class OrderController extends Controller
                 $warehouseId = (int) $defaultWarehouse['id'];
             }
 
-            // Stock sirf tab wapas jab order ne pakda hua ho — cancelled order ka stock pehle hi wapas aa chuka hai
-            // (warna delete pe dobara jud jata aur stock asal se zyada dikhta)
-            if (OrderStockService::holdsStock($order)) {
+            // Stock sirf tab wapas jab order ne pakda hua ho — cancelled order ka stock pehle hi wapas aa chuka hai.
+            // Aur sirf utna jitna abhi pakda hai: jo maal "return complete" se wapas aa chuka, woh dobara nahi judta.
+            $held = (new OrderStockService())->heldQuantity($order);
+            if (OrderStockService::holdsStock($order) && $held > 0) {
                 $this->inventoryService->release(
                     (int) $order['product_id'],
                     !empty($order['variant_id']) ? (int) $order['variant_id'] : null,
                     $warehouseId,
-                    (int) $order['quantity'],
+                    $held,
                     'order_delete',
                     "order:{$id}",
                     $actor
                 );
             }
 
-            $delStmt = $db->prepare("DELETE FROM orders WHERE id = ?");
-            $delStmt->execute([$id]);
+            $delStmt = $db->prepare("DELETE FROM orders WHERE id = ? AND store_id = ?");
+            $delStmt->execute([$id, (int) $order['store_id']]);
+
+            $this->auditService->log(
+                (int) $order['store_id'],
+                'order_deleted',
+                'order',
+                (string) $id,
+                "Order #{$id} deleted ({$order['product_name']} x {$order['quantity']}, status {$order['status']})"
+            );
         }
 
         $this->redirect('/orders?deleted=1');
     }
 
-    // ---------- Settings ----------
+    private function requireStoreSettingsAccess(bool $json = false): void
+    {
+        if ($this->isAdminOrManager()) {
+            return;
+        }
+        if ($json) {
+            header('Content-Type: application/json');
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'message' => 'Only Admin or Manager can manage store connections.']);
+            exit;
+        }
+        $this->redirect('/orders?error=' . urlencode('Only Admin or Manager can open store connection settings.'));
+    }
 
     public function showSettingsForm(): void
     {
+        $this->requireStoreSettingsAccess();
         $store = $this->getCurrentStore();
 
         $this->view('orders/settings', [
@@ -650,58 +593,48 @@ class OrderController extends Controller
 
     public function saveSettings(): void
     {
+        $this->requireStoreSettingsAccess();
         $store = $this->getCurrentStore();
-
-        $storeUrl = trim($_POST['shopify_store_url'] ?? '');
-        $accessToken = trim($_POST['shopify_access_token'] ?? '');
-        $this->storeModel->updateCredentials((int) $store['id'], $storeUrl, $accessToken);
-
-        $wcStoreUrl = trim($_POST['woocommerce_store_url'] ?? '');
-        $wcConsumerKey = trim($_POST['woocommerce_consumer_key'] ?? '');
-        $wcConsumerSecret = trim($_POST['woocommerce_consumer_secret'] ?? '');
-        $this->storeModel->updateWooCommerceCredentials((int) $store['id'], $wcStoreUrl, $wcConsumerKey, $wcConsumerSecret);
-
-        $bcStoreHash = trim($_POST['bigcommerce_store_hash'] ?? '');
-        $bcAccessToken = trim($_POST['bigcommerce_access_token'] ?? '');
-        if ($bcStoreHash !== '' || $bcAccessToken !== '') {
-            $this->storeModel->updateBigCommerceCredentials((int) $store['id'], $bcStoreHash, $bcAccessToken);
-        }
-
-        $psStoreUrl = trim($_POST['prestashop_store_url'] ?? '');
-        $psApiKey = trim($_POST['prestashop_api_key'] ?? '');
-        if ($psStoreUrl !== '' || $psApiKey !== '') {
-            $this->storeModel->updatePrestaShopCredentials((int) $store['id'], $psStoreUrl, $psApiKey);
-        }
-
-        $ocStoreUrl = trim($_POST['opencart_store_url'] ?? '');
-        if ($ocStoreUrl !== '') {
-            $this->storeModel->updateOpenCartCredentials((int) $store['id'], $ocStoreUrl, '', '');
-        }
-
-        $oscStoreUrl = trim($_POST['oscommerce_store_url'] ?? '');
-        if ($oscStoreUrl !== '') {
-            $this->storeModel->updateOsCommerceCredentials((int) $store['id'], $oscStoreUrl, '', '');
-        }
-
-        $wixSiteId = trim($_POST['wix_site_id'] ?? '');
-        $wixApiKey = trim($_POST['wix_api_key'] ?? '');
-        if ($wixSiteId !== '' || $wixApiKey !== '') {
-            $this->storeModel->updateWixCredentials((int) $store['id'], $wixSiteId, $wixApiKey);
-        }
-
-        $ebayUserToken = trim($_POST['ebay_user_token'] ?? '');
-        if ($ebayUserToken !== '') {
-            $this->storeModel->updateEbayCredentials((int) $store['id'], $ebayUserToken);
-        }
-
-        $shopifyWebhookSecret = trim($_POST['shopify_webhook_secret'] ?? '');
-        $wcWebhookSecret = trim($_POST['woocommerce_webhook_secret'] ?? '');
-
+        $storeId = (int) $store['id'];
+        $platform = $store['platform'] ?? 'manual';
         $db = Database::getConnection();
-        $stmt = $db->prepare("UPDATE stores SET shopify_webhook_secret = ?, woocommerce_webhook_secret = ? WHERE id = ?");
-        $stmt->execute([$shopifyWebhookSecret ?: null, $wcWebhookSecret ?: null, (int) $store['id']]);
+        $in = fn(string $key): string => trim((string) ($_POST[$key] ?? ''));
 
-        $this->auditService->log((int) $store['id'], 'credential_update', 'store', (string) $store['id'], 'Store credentials updated.');
+        switch ($platform) {
+            case 'shopify':
+                $this->storeModel->updateCredentials($storeId, $in('shopify_store_url'), $in('shopify_access_token'));
+                $db->prepare("UPDATE stores SET shopify_webhook_secret = ? WHERE id = ?")->execute([$in('shopify_webhook_secret') ?: null, $storeId]);
+                break;
+            case 'woocommerce':
+                $this->storeModel->updateWooCommerceCredentials($storeId, $in('woocommerce_store_url'), $in('woocommerce_consumer_key'), $in('woocommerce_consumer_secret'));
+                $db->prepare("UPDATE stores SET woocommerce_webhook_secret = ? WHERE id = ?")->execute([$in('woocommerce_webhook_secret') ?: null, $storeId]);
+                break;
+            case 'bigcommerce':
+                $this->storeModel->updateBigCommerceCredentials($storeId, $in('bigcommerce_store_hash'), $in('bigcommerce_access_token'));
+                break;
+            case 'prestashop':
+                $this->storeModel->updatePrestaShopCredentials($storeId, $in('prestashop_store_url'), $in('prestashop_api_key'));
+                break;
+            case 'opencart':
+                $this->storeModel->updateOpenCartCredentials($storeId, $in('opencart_store_url'), '', '');
+                break;
+            case 'oscommerce':
+                $this->storeModel->updateOsCommerceCredentials($storeId, $in('oscommerce_store_url'), '', '');
+                break;
+            case 'wix':
+                $this->storeModel->updateWixCredentials($storeId, $in('wix_site_id'), $in('wix_api_key'));
+                break;
+            case 'ebay':
+                if ($in('ebay_user_token') !== '') {
+                    $this->storeModel->updateEbayCredentials($storeId, $in('ebay_user_token'));
+                }
+                break;
+            case 'custom':
+                $this->storeModel->updateBridgeCredentials($storeId, $in('bridge_url'), $in('bridge_api_key'), $in('bridge_shared_secret'));
+                break;
+        }
+
+        $this->auditService->log($storeId, 'credential_update', 'store', (string) $storeId, 'Store credentials updated (' . $platform . ').');
 
         $this->redirect('/orders/settings?saved=1');
     }
@@ -710,6 +643,7 @@ class OrderController extends Controller
 
     public function testShopifyConnection(): void
     {
+        $this->requireStoreSettingsAccess(true);
         header('Content-Type: application/json');
 
         $storeUrl = trim($_POST['store_url'] ?? '');
@@ -741,6 +675,7 @@ class OrderController extends Controller
 
     public function testWooCommerceConnection(): void
     {
+        $this->requireStoreSettingsAccess(true);
         header('Content-Type: application/json');
 
         $storeUrl = trim($_POST['store_url'] ?? '');
@@ -770,8 +705,7 @@ class OrderController extends Controller
             echo json_encode(['ok' => false, 'message' => "Connection failed (HTTP {$httpCode}). Please check your credentials."]);
         }
     }
-
-    // ---------- Shopify: Orders Pull ----------
+        // ---------- Shopify: Orders Pull ----------
 
     public function syncShopify(): void
     {
@@ -803,6 +737,10 @@ class OrderController extends Controller
             $paymentStatus = CanonicalMapper::paymentStatusFromShopify($financialStatus);
             $canonicalStatus = CanonicalMapper::fromShopify($fulfillmentStatus, $financialStatus);
             $orderStatus = CanonicalMapper::toInternalOrderStatus($canonicalStatus);
+            // Shopify pe "Cancel order" (bina refund ke): financial_status "paid" hi reh sakta hai, sirf cancelled_at bharta hai
+            if (!empty($order['cancelled_at'])) {
+                $orderStatus = 'cancelled';
+            }
 
             if ($this->importer->exists((int) $store['id'], 'shopify_pull', $externalId)) {
                 $this->importer->updateStatus((int) $store['id'], 'shopify_pull', $externalId, $orderStatus, $paymentStatus);
@@ -1083,8 +1021,7 @@ class OrderController extends Controller
         $this->storeModel->markHealthy((int) $store['id']);
         $this->redirect('/orders?synced=' . $importedCount);
     }
-
-    // ---------- OpenCart: Orders Pull (direct DB read) ----------
+        // ---------- OpenCart: Orders Pull (direct DB read) ----------
 
     public function syncOpenCart(): void
     {
@@ -1370,7 +1307,8 @@ class OrderController extends Controller
 
     public function exportCsv(): void
     {
-        $orders = $this->orderModel->all();
+        // Sirf isi store ke orders (pehle saare stores ke orders ek hi file mein aa jate the)
+        $orders = $this->orderModel->allByStore((int) $this->getCurrentStore()['id']);
 
         header('Content-Type: text/csv');
         header('Content-Disposition: attachment; filename="orders.csv"');
@@ -1414,6 +1352,7 @@ class OrderController extends Controller
         fgetcsv($handle);
         $importedCount = 0;
         $skippedCount = 0;
+        $invalidCount = 0;
 
         while (($row = fgetcsv($handle)) !== false) {
             if (count($row) < 4) {
@@ -1423,14 +1362,22 @@ class OrderController extends Controller
             [$customerName, $productName, $quantity, $price] = $row;
             $customerName = trim($customerName);
             $productName = trim($productName);
-            $quantity = (int) trim($quantity) ?: 1;
+            $quantity = trim((string) $quantity) === '' ? 1 : (int) trim($quantity);
             $price = (float) trim($price);
 
-            if ($customerName === '' || $productName === '' || $price <= 0) {
+            // Quantity 0 ya minus: "reserve" asal mein stock BADHA deta — aisi row chhod do
+            if ($customerName === '' || $productName === '' || $price <= 0 || $quantity <= 0) {
+                $invalidCount++;
                 continue;
             }
 
             $productId = $this->productModel->findOrCreate($store['id'], $productName, $price);
+
+            // Variant wale product (sizes / colours) ka stock variant pe hota hai — CSV mein variant nahi hota
+            if ($this->productModel->hasVariants($productId)) {
+                $invalidCount++;
+                continue;
+            }
 
             $result = $this->inventoryService->reserve($productId, null, (int) $defaultWarehouse['id'], $quantity, 'csv_import', 'csv_import', $_SESSION['user']['name'] ?? 'system');
 
@@ -1452,8 +1399,15 @@ class OrderController extends Controller
 
         fclose($handle);
 
-        if ($skippedCount > 0) {
-            $this->redirect('/orders?imported=' . $importedCount . '&error=' . urlencode("{$skippedCount} row(s) skipped due to insufficient stock."));
+        if ($skippedCount > 0 || $invalidCount > 0) {
+            $problems = [];
+            if ($skippedCount > 0) {
+                $problems[] = "{$skippedCount} row(s) skipped due to insufficient stock";
+            }
+            if ($invalidCount > 0) {
+                $problems[] = "{$invalidCount} row(s) skipped (empty name, price or quantity below 1, or a product with variants)";
+            }
+            $this->redirect('/orders?imported=' . $importedCount . '&error=' . urlencode(implode('; ', $problems) . '.'));
             return;
         }
 

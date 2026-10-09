@@ -18,6 +18,7 @@ class PlatformOrderMapper
                 'quantity' => (int) ($li['quantity'] ?? 0),
                 'unit_price' => (float) ($li['price'] ?? 0),
                 'external_product_id' => isset($li['product_id']) ? (string) $li['product_id'] : null,
+                'external_variant_id' => !empty($li['variant_id']) ? (string) $li['variant_id'] : null,
             ];
         }
         return $lines;
@@ -36,6 +37,7 @@ class PlatformOrderMapper
                 'quantity' => $qty,
                 'unit_price' => $unit,
                 'external_product_id' => !empty($li['product_id']) ? (string) $li['product_id'] : null,
+                'external_variant_id' => !empty($li['variation_id']) ? (string) $li['variation_id'] : null,
             ];
         }
         return $lines;

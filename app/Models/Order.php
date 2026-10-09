@@ -43,9 +43,16 @@ class Order extends Model
     }
 
     // Invoice ke liye — order + uske saare line items (order_group se) ek saath, currency ke sath
-    public function findWithItems(int $orderId): ?array
+        /**
+     * Invoice ke liye order + us ke group ki saari rows.
+     * $storeId do to sirf usi store ka order (pehle koi bhi order id badal kar doosre store ki invoice le sakta tha).
+     * Cancelled rows invoice mein nahi aatin (us maal ka paisa nahi liya jata).
+     */
+    public function findWithItems(int $orderId, ?int $storeId = null): ?array
     {
-        $stmt = $this->query("SELECT * FROM orders WHERE id = ?", [$orderId]);
+        $stmt = $storeId === null
+            ? $this->query("SELECT * FROM orders WHERE id = ?", [$orderId])
+            : $this->query("SELECT * FROM orders WHERE id = ? AND store_id = ?", [$orderId, $storeId]);
         $main = $stmt->fetch();
 
         if (!$main) {
@@ -54,12 +61,17 @@ class Order extends Model
 
         if (!empty($main['order_group'])) {
             $groupStmt = $this->query(
-                "SELECT * FROM orders WHERE order_group = ? ORDER BY id ASC",
-                [$main['order_group']]
+                "SELECT * FROM orders WHERE order_group = ? AND store_id = ? ORDER BY id ASC",
+                [$main['order_group'], $main['store_id']]
             );
             $rows = $groupStmt->fetchAll();
         } else {
             $rows = [$main];
+        }
+
+        $rows = array_values(array_filter($rows, fn($r) => ($r['status'] ?? '') !== 'cancelled'));
+        if (!$rows) {
+            return ['cancelled' => true];
         }
         $storeStmt = $this->query("SELECT name FROM stores WHERE id = ?", [$main['store_id']]);
         $storeRow = $storeStmt->fetch();

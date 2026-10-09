@@ -137,8 +137,9 @@ function renderMovementRows(array $list): void
                 <i class="bi bi-box-seam"></i>
                 <select name="product_id" required>
                     <option value="">Select product...</option>
-                    <?php foreach ($products as $p): ?>
-                        <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['name']) ?></option>
+                    <?php /* Variant wala product: har variant alag (stock variant ka hota hai) */ ?>
+                    <?php foreach ($stockItems as $item): ?>
+                        <option value="<?= htmlspecialchars($item['value']) ?>"><?= htmlspecialchars($item['label']) ?></option>
                     <?php endforeach; ?>
                 </select>
             </span>
@@ -213,8 +214,9 @@ function renderMovementRows(array $list): void
                     <i class="bi bi-box-seam"></i>
                     <select name="product_id" required>
                         <option value="">Select product...</option>
-                        <?php foreach ($products as $p): ?>
-                            <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['name']) ?></option>
+                        <?php /* Variant wala product: har variant alag (stock variant ka hota hai) */ ?>
+                        <?php foreach ($stockItems as $item): ?>
+                            <option value="<?= htmlspecialchars($item['value']) ?>"><?= htmlspecialchars($item['label']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </span>

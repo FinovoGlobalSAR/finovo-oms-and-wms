@@ -12,6 +12,7 @@ class InvoiceController extends Controller
     {
         parent::__construct();
         $this->requireRole(['admin', 'manager', 'sales staff']);
+        $this->requireStoreContext();
         $this->orderModel = new Order();
         $this->invoiceService = new InvoiceService();
     }
@@ -26,11 +27,17 @@ class InvoiceController extends Controller
             return;
         }
 
-        $order = $this->orderModel->findWithItems((int) $orderId);
+        // Sirf isi store ka order
+        $order = $this->orderModel->findWithItems((int) $orderId, (int) $this->getCurrentStore()['id']);
 
         if (!$order) {
             http_response_code(404);
             echo 'Order not found.';
+            return;
+        }
+        if (!empty($order['cancelled'])) {
+            http_response_code(409);
+            echo 'This order is cancelled, so it has no invoice.';
             return;
         }
 

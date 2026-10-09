@@ -46,6 +46,19 @@ class WixConnector
         return $this->searchAll('https://www.wixapis.com/ecom/v1/orders/search', 'orders');
     }
 
+        /**
+     * Ek order seedha Wix se (webhook ke baad — webhook ke data pe bharosa nahi, asli order Wix se lete hain).
+     * @return array{ok: bool, order?: array, code?: int}
+     */
+    public function fetchOrder(string $orderId): array
+    {
+        $result = $this->request('GET', 'https://www.wixapis.com/ecom/v1/orders/' . rawurlencode($orderId));
+        if ($result['code'] !== 200 || empty($result['data']['order'])) {
+            return ['ok' => false, 'code' => (int) $result['code']];
+        }
+        return ['ok' => true, 'order' => $result['data']['order']];
+    }
+
     /** Wix search API: pagingMetadata.cursors.next mile to agla page maango */
     private function searchAll(string $url, string $key, int $maxPages = 40): array
     {

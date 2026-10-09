@@ -1,9 +1,16 @@
 <?php
 require_once __DIR__ . '/../../core/Controller.php';
 require_once __DIR__ . '/../../core/Database.php';
+require_once __DIR__ . '/../../core/SignedToken.php';
 require_once __DIR__ . '/../Models/Store.php';
 
-
+/**
+ * WooCommerce "Connect" — customer apni WordPress site pe "Approve" dabata hai, WooCommerce keys
+ * seedha Finovo ke callback pe bhejta hai.
+ *
+ * Hifazat: callback URL mein ek signed token hota hai (store + site + 1 ghanta). Pehle callback
+ * pe koi check nahi tha — koi bhi kisi store ki keys apni fake site se badal sakta tha.
+ */
 class WooCommerceConnectController extends Controller
 {
     private Store $storeModel;
@@ -34,7 +41,9 @@ class WooCommerceConnectController extends Controller
 
         $wpUrl = rtrim($wpUrl, '/');
 
-        $callbackUrl = $this->getBaseUrl() . '/woocommerce-connect/callback?store_id=' . $storeId . '&wp_url=' . urlencode($wpUrl);
+        // Sirf Finovo ka banaya token callback chala sakta hai (store + site us ke andar, 1 ghante ke liye)
+        $token = SignedToken::make(['purpose' => 'woo_connect', 'store_id' => $storeId, 'wp_url' => $wpUrl], 3600);
+        $callbackUrl = $this->getBaseUrl() . '/woocommerce-connect/callback?token=' . urlencode($token);
         $returnUrl = $this->getBaseUrl() . '/stores?woo_connected=1';
 
         $params = http_build_query([
@@ -53,6 +62,7 @@ class WooCommerceConnectController extends Controller
     
     public function callback(): void
     {
+        header('Content-Type: application/json');
         if (session_status() === PHP_SESSION_ACTIVE) {
             session_write_close();
         }
@@ -66,12 +76,19 @@ class WooCommerceConnectController extends Controller
             return;
         }
 
-        $storeId = (int) ($_GET['store_id'] ?? 0);
-        $wpUrl = $_GET['wp_url'] ?? '';
+        // Store aur site token se aate hain (URL ke store_id / wp_url pe bharosa nahi)
+        $token = SignedToken::verify((string) ($_GET['token'] ?? ''), 'woo_connect');
+        if ($token === null) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Invalid or expired connect link. Please click "Connect WooCommerce" again in Finovo.']);
+            return;
+        }
+        $storeId = (int) $token['store_id'];
+        $wpUrl = (string) $token['wp_url'];
 
         if ($storeId <= 0 || !$this->storeModel->find($storeId)) {
             http_response_code(400);
-            echo json_encode(['error' => 'Invalid or missing store_id.']);
+            echo json_encode(['error' => 'Store not found.']);
             return;
         }
 

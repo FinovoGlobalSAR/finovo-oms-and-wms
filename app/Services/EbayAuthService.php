@@ -1,22 +1,6 @@
 <?php
 require_once __DIR__ . '/../../core/Database.php';
 
-/**
- * eBay OAuth (Production-ready).
- *
- * Pehle: store pe ek "User Token" paste hota tha jo 2 ghante mein expire ho jata tha.
- * Ab:    "Connect eBay" button → seller eBay pe login karke ijazat deta hai →
- *        humein access token (2 ghante) + refresh token (~18 mahine) milte hain →
- *        access token expire hone se pehle khud naya ban jata hai.
- *
- * .env mein chahiye:
- *   EBAY_ENV=sandbox | production
- *   EBAY_APP_ID   (Client ID)
- *   EBAY_CERT_ID  (Client Secret)
- *   EBAY_RUNAME   (eBay Developer portal → User Tokens → "RuName" / redirect URL name)
- *
- * Purana "User Token paste" tareeqa bhi chalta rahega (agar refresh token na ho).
- */
 class EbayAuthService
 {
     public const USER_SCOPES = [

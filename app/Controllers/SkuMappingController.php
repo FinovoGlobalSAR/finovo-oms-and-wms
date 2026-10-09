@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../core/Controller.php';
 require_once __DIR__ . '/../Models/SkuMapping.php';
+require_once __DIR__ . '/../../core/Paginator.php';
 require_once __DIR__ . '/../Models/Product.php';
 require_once __DIR__ . '/../Services/AuditLogService.php';
 
@@ -23,9 +24,27 @@ class SkuMappingController extends Controller
     public function index(): void
     {
         $store = $this->getCurrentStore();
+        $allMappings = $this->mappingModel->all((int) $store['id']);
+
+        // Search (?q=) + state (?state=) server pe, phir 25-25 ke pages
+        $search = trim((string) ($_GET['q'] ?? ''));
+        $stateFilter = in_array($_GET['state'] ?? '', ['mapped', 'unmapped', 'conflict', 'disabled'], true) ? $_GET['state'] : '';
+        $needle = mb_strtolower($search);
+        $filtered = array_filter($allMappings, function ($m) use ($needle, $stateFilter) {
+            if ($stateFilter !== '' && ($m['mapping_state'] ?? '') !== $stateFilter) {
+                return false;
+            }
+            $text = $m['product_name'] . ' ' . ($m['external_product_id'] ?? '') . ' ' . ($m['external_sku'] ?? '') . ' ' . ($m['barcode'] ?? '');
+            return $needle === '' || str_contains(mb_strtolower($text), $needle);
+        });
+        $pager = Paginator::make($filtered);
 
         $this->view('sku-mappings/index', [
-            'mappings' => $this->mappingModel->all((int) $store['id']),
+            'mappings' => $pager['items'],
+            'allMappings' => $allMappings,
+            'pager' => $pager,
+            'search' => $search,
+            'stateFilter' => $stateFilter,
             'products' => $this->productModel->all((int) $store['id']),
             'created' => $_GET['created'] ?? null,
             'error' => $_GET['error'] ?? null,
@@ -43,6 +62,12 @@ class SkuMappingController extends Controller
 
         if ($productId <= 0 || $externalProductId === '') {
             $this->redirect('/sku-mappings?error=' . urlencode('Please select a product and enter the external product ID.'));
+            return;
+        }
+        // Product isi store ka (ya store ke warehouse wala) ho
+        $allowed = array_map(fn($p) => (int) $p['id'], $this->productModel->all((int) $store['id']));
+        if (!in_array($productId, $allowed, true)) {
+            $this->redirect('/sku-mappings?error=' . urlencode('Please select a valid product.'));
             return;
         }
 

@@ -75,6 +75,12 @@ class StripeConnector
 
         $data = json_decode($response, true);
 
-        return ['ok' => true, 'paid' => ($data['payment_status'] ?? '') === 'paid'];
+        return [
+            'ok' => true,
+            'paid' => ($data['payment_status'] ?? '') === 'paid',
+            // Kis order ka session hai (session banate waqt metadata mein daala tha)
+            'order_id' => (int) ($data['metadata']['order_id'] ?? 0),
+            'amount_total' => (int) ($data['amount_total'] ?? 0),
+        ];
     }
 }

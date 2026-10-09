@@ -5,7 +5,7 @@ require_once __DIR__ . '/../../core/Database.php';
 
 class StoreSyncRunner
 {
-    public static function jobMap(): array
+        public static function jobMap(): array
     {
         return [
             // ---------- Orders ----------
@@ -20,6 +20,16 @@ class StoreSyncRunner
             'magento_orders_sync'     => ['MagentoController', 'syncOrders'],
 
             // ---------- Products ----------
+            // Sab platforms ki product sync ab wahi "Sync" button wala code chalati hai (saare pages,
+            // har sync pe stock, variants, "stock track nahi hota" ka khayal). Pehle Shopify / WooCommerce /
+            // BigCommerce / PrestaShop / OpenCart / osCommerce ki background sync worker.php ka purana
+            // code chalati thi — sirf 50 products, purane products ka stock kabhi update nahi hota tha.
+            'shopify_products_sync'     => ['ProductController', 'syncShopify'],
+            'woocommerce_products_sync' => ['ProductController', 'syncWooCommerce'],
+            'bigcommerce_products_sync' => ['ProductController', 'syncBigCommerce'],
+            'prestashop_products_sync'  => ['ProductController', 'syncPrestaShop'],
+            'opencart_products_sync'    => ['ProductController', 'syncOpenCart'],
+            'oscommerce_products_sync'  => ['ProductController', 'syncOsCommerce'],
             'wix_products_sync'       => ['ProductController', 'syncWix'],
             'ebay_products_sync'      => ['ProductController', 'syncEbay'],
             'magento_products_sync'   => ['MagentoController', 'syncProducts'],

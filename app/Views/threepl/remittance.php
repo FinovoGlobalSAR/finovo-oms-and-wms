@@ -1,9 +1,13 @@
 <?php
-// ---------- Summary numbers (sirf display ke liye, $shipments se hi) ----------
+$allShipments = $allShipments ?? $shipments;
+$search = $search ?? '';
+$statusFilter = $statusFilter ?? '';
+
+// ---------- Summary numbers: POORI list se (sirf is page se nahi) ----------
 $remittedCount = 0;
 $pendingAmount = 0.0;
 $remittedAmount = 0.0;
-foreach ($shipments as $s) {
+foreach ($allShipments as $s) {
     if ($s['remittance_status'] === 'remitted') {
         $remittedCount++;
         $remittedAmount += (float) ($s['remittance_amount'] ?? 0);
@@ -11,13 +15,13 @@ foreach ($shipments as $s) {
         $pendingAmount += (float) $s['order_total'];
     }
 }
-$notRemittedCount = count($shipments) - $remittedCount;
+$notRemittedCount = count($allShipments) - $remittedCount;
 ?>
 
 <div class="ui-head">
     <div class="ui-head-left">
         <div class="breadcrumb">Finovo <i class="bi bi-chevron-right"></i> <a href="/shipments" style="color:inherit; text-decoration:none;">Shipments</a> <i class="bi bi-chevron-right"></i> <span class="current">3PL Remittance</span></div>
-        <h1>3PL Remittance <span class="count-badge"><?= count($shipments) ?></span></h1>
+        <h1>3PL Remittance <span class="count-badge"><?= count($allShipments) ?></span></h1>
         <p>Track COD payments received back from 3PL courier companies.</p>
     </div>
 </div>
@@ -31,7 +35,7 @@ $notRemittedCount = count($shipments) - $remittedCount;
         <div class="ui-stat-icon"><i class="bi bi-truck"></i></div>
         <div>
             <div class="ui-stat-label">Handed Over</div>
-            <div class="ui-stat-value"><b><?= count($shipments) ?></b><span class="ui-pill ui-pill-blue">Shipments</span></div>
+            <div class="ui-stat-value"><b><?= count($allShipments) ?></b><span class="ui-pill ui-pill-blue">Shipments</span></div>
         </div>
     </div>
     <div class="ui-stat">
@@ -60,20 +64,25 @@ $notRemittedCount = count($shipments) - $remittedCount;
 </div>
 
 <div class="ui-card">
-    <div class="rem-toolbar">
+    <!-- Search / status filter server pe (har page ka result sahi) -->
+    <form method="GET" action="/3pl/remittance" class="rem-toolbar">
         <label class="ui-search rem-search">
             <i class="bi bi-search"></i>
-            <input type="text" id="remSearch" placeholder="Search AWB, courier or customer..." aria-label="Search remittance">
+            <input type="text" name="q" value="<?= htmlspecialchars($search) ?>" placeholder="Search AWB, courier or customer..." aria-label="Search remittance">
         </label>
-        <select id="remFilter" class="ui-btn" aria-label="Filter by remittance status" style="padding-right:10px;">
-            <option value="">All</option>
-            <option value="not_remitted">Not Remitted</option>
-            <option value="remitted">Remitted</option>
+        <select name="status" class="ui-btn" aria-label="Filter by remittance status" style="padding-right:10px;" onchange="this.form.submit()">
+            <?php foreach (['' => 'All', 'not_remitted' => 'Not Remitted', 'remitted' => 'Remitted'] as $value => $label): ?>
+                <option value="<?= $value ?>" <?= $statusFilter === $value ? 'selected' : '' ?>><?= $label ?></option>
+            <?php endforeach; ?>
         </select>
+        <button type="submit" class="ui-btn">Search</button>
+        <?php if ($search !== '' || $statusFilter !== ''): ?>
+            <a href="/3pl/remittance" class="ui-btn">Clear</a>
+        <?php endif; ?>
         <div style="margin-left:auto; flex-shrink:0; font-size:12.5px; color:#475569; white-space:nowrap;">
             Received so far: <b style="color:#166534;">Rs. <?= number_format($remittedAmount, 2) ?></b>
         </div>
-    </div>
+    </form>
 
     <div style="overflow-x:auto;">
         <table class="data-table">
@@ -89,7 +98,11 @@ $notRemittedCount = count($shipments) - $remittedCount;
             </thead>
             <tbody>
                 <?php if (empty($shipments)): ?>
-                    <tr><td colspan="6" class="ui-empty"><i class="bi bi-cash-coin"></i>No handed-over shipments yet. Use LM Inventory Scan to hand parcels to the courier.</td></tr>
+                    <?php if ($search !== '' || $statusFilter !== ''): ?>
+                        <tr><td colspan="6" class="ui-empty"><i class="bi bi-search"></i>No shipments match your search.</td></tr>
+                    <?php else: ?>
+                        <tr><td colspan="6" class="ui-empty"><i class="bi bi-cash-coin"></i>No handed-over shipments yet. Use LM Inventory Scan to hand parcels to the courier.</td></tr>
+                    <?php endif; ?>
                 <?php else: ?>
                     <?php foreach ($shipments as $s): ?>
                         <tr class="rem-row" data-status="<?= htmlspecialchars($s['remittance_status']) ?>" data-search="<?= htmlspecialchars(strtolower($s['tracking_number'] . ' ' . $s['courier_name'] . ' ' . ($s['customer_name'] ?? ''))) ?>">
@@ -111,7 +124,7 @@ $notRemittedCount = count($shipments) - $remittedCount;
                                         <option value="not_remitted" <?= $s['remittance_status'] === 'not_remitted' ? 'selected' : '' ?>>Not Remitted</option>
                                         <option value="remitted" <?= $s['remittance_status'] === 'remitted' ? 'selected' : '' ?>>Remitted</option>
                                     </select>
-                                    <input type="number" name="remittance_amount" step="0.01" placeholder="Amount" aria-label="Remitted amount"
+                                    <input type="number" name="remittance_amount" min="0" step="0.01" placeholder="Amount" aria-label="Remitted amount"
                                            value="<?= $s['remittance_amount'] !== null ? htmlspecialchars($s['remittance_amount']) : '' ?>"
                                            style="width:100px; height:32px; border:1px solid var(--border-color); border-radius:7px; padding:0 10px; font-size:12.5px; font-family:inherit; background:#f8fafc;">
                                     <button type="submit" class="ui-btn ui-btn-soft ui-btn-icon" title="Save" aria-label="Save remittance"><i class="bi bi-check-lg"></i></button>
@@ -119,15 +132,12 @@ $notRemittedCount = count($shipments) - $remittedCount;
                             </td>
                         </tr>
                     <?php endforeach; ?>
-                    <tr id="remNoMatch" style="display:none;"><td colspan="6" class="ui-empty"><i class="bi bi-search"></i>No shipments match your search.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
     </div>
 
-    <div class="pagination-bar">
-        <span id="remShowing">Showing <?= count($shipments) ?> of <?= count($shipments) ?> shipments</span>
-    </div>
+    <?php $pagerLabel = 'shipments'; require __DIR__ . '/../partials/pagination.php'; ?>
 </div>
 
 <style>
@@ -135,26 +145,3 @@ $notRemittedCount = count($shipments) - $remittedCount;
 .rem-search { flex: 0 1 360px; min-width: 180px; height: 34px; }
 .rem-toolbar .ui-btn { height: 34px; padding: 0 10px; font-size: 12.5px; white-space: nowrap; }
 </style>
-
-<script>
-(function () {
-    var input = document.getElementById('remSearch');
-    var filter = document.getElementById('remFilter');
-    var rows = Array.prototype.slice.call(document.querySelectorAll('.rem-row'));
-    function apply() {
-        var q = input.value.trim().toLowerCase();
-        var st = filter.value;
-        var shown = 0;
-        rows.forEach(function (r) {
-            var ok = (q === '' || r.dataset.search.indexOf(q) !== -1) && (st === '' || r.dataset.status === st);
-            r.style.display = ok ? '' : 'none';
-            if (ok) { shown++; }
-        });
-        var nm = document.getElementById('remNoMatch');
-        if (nm) { nm.style.display = shown === 0 ? '' : 'none'; }
-        document.getElementById('remShowing').textContent = 'Showing ' + shown + ' of ' + rows.length + ' shipments';
-    }
-    input.addEventListener('input', apply);
-    filter.addEventListener('change', apply);
-})();
-</script>

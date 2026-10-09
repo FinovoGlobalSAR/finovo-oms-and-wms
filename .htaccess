@@ -6,7 +6,7 @@ RewriteRule ^(app|core|config|database|routes|libraries|vendor|tests|\.git)(/.*)
 # ---- Secret / setup / command-line wali files block ----
 RewriteRule ^\.env(\..*)?$ - [F,L]
 RewriteRule ^\.(gitignore|htaccess|phpunit\.result\.cache)$ - [F,L]
-RewriteRule ^(migrate|worker|auto-sync|auto-sync-and-process|register-webhooks|ebay-notifications-setup|load-test|create-admin)\.php$ - [F,L]
+RewriteRule ^(migrate|worker|auto-sync|auto-sync-and-process|register-webhooks|ebay-notifications-setup|load-test|create-admin|golive-check)\.php$ - [F,L]
 RewriteRule ^(composer\.json|composer\.lock|phpunit\.xml|README\.md)$ - [F,L]
 
 # ---- public/ ke andar ki asli files (images, css, js) seedha do ----

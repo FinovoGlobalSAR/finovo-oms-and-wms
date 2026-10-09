@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../core/Controller.php';
 require_once __DIR__ . '/../../core/Database.php';
+require_once __DIR__ . '/../../core/SignedToken.php';
 require_once __DIR__ . '/../Models/Store.php';
 
 class ShopifyConnectController extends Controller
@@ -40,7 +41,12 @@ class ShopifyConnectController extends Controller
             $shopUrl .= '.myshopify.com';
         }
 
-        $state = bin2hex(random_bytes(16)) . '.' . $storeId;
+        // state = Finovo ka signed token (store + shop, 1 ghanta) + ek nonce jo isi browser ke session mein bhi save hai.
+        // Pehle state sirf "random.storeId" tha aur kahin save nahi hota tha — koi bhi apni Shopify shop
+        // se "state=xyz.5" bhej kar store 5 ka connection apni shop se badal sakta tha.
+        $nonce = bin2hex(random_bytes(16));
+        $_SESSION['shopify_oauth_nonce'] = $nonce;
+        $state = SignedToken::make(['purpose' => 'shopify_connect', 'store_id' => $storeId, 'shop' => $shopUrl, 'nonce' => $nonce], 3600);
 
         $redirectUri = $this->getBaseUrl() . '/shopify-connect/callback';
 
@@ -76,12 +82,25 @@ class ShopifyConnectController extends Controller
             return;
         }
 
-        // State se store_id nikalo
-        $parts = explode('.', $state);
-        $storeId = (int) ($parts[1] ?? 0);
+        // State: Finovo ka token ho, isi browser ka nonce ho, aur shop wahi ho jo Connect karte waqt di thi
+        $token = SignedToken::verify($state, 'shopify_connect');
+        $sessionNonce = (string) ($_SESSION['shopify_oauth_nonce'] ?? '');
+        unset($_SESSION['shopify_oauth_nonce']);   // ek dafa hi chalta hai
 
-        if ($storeId <= 0) {
-            echo "Invalid state — could not determine store.";
+        if ($token === null || $sessionNonce === '' || !hash_equals($sessionNonce, (string) ($token['nonce'] ?? ''))) {
+            http_response_code(403);
+            echo "This connect link is invalid or has expired. Please click \"Connect Shopify\" again in Finovo (in the same browser).";
+            return;
+        }
+        if (!preg_match('/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/', $shop) || strcasecmp($shop, (string) $token['shop']) !== 0) {
+            http_response_code(403);
+            echo "The Shopify store does not match the one you started connecting.";
+            return;
+        }
+
+        $storeId = (int) $token['store_id'];
+        if ($storeId <= 0 || !$this->storeModel->find($storeId)) {
+            echo "Store not found.";
             return;
         }
 

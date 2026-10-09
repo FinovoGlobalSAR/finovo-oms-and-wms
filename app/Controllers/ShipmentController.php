@@ -61,7 +61,7 @@ class ShipmentController extends Controller
         ]);
     }
 
-    public function create(): void
+        public function create(): void
     {
         $store = $this->getCurrentStore();
 
@@ -76,7 +76,12 @@ class ShipmentController extends Controller
         }
 
         $shipmentId = $this->shipmentModel->create((int) $store['id'], $courierName, $trackingNumber, $notes);
-        $this->shipmentModel->assignOrderUnit($shipmentId, $unitKey);
+        // Order isi store ka, cancel na hua, aur pehle se kisi shipment mein na ho — warna khaali shipment hata do
+        if ($this->shipmentModel->assignOrderUnit($shipmentId, $unitKey) === 0) {
+            Database::getConnection()->prepare("DELETE FROM shipments WHERE id = ? AND store_id = ?")->execute([$shipmentId, (int) $store['id']]);
+            $this->redirect('/shipments?error=' . urlencode('This order cannot be shipped (it is cancelled, already shipped, or not in this store).'));
+            return;
+        }
         $this->shipmentModel->updateStatus($shipmentId, 'packed');
 
         $this->redirect('/shipments?created=1');
@@ -84,10 +89,12 @@ class ShipmentController extends Controller
 
     public function updateStatus(): void
     {
+        $store = $this->getCurrentStore();
         $id = (int) ($_POST['id'] ?? 0);
         $status = trim($_POST['status'] ?? '');
 
-        if ($id > 0 && in_array($status, Shipment::$statuses, true)) {
+        // Sirf isi store ki shipment
+        if ($id > 0 && in_array($status, Shipment::$statuses, true) && $this->shipmentModel->find($id, (int) $store['id'])) {
             $this->shipmentModel->updateStatus($id, $status);
         }
 

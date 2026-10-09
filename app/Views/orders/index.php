@@ -182,7 +182,9 @@ $showCjSync = ($platform === 'cj') || !empty($store['cj_api_key']);
             <?php if ($showCjSync): ?>
                 <a href="/orders/sync-cj" class="ui-btn ui-btn-soft"><i class="bi bi-arrow-repeat"></i> Sync CJ</a>
             <?php endif; ?>
-            <a href="/orders/settings" class="ui-btn"><i class="bi bi-gear"></i> Settings</a>
+            <?php if (in_array(strtolower(trim($_SESSION['user']['role'] ?? '')), ['admin', 'manager'], true)): ?>
+                <a href="/orders/settings" class="ui-btn"><i class="bi bi-gear"></i> Settings</a>
+            <?php endif; ?>
             <a href="/orders/create" class="ui-btn ui-btn-primary"><i class="bi bi-plus-lg"></i> Add Order</a>
         </div>
     </form>
@@ -325,12 +327,17 @@ $showCjSync = ($platform === 'cj') || !empty($store['cj_api_key']);
                                         <?php endif; ?>
                                     <?php endif; ?>
                                 <?php endif; ?>
-                                <div class="row-menu-divider"></div>
-                                <a href="#" class="row-menu-danger" onclick="if(confirm('Delete this order? Stock will be returned to the warehouse.')){document.getElementById('deleteOrderForm<?= $order['id'] ?>').submit();} return false;"><i class="bi bi-trash"></i> Delete</a>
+                                                               <?php if (in_array(strtolower(trim($_SESSION['user']['role'] ?? '')), ['admin', 'manager'], true)): ?>
+                                    <!-- Order delete sirf Admin / Manager -->
+                                    <div class="row-menu-divider"></div>
+                                    <a href="#" class="row-menu-danger" onclick="if(confirm('Delete this order? Stock will be returned to the warehouse.')){document.getElementById('deleteOrderForm<?= $order['id'] ?>').submit();} return false;"><i class="bi bi-trash"></i> Delete</a>
+                                <?php endif; ?>
                             </div>
-                            <form id="deleteOrderForm<?= $order['id'] ?>" action="/orders/delete" method="POST" style="display:none;">
-                                <input type="hidden" name="id" value="<?= $order['id'] ?>">
-                            </form>
+                            <?php if (in_array(strtolower(trim($_SESSION['user']['role'] ?? '')), ['admin', 'manager'], true)): ?>
+                                <form id="deleteOrderForm<?= $order['id'] ?>" action="/orders/delete" method="POST" style="display:none;">
+                                    <input type="hidden" name="id" value="<?= $order['id'] ?>">
+                                </form>
+                            <?php endif; ?>
                         </td>
                     </tr>
                 <?php endforeach; ?>

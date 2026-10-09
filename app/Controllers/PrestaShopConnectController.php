@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../core/Controller.php';
 require_once __DIR__ . '/../../core/Database.php';
+require_once __DIR__ . '/../../core/SignedToken.php';
 require_once __DIR__ . '/../Models/Store.php';
 
 class PrestaShopConnectController extends Controller
@@ -15,9 +16,19 @@ class PrestaShopConnectController extends Controller
         $this->storeModel = new Store();
     }
 
+    /** Store ka "PrestaShop connection code" (Stores → Edit mein dikhta hai). Module mein Store ID ki jagah yahi daalo. */
+    public static function connectCode(int $storeId): string
+    {
+        return SignedToken::make(['purpose' => 'ps_connect', 'store_id' => $storeId]);
+    }
+
     /**
      * PrestaShop module install hone par yahan POST request aati hai:
-     * { store_id: 5, store_url: "http://localhost/prestashop", api_key: "..." }
+     * { connect_token: "<connection code>", store_url: "http://localhost/prestashop", api_key: "..." }
+     *
+     * Hifazat: pehle sirf { store_id: 5 } chahiye tha — koi bhi kisi store ki keys badal sakta tha.
+     * Ab Finovo ka diya hua "connection code" zaroori hai (connect_token mein, ya module ke purane
+     * store_id field mein bhi chalega). Sirf number (5) ab qubool nahi.
      */
     public function receiveKey(): void
     {
@@ -32,13 +43,21 @@ class PrestaShopConnectController extends Controller
             return;
         }
 
-        $storeId = (int) ($data['store_id'] ?? 0);
-        $storeUrl = trim($data['store_url'] ?? '');
-        $apiKey = trim($data['api_key'] ?? '');
+        $code = (string) ($data['connect_token'] ?? $data['store_id'] ?? '');
+        $token = SignedToken::verify($code, 'ps_connect');
+        if ($token === null) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Invalid connection code. Copy the PrestaShop connection code from Finovo (Stores → Edit) into the module.']);
+            return;
+        }
 
-        if ($storeId <= 0 || $storeUrl === '' || $apiKey === '') {
+        $storeId = (int) $token['store_id'];
+        $storeUrl = trim((string) ($data['store_url'] ?? ''));
+        $apiKey = trim((string) ($data['api_key'] ?? ''));
+
+        if ($storeUrl === '' || $apiKey === '' || !preg_match('#^https?://#i', $storeUrl)) {
             http_response_code(422);
-            echo json_encode(['error' => 'Missing store_id, store_url, or api_key.']);
+            echo json_encode(['error' => 'Missing or invalid store_url, or missing api_key.']);
             return;
         }
 

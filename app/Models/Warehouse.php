@@ -37,8 +37,15 @@ class Warehouse extends Model
 
     public function linkToStore(int $warehouseId, int $storeId, bool $isDefault = false): void
     {
+        if (!$isDefault) {
+            $hasDefault = $this->query(
+                "SELECT 1 FROM store_warehouses WHERE store_id = ? AND is_default = 1 AND warehouse_id <> ? LIMIT 1",
+                [$storeId, $warehouseId]
+            )->fetchColumn();
+            $isDefault = !$hasDefault;
+        }
         if ($isDefault) {
-            $this->query("UPDATE store_warehouses SET is_default = 0 WHERE store_id = ?", [$storeId]);
+            $this->query("UPDATE store_warehouses SET is_default = 0 WHERE store_id = ? AND warehouse_id <> ?", [$storeId, $warehouseId]);
         }
         $this->query(
             "INSERT INTO store_warehouses (store_id, warehouse_id, is_default)
@@ -48,9 +55,34 @@ class Warehouse extends Model
         );
     }
 
-    public function unlinkFromStore(int $warehouseId, int $storeId): void
+    /**
+     * Is warehouse mein is store ka kitna maal pada hai (products + variants), aur kitne khule orders
+     * (cancel / deliver / complete nahi hue) isi warehouse se jude hain.
+     * Store se warehouse hatane se pehle check — warna maal "gum" ho jata aur orders ka cancel stock kahin aur jata.
+     * @return array{stock: int, open_orders: int}
+     */
+    public function storeUsage(int $warehouseId, int $storeId): array
     {
-        $this->query("DELETE FROM store_warehouses WHERE store_id = ? AND warehouse_id = ?", [$storeId, $warehouseId]);
+        $stock = (int) $this->query(
+            "SELECT COALESCE(SUM(pws.stock_quantity), 0) FROM product_warehouse_stock pws
+             INNER JOIN products p ON p.id = pws.product_id
+             WHERE pws.warehouse_id = ? AND p.store_id = ?",
+            [$warehouseId, $storeId]
+        )->fetchColumn();
+        $stock += (int) $this->query(
+            "SELECT COALESCE(SUM(vws.stock_quantity), 0) FROM variant_warehouse_stock vws
+             INNER JOIN product_variants pv ON pv.id = vws.variant_id
+             INNER JOIN products p ON p.id = pv.product_id
+             WHERE vws.warehouse_id = ? AND p.store_id = ?",
+            [$warehouseId, $storeId]
+        )->fetchColumn();
+        $openOrders = (int) $this->query(
+            "SELECT COUNT(*) FROM orders
+             WHERE warehouse_id = ? AND store_id = ? AND status NOT IN ('cancelled', 'delivered', 'completed')",
+            [$warehouseId, $storeId]
+        )->fetchColumn();
+
+        return ['stock' => $stock, 'open_orders' => $openOrders];
     }
 
     public function getDefault(int $storeId): array

@@ -32,6 +32,9 @@ class EbayOrderImporter
                 'IN_PROGRESS' => 'processing',
                 default => 'pending',
             };
+            if (strtoupper((string) ($order['cancelStatus']['cancelState'] ?? '')) === 'CANCELED') {
+                $orderStatus = 'cancelled';
+            }
             $paymentStatus = ($order['orderPaymentStatus'] ?? '') === 'PAID' ? 'paid' : 'unpaid';
 
             // Pehle se aaya hua order → sirf status update

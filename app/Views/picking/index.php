@@ -6,11 +6,15 @@ $pickColors = [
     'packed'      => ['bg' => '#dcfce7', 'text' => '#166534'],
 ];
 
-// ---------- Summary numbers (sirf display ke liye, $orders se hi count) ----------
+$search = $search ?? '';
+$statusFilter = $statusFilter ?? '';
+$allOrders = $allOrders ?? $orders;
+
+// ---------- Summary numbers: POORI list se (sirf is page se nahi) ----------
 $totalItemsToPick = 0;
 $inProgressCount  = 0;
 $pickedCount      = 0;
-foreach ($orders as $o) {
+foreach ($allOrders as $o) {
     $totalItemsToPick += (int) $o['quantity'];
     $pk = $o['picking_status'] ?? 'not_started';
     if ($pk === 'picking') { $inProgressCount++; }
@@ -21,7 +25,7 @@ foreach ($orders as $o) {
 <div class="ui-head" style="align-items:center;">
     <div class="ui-head-left">
         <div class="breadcrumb">Finovo <i class="bi bi-chevron-right"></i> <span class="current">Picking</span></div>
-        <h1>Picking &amp; Packing <span class="count-badge"><?= count($orders) ?></span></h1>
+        <h1>Picking &amp; Packing <span class="count-badge"><?= count($allOrders) ?></span></h1>
         <p>Orders waiting to be picked and packed before dispatch.</p>
     </div>
     <div class="ui-head-right">
@@ -30,13 +34,14 @@ foreach ($orders as $o) {
 </div>
 
 <?php if (!empty($updated)): ?><div class="banner banner-success"><i class="bi bi-check-circle"></i> Picking status updated.</div><?php endif; ?>
+<?php if (!empty($error)): ?><div class="banner banner-error"><i class="bi bi-exclamation-circle"></i> <?= htmlspecialchars($error) ?></div><?php endif; ?>
 
 <div class="ui-stats">
     <div class="ui-stat">
         <div class="ui-stat-icon"><i class="bi bi-box-seam"></i></div>
         <div>
             <div class="ui-stat-label">Pending Orders</div>
-            <div class="ui-stat-value"><b><?= count($orders) ?></b><span class="ui-pill ui-pill-blue">All</span></div>
+            <div class="ui-stat-value"><b><?= count($allOrders) ?></b><span class="ui-pill ui-pill-blue">All</span></div>
         </div>
     </div>
     <div class="ui-stat">
@@ -67,23 +72,27 @@ foreach ($orders as $o) {
         <h2>Orders to Pick &amp; Pack</h2>
     </div>
 
-    <!-- Ek hi line: search + status filter ... Bulk Update + Export -->
-    <div class="pick-toolbar">
+    <!-- Ek hi line: search + status filter ... Bulk Update + Export (search server pe — har page ka result sahi) -->
+    <form method="GET" action="/picking" class="pick-toolbar">
         <label class="ui-search pick-search">
             <i class="bi bi-search"></i>
-            <input type="text" id="pickSearch" placeholder="Search orders, customers or products..." aria-label="Search orders, customers or products">
+            <input type="text" name="q" value="<?= htmlspecialchars($search) ?>" placeholder="Search orders, customers or products..." aria-label="Search orders, customers or products">
         </label>
-        <select id="pickStatusFilter" class="pick-select" aria-label="Filter by status">
+        <select name="status" class="pick-select" aria-label="Filter by status" onchange="this.form.submit()">
             <option value="">All statuses</option>
-            <option value="not_started">Not Started</option>
-            <option value="picking">Picking</option>
-            <option value="picked">Picked</option>
+            <?php foreach (['not_started' => 'Not Started', 'picking' => 'Picking', 'picked' => 'Picked'] as $value => $label): ?>
+                <option value="<?= $value ?>" <?= $statusFilter === $value ? 'selected' : '' ?>><?= $label ?></option>
+            <?php endforeach; ?>
         </select>
+        <button type="submit" class="ui-btn">Search</button>
+        <?php if ($search !== '' || $statusFilter !== ''): ?>
+            <a href="/picking" class="ui-btn ui-btn-soft">Clear</a>
+        <?php endif; ?>
         <div class="pick-toolbar-right">
             <button type="button" class="ui-btn ui-btn-soft" onclick="openBulkModal()"><i class="bi bi-arrow-repeat"></i> Bulk Update</button>
-            <button type="button" class="ui-btn" onclick="exportPickingCsv()"><i class="bi bi-download"></i> Export</button>
+            <a class="ui-btn" href="/picking?<?= htmlspecialchars(http_build_query(['q' => $search, 'status' => $statusFilter, 'export' => 'csv'])) ?>"><i class="bi bi-download"></i> Export</a>
         </div>
-    </div>
+    </form>
 
     <div style="overflow-x:auto;">
         <table class="data-table" id="pickTable">
@@ -100,7 +109,13 @@ foreach ($orders as $o) {
             </thead>
             <tbody>
                 <?php if (empty($orders)): ?>
-                    <tr><td colspan="7" class="ui-empty"><i class="bi bi-check2-all"></i>Nothing to pick right now.</td></tr>
+                    <tr><td colspan="7" class="ui-empty">
+                        <?php if ($search !== '' || $statusFilter !== ''): ?>
+                            <i class="bi bi-search"></i>No orders match your search.
+                        <?php else: ?>
+                            <i class="bi bi-check2-all"></i>Nothing to pick right now.
+                        <?php endif; ?>
+                    </td></tr>
                 <?php else: ?>
                     <?php foreach ($orders as $o):
                         $pk = $o['picking_status'] ?? 'not_started';
@@ -135,16 +150,12 @@ foreach ($orders as $o) {
                             </td>
                         </tr>
                     <?php endforeach; ?>
-                    <tr id="pickNoMatch" style="display:none;"><td colspan="7" class="ui-empty"><i class="bi bi-search"></i>No orders match your search.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
     </div>
 
-    <div class="pagination-bar">
-        <span id="pickShowing">Showing <?= count($orders) ?> of <?= count($orders) ?> orders</span>
-        <div class="pagination-controls" id="pickPager"></div>
-    </div>
+    <?php $pagerLabel = 'orders'; require __DIR__ . '/../partials/pagination.php'; ?>
 </div>
 
 <style>
@@ -197,82 +208,16 @@ foreach ($orders as $o) {
 
 <script>
 (function () {
-    var PER_PAGE = 10;
-    var page = 1;
-    var rows = Array.prototype.slice.call(document.querySelectorAll('.pick-row'));
-    var searchInput = document.getElementById('pickSearch');
-    var statusFilter = document.getElementById('pickStatusFilter');
-    var pager = document.getElementById('pickPager');
-    var showing = document.getElementById('pickShowing');
-    var noMatch = document.getElementById('pickNoMatch');
+    // "Select all" sirf is page ke orders chunta hai
     var selectAll = document.getElementById('pickSelectAll');
-
-    function matchingRows() {
-        var q = (searchInput.value || '').trim().toLowerCase();
-        var st = statusFilter.value;
-        return rows.filter(function (r) {
-            return (q === '' || r.dataset.search.indexOf(q) !== -1) && (st === '' || r.dataset.status === st);
-        });
-    }
-
-    function render() {
-        var list = matchingRows();
-        var pages = Math.max(1, Math.ceil(list.length / PER_PAGE));
-        if (page > pages) { page = pages; }
-        var start = (page - 1) * PER_PAGE;
-        rows.forEach(function (r) { r.style.display = 'none'; });
-        list.slice(start, start + PER_PAGE).forEach(function (r) { r.style.display = ''; });
-        if (noMatch) { noMatch.style.display = (rows.length > 0 && list.length === 0) ? '' : 'none'; }
-
-        var shown = Math.min(PER_PAGE, Math.max(0, list.length - start));
-        showing.textContent = 'Showing ' + shown + ' of ' + list.length + ' orders';
-
-        pager.innerHTML = '';
-        if (pages <= 1) { return; }
-        function add(label, target, disabled, active) {
-            var b = document.createElement('button');
-            b.type = 'button';
-            b.innerHTML = label;
-            b.disabled = disabled;
-            if (active) { b.className = 'page-num active'; b.setAttribute('aria-current', 'page'); }
-            b.addEventListener('click', function () { page = target; render(); });
-            pager.appendChild(b);
-        }
-        add('<i class="bi bi-arrow-left"></i> Prev', page - 1, page === 1, false);
-        for (var i = 1; i <= pages; i++) { add(String(i), i, false, i === page); }
-        add('Next <i class="bi bi-arrow-right"></i>', page + 1, page === pages, false);
-    }
-
-    if (searchInput) { searchInput.addEventListener('input', function () { page = 1; render(); }); }
-    if (statusFilter) { statusFilter.addEventListener('change', function () { page = 1; render(); }); }
     if (selectAll) {
         selectAll.addEventListener('change', function () {
-            rows.forEach(function (r) {
-                if (r.style.display !== 'none') { r.querySelector('.pick-check').checked = selectAll.checked; }
-            });
+            document.querySelectorAll('.pick-check').forEach(function (c) { c.checked = selectAll.checked; });
         });
     }
-    render();
 
     window.pickSelectedIds = function () {
         return Array.prototype.map.call(document.querySelectorAll('.pick-check:checked'), function (c) { return c.value; });
-    };
-
-    window.exportPickingCsv = function () {
-        var list = matchingRows();
-        var lines = [['Order', 'Customer', 'Product', 'Qty', 'Status']];
-        list.forEach(function (r) {
-            lines.push(['#' + r.dataset.id, r.dataset.customer, r.dataset.product, r.dataset.qty, r.dataset.status.replace('_', ' ')]);
-        });
-        var csv = lines.map(function (l) {
-            return l.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');
-        }).join('\n');
-        var a = document.createElement('a');
-        a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-        a.download = 'picking-orders.csv';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
     };
 })();
 

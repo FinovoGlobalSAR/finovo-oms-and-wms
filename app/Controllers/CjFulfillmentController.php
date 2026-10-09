@@ -195,12 +195,17 @@ class CjFulfillmentController extends Controller
         }
 
         $db = Database::getConnection();
-        // CJ 1 second mein 1 request leta hai, is liye ek dafa mein max 20 orders
+        // CJ 1 second mein 1 request leta hai, is liye ek dafa mein max 20 orders.
+        // Pehle hamesha SABSE NAYE 20 aate the — 21wan aur purane orders ka status kabhi update nahi hota tha.
+        // Ab woh 20 jin ka status sab se pehle (sab se purana) check hua tha; har sync ke baad un ka
+        // cj_pushed_at "abhi" ho jata hai, to agli dafa agle 20 aate hain — sab orders baari baari check hote hain.
+        // (cj_pushed_at yahan "aakhri baar CJ se check kiya" ka kaam bhi karta hai — naya column nahi chahiye.)
         $stmt = $db->prepare(
-            "SELECT DISTINCT cj_order_id FROM orders
+            "SELECT cj_order_id FROM orders
              WHERE store_id = ? AND cj_order_id IS NOT NULL AND cj_order_id <> ''
                AND (cj_order_status IS NULL OR cj_order_status NOT IN ('DELIVERED', 'CANCELLED'))
-             ORDER BY cj_pushed_at DESC
+             GROUP BY cj_order_id
+             ORDER BY MIN(cj_pushed_at) ASC
              LIMIT 20"
         );
         $stmt->execute([(int) $store['id']]);
@@ -213,9 +218,12 @@ class CjFulfillmentController extends Controller
 
         $connector = $this->connector($store);
         $update = $db->prepare(
-            "UPDATE orders SET cj_order_status = ?, cj_tracking_number = COALESCE(?, cj_tracking_number), cj_logistic_name = COALESCE(?, cj_logistic_name)
+            "UPDATE orders SET cj_order_status = ?, cj_tracking_number = COALESCE(?, cj_tracking_number), cj_logistic_name = COALESCE(?, cj_logistic_name),
+                               cj_pushed_at = NOW()
              WHERE cj_order_id = ? AND store_id = ?"
         );
+        // Fail hone wala order bhi line ke peeche jaye (warna har dafa wahi 20 atke rehte)
+        $touch = $db->prepare("UPDATE orders SET cj_pushed_at = NOW() WHERE cj_order_id = ? AND store_id = ?");
 
         $updated = 0;
         foreach ($cjOrderIds as $cjOrderId) {
@@ -228,6 +236,7 @@ class CjFulfillmentController extends Controller
                     $this->redirect('/orders?error=' . urlencode($result['message']));
                     return;
                 }
+                $touch->execute([(string) $cjOrderId, (int) $store['id']]);
                 continue;
             }
 

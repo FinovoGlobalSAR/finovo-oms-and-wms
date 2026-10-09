@@ -20,8 +20,11 @@ class StoreController extends Controller
     public function index(): void
     {
         $stores = $this->storeModel->all();
+        require_once __DIR__ . '/PrestaShopConnectController.php';
         foreach ($stores as &$s) {
             $s['warehouses'] = $this->warehouseModel->allByStore((int) $s['id']);
+            // PrestaShop module ke liye "connection code" (is ke bina module keys nahi bhej sakta)
+            $s['ps_connect_code'] = PrestaShopConnectController::connectCode((int) $s['id']);
         }
         unset($s);
 
@@ -148,6 +151,19 @@ class StoreController extends Controller
         if ($id <= 0 || $name === '' || !$this->storeModel->find($id)) {
             $this->redirect('/stores?error=' . urlencode('Invalid store data.'));
             return;
+        }
+
+        // Warehouse check PEHLE (keys save karne se pehle) — taake error pe aadha update na ho
+        $current = $this->warehouseModel->allByStore($id);
+        // Jis warehouse mein is store ka maal pada hai ya khule orders hain, use store se nahi hata sakte
+        foreach ($current as $w) {
+            if (!in_array((int) $w['id'], $warehouseIds, true)) {
+                $usage = $this->warehouseModel->storeUsage((int) $w['id'], $id);
+                if ($usage['stock'] > 0 || $usage['open_orders'] > 0) {
+                    $this->redirect('/stores?error=' . urlencode("Warehouse \"{$w['name']}\" still has {$usage['stock']} unit(s) of this store's stock and {$usage['open_orders']} open order(s). Move the stock (Stock → Transfer) and finish the orders before unlinking it."));
+                    return;
+                }
+            }
         }
 
         $this->storeModel->update($id, $name, $platform, $storeUrl ?: null);

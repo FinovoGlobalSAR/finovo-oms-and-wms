@@ -49,8 +49,12 @@ class ReturnController extends Controller
         $stmt->execute([(int) $store['id']]);
         $allOrders = $stmt->fetchAll();
 
+        // "New Return" ki list: jin ka return pehle se nahi, jo cancel nahi (cancel order ka stock pehle hi wapas hai),
+        // aur jin pe "stock warning" nahi (un ka stock kata hi nahi tha)
         $recentOrders = array_values(array_filter($allOrders, function ($o) use ($alreadyReturned) {
-            return !in_array((int) $o['id'], $alreadyReturned, true) && ($o['status'] ?? '') !== 'cancelled';
+            return !in_array((int) $o['id'], $alreadyReturned, true)
+                && ($o['status'] ?? '') !== 'cancelled'
+                && empty($o['stock_warning']);
         }));
 
         $allReturns = $this->returnModel->all((int) $store['id']);
@@ -88,15 +92,16 @@ class ReturnController extends Controller
         $orderId = (int) ($_POST['order_id'] ?? 0);
         $quantity = (int) ($_POST['quantity'] ?? 0);
         $reason = trim($_POST['reason'] ?? '');
-        $refundAmount = (float) ($_POST['refund_amount'] ?? 0);
+        $refundAmount = round((float) ($_POST['refund_amount'] ?? 0), 2);
 
         if ($orderId <= 0 || $quantity <= 0) {
             $this->redirect('/returns?error=' . urlencode('Please select an order and a valid quantity.'));
             return;
         }
 
-        $stmt = $db->prepare("SELECT * FROM orders WHERE id = ?");
-        $stmt->execute([$orderId]);
+        // Order sirf isi store ka (pehle kisi bhi store ka order id de kar return ban jata tha)
+        $stmt = $db->prepare("SELECT * FROM orders WHERE id = ? AND store_id = ?");
+        $stmt->execute([$orderId, (int) $store['id']]);
         $order = $stmt->fetch();
 
         if (!$order) {
@@ -109,12 +114,36 @@ class ReturnController extends Controller
             $this->redirect('/returns?error=' . urlencode('This order is cancelled, its stock is already back in the warehouse. A return is not needed.'));
             return;
         }
-        if ($quantity > (int) $order['quantity']) {
-            $this->redirect('/returns?error=' . urlencode('Return quantity cannot be more than the ordered quantity (' . (int) $order['quantity'] . ').'));
+        // "Stock warning" order se stock kata hi nahi tha — return complete hone pe stock hawa mein se ban jata
+        if (!empty($order['stock_warning'])) {
+            $this->redirect('/returns?error=' . urlencode('This order has a stock warning (no stock was taken for it), so a return cannot add stock back. Fix the order first.'));
+            return;
+        }
+
+        // Is order ke saare returns mila kar bhi order ki quantity se zyada nahi
+        $alreadyReturned = $this->returnModel->returnedQuantityForOrder($orderId);
+        $remaining = (int) $order['quantity'] - $alreadyReturned;
+        if ($quantity > $remaining) {
+            $this->redirect('/returns?error=' . urlencode("Only {$remaining} more can be returned for this order (ordered " . (int) $order['quantity'] . ", already returned {$alreadyReturned})."));
+            return;
+        }
+
+        // Refund: minus nahi, aur is order line ki qeemat (price × quantity) se zyada nahi
+        $lineTotal = round((float) $order['price'] * (int) $order['quantity'], 2);
+        if ($refundAmount < 0) {
+            $this->redirect('/returns?error=' . urlencode('Refund amount cannot be negative.'));
+            return;
+        }
+        if ($lineTotal > 0 && $refundAmount > $lineTotal) {
+            $this->redirect('/returns?error=' . urlencode('Refund amount cannot be more than the order amount (' . number_format($lineTotal, 2) . ').'));
             return;
         }
 
         $warehouseId = (int) ($order['warehouse_id'] ?? 0);
+        if ($warehouseId <= 0) {
+            require_once __DIR__ . '/../Models/Warehouse.php';
+            $warehouseId = (int) ((new Warehouse())->getDefault((int) $store['id'])['id'] ?? 0);
+        }
 
         $this->returnModel->create(
             (int) $store['id'],
@@ -132,33 +161,74 @@ class ReturnController extends Controller
 
     public function updateStatus(): void
     {
+        $store = $this->getCurrentStore();
+        $db = Database::getConnection();
         $id = (int) ($_POST['id'] ?? 0);
         $status = trim($_POST['status'] ?? '');
         $condition = trim($_POST['condition_status'] ?? 'resellable');
         $actor = $_SESSION['user']['name'] ?? 'system';
 
-        $return = $this->returnModel->find($id);
-
-        if (!$return) {
-            $this->redirect('/returns?error=' . urlencode('Return not found.'));
+        if (!in_array($status, ReturnRequest::$statuses, true) || !in_array($condition, ReturnRequest::$conditions, true)) {
+            $this->redirect('/returns?error=' . urlencode('Invalid status or condition.'));
             return;
         }
 
-        if ($status === 'completed' && $return['status'] !== 'completed' && $condition === 'resellable') {
-            if (!empty($return['product_id'])) {
-                $this->inventoryService->release(
-                    (int) $return['product_id'],
-                    !empty($return['variant_id']) ? (int) $return['variant_id'] : null,
-                    (int) $return['warehouse_id'],
-                    (int) $return['quantity'],
-                    'return_completed',
-                    "return:{$id}",
-                    $actor
-                );
+        $db->beginTransaction();
+        try {
+            // Row lock: do log ek saath "Completed" dabayein to bhi stock sirf EK dafa jude
+            $stmt = $db->prepare("SELECT * FROM returns WHERE id = ? AND store_id = ? FOR UPDATE");
+            $stmt->execute([$id, (int) $store['id']]);
+            $return = $stmt->fetch();
+
+            if (!$return) {
+                $db->rollBack();
+                $this->redirect('/returns?error=' . urlencode('Return not found.'));
+                return;
             }
+
+            // Completed / Rejected aakhri hain — pehle "completed → requested → completed" kar ke stock baar baar judta tha
+            if (!ReturnRequest::canMove((string) $return['status'], $status)) {
+                $db->rollBack();
+                $this->redirect('/returns?error=' . urlencode("A {$return['status']} return cannot be changed to {$status}."));
+                return;
+            }
+
+            if ($status === 'completed') {
+                $orderStmt = $db->prepare("SELECT status, stock_warning FROM orders WHERE id = ?");
+                $orderStmt->execute([(int) $return['order_id']]);
+                $order = $orderStmt->fetch();
+
+                // Order cancel ho chuka → us ka stock pehle hi wapas aa gaya; stock warning → stock kata hi nahi tha
+                if ($order && (($order['status'] ?? '') === 'cancelled' || !empty($order['stock_warning']))) {
+                    $db->rollBack();
+                    $this->redirect('/returns?error=' . urlencode('This order is cancelled or has a stock warning — its stock is not held, so the return cannot be completed. Reject it instead.'));
+                    return;
+                }
+
+                if ($condition === 'resellable' && !empty($return['product_id']) && (int) $return['quantity'] > 0) {
+                    $this->inventoryService->release(
+                        (int) $return['product_id'],
+                        !empty($return['variant_id']) ? (int) $return['variant_id'] : null,
+                        (int) $return['warehouse_id'],
+                        (int) $return['quantity'],
+                        'return_completed',
+                        "return:{$id}",
+                        $actor
+                    );
+                }
+            }
+
+            $this->returnModel->updateStatus($id, $status, $condition);
+            $db->commit();
+        } catch (Throwable $e) {
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+            error_log('Return status update failed: ' . $e->getMessage());
+            $this->redirect('/returns?error=' . urlencode('Return could not be updated. Please try again.'));
+            return;
         }
 
-        $this->returnModel->updateStatus($id, $status, $condition);
         $this->redirect('/returns?updated=1');
     }
 }

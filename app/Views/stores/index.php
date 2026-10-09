@@ -437,6 +437,12 @@ foreach ($stores as $s) {
                 <label>BigCommerce Access Token</label>
                 <input type="text" name="bigcommerce_access_token" id="editStoreBcToken">
             </div>
+            <div class="form-group" style="background:#fdf2f8; border-radius:8px; padding:12px;">
+                <p style="font-size:12px; color:#9d174d; margin-bottom:8px;">
+                    <i class="bi bi-key"></i> PrestaShop connection code — paste this into the Finovo module in PrestaShop (in the "Store ID" / "Connection code" box). The module only works with this code.
+                </p>
+                <input type="text" id="editStorePsCode" readonly onclick="this.select()" style="width:100%; border:1px solid var(--border-color); border-radius:8px; padding:8px 10px; font-size:12px; font-family:monospace; background:#fff;">
+            </div>
             <div class="form-group">
                 <label>PrestaShop Store URL</label>
                 <input type="text" name="prestashop_store_url" id="editStorePsUrl">
@@ -519,6 +525,7 @@ function openEditModal(store) {
     document.getElementById('editStoreBridgeSecret').value = store.bridge_shared_secret || '';
     document.getElementById('editStoreBcHash').value = store.bigcommerce_store_hash || '';
     document.getElementById('editStoreBcToken').value = store.bigcommerce_access_token || '';
+    document.getElementById('editStorePsCode').value = store.ps_connect_code || '';
     document.getElementById('editStorePsUrl').value = store.prestashop_store_url || '';
     document.getElementById('editStorePsKey').value = store.prestashop_api_key || '';
     document.getElementById('editStoreOcUrl').value = store.opencart_store_url || '';

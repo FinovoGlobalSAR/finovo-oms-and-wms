@@ -19,11 +19,33 @@ class ReturnRequest extends Model
         return $stmt->fetchAll();
     }
 
-    public function find(int $id): ?array
+    /** $storeId do to sirf usi store ka return milta hai (doosre store ka id badal kar nahi chhed sakte) */
+    public function find(int $id, ?int $storeId = null): ?array
     {
-        $stmt = $this->query("SELECT * FROM returns WHERE id = ?", [$id]);
+        $stmt = $storeId === null
+            ? $this->query("SELECT * FROM returns WHERE id = ?", [$id])
+            : $this->query("SELECT * FROM returns WHERE id = ? AND store_id = ?", [$id, $storeId]);
         $row = $stmt->fetch();
         return $row ?: null;
+    }
+
+    /** Is order ki kitni quantity ka return pehle se bana hua hai (rejected chhod kar) */
+    public function returnedQuantityForOrder(int $orderId): int
+    {
+        $stmt = $this->query("SELECT COALESCE(SUM(quantity), 0) FROM returns WHERE order_id = ? AND status != 'rejected'", [$orderId]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    /** Status kahan se kahan ja sakta hai — completed / rejected aakhri hain (stock dobara na jude) */
+    public static function canMove(string $from, string $to): bool
+    {
+        $allowed = [
+            'requested' => ['requested', 'approved', 'rejected', 'completed'],
+            'approved'  => ['approved', 'rejected', 'completed'],
+            'rejected'  => [],
+            'completed' => [],
+        ];
+        return in_array($to, $allowed[$from] ?? [], true);
     }
 
     public function returnedOrderIds(int $storeId): array
