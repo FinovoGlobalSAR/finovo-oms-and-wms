@@ -1,4 +1,8 @@
 <?php
+// Upar ke numbers POORI list se ($allShipments); table mein sirf is page ki rows ($shipments)
+$allShipments = $allShipments ?? $shipments;
+$search = $search ?? '';
+$statusFilter = $statusFilter ?? '';
 $statusColors = [
     'pending'     => ['bg' => '#f1f5f9', 'text' => '#334155'],
     'packed'      => ['bg' => '#fef3c7', 'text' => '#92400e'],
@@ -8,11 +12,11 @@ $statusColors = [
     'returned'    => ['bg' => '#fee2e2', 'text' => '#991b1b'],
 ];
 
-// ---------- Summary numbers (sirf display ke liye, $shipments se hi) ----------
+// ---------- Summary numbers (POORI list se — $allShipments) ----------
 $onTheWayCount = 0;
 $deliveredCount = 0;
 $returnedCount = 0;
-foreach ($shipments as $s) {
+foreach ($allShipments as $s) {
     if (in_array($s['status'], ['dispatched', 'in_transit'], true)) { $onTheWayCount++; }
     if ($s['status'] === 'delivered') { $deliveredCount++; }
     if ($s['status'] === 'returned') { $returnedCount++; }
@@ -22,7 +26,7 @@ foreach ($shipments as $s) {
 <div class="ui-head">
     <div class="ui-head-left">
         <div class="breadcrumb">Finovo <i class="bi bi-chevron-right"></i> <span class="current">Shipments</span></div>
-        <h1>Shipments <span class="count-badge"><?= count($shipments) ?></span></h1>
+        <h1>Shipments <span class="count-badge"><?= count($allShipments) ?></span></h1>
         <p>Dispatch orders with a courier and track them until delivery.</p>
     </div>
 </div>
@@ -37,7 +41,7 @@ foreach ($shipments as $s) {
         <div class="ui-stat-icon"><i class="bi bi-box-seam"></i></div>
         <div>
             <div class="ui-stat-label">Total Shipments</div>
-            <div class="ui-stat-value"><b><?= count($shipments) ?></b><span class="ui-pill ui-pill-blue">All</span></div>
+            <div class="ui-stat-value"><b><?= count($allShipments) ?></b><span class="ui-pill ui-pill-blue">All</span></div>
         </div>
     </div>
     <div class="ui-stat">
@@ -66,17 +70,22 @@ foreach ($shipments as $s) {
 </div>
 
 <div class="ui-card" style="overflow: visible;">
-    <div class="ship-toolbar">
+    <!-- Search / status filter: server pe chalte hain, har page ka result sahi -->
+    <form method="GET" action="/shipments" class="ship-toolbar">
         <label class="ui-search ship-search">
             <i class="bi bi-search"></i>
-            <input type="text" id="shipSearch" placeholder="Search customer, courier or tracking number..." aria-label="Search shipments">
+            <input type="text" name="q" value="<?= htmlspecialchars($search) ?>" placeholder="Search customer, courier or tracking number..." aria-label="Search shipments">
         </label>
-        <select id="shipStatusFilter" class="ui-btn" aria-label="Filter by status" style="padding-right:10px;">
+        <select name="status" onchange="this.form.submit()" class="ui-btn" aria-label="Filter by status" style="padding-right:10px;">
             <option value="">All statuses</option>
             <?php foreach ($statuses as $st): ?>
-                <option value="<?= $st ?>"><?= ucwords(str_replace('_', ' ', $st)) ?></option>
+                <option value="<?= $st ?>" <?= $statusFilter === $st ? 'selected' : '' ?>><?= ucwords(str_replace('_', ' ', $st)) ?></option>
             <?php endforeach; ?>
         </select>
+        <button type="submit" class="ui-btn"><i class="bi bi-search"></i> Search</button>
+        <?php if ($search !== '' || $statusFilter !== ''): ?>
+            <a href="/shipments" class="ui-btn"><i class="bi bi-x"></i> Clear</a>
+        <?php endif; ?>
         <div class="ship-toolbar-actions">
             <a href="/3pl/scan" class="ui-btn"><i class="bi bi-upc-scan"></i> LM Scan</a>
             <a href="/3pl/remittance" class="ui-btn"><i class="bi bi-cash-coin"></i> Remittance</a>
@@ -84,7 +93,7 @@ foreach ($shipments as $s) {
                 <i class="bi bi-truck"></i> Dispatch Order
             </button>
         </div>
-    </div>
+    </form>
 
     <div style="overflow-x:auto;">
         <table class="data-table">
@@ -137,15 +146,12 @@ foreach ($shipments as $s) {
                             </td>
                         </tr>
                     <?php endforeach; ?>
-                    <tr id="shipNoMatch" style="display:none;"><td colspan="7" class="ui-empty"><i class="bi bi-search"></i>No shipments match your search.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
     </div>
 
-    <div class="pagination-bar">
-        <span id="shipShowing">Showing <?= count($shipments) ?> of <?= count($shipments) ?> shipments</span>
-    </div>
+    <?php if (!empty($pager)) { $pagerLabel = 'shipments'; require __DIR__ . '/../partials/pagination.php'; } ?>
 </div>
 
 <div class="modal-backdrop" id="createShipmentModal">
@@ -202,24 +208,4 @@ foreach ($shipments as $s) {
 function openModal(id) { document.getElementById(id).classList.add('show'); }
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
 
-(function () {
-    var input = document.getElementById('shipSearch');
-    var filter = document.getElementById('shipStatusFilter');
-    var rows = Array.prototype.slice.call(document.querySelectorAll('.ship-row'));
-    function apply() {
-        var q = input.value.trim().toLowerCase();
-        var st = filter.value;
-        var shown = 0;
-        rows.forEach(function (r) {
-            var ok = (q === '' || r.dataset.search.indexOf(q) !== -1) && (st === '' || r.dataset.status === st);
-            r.style.display = ok ? '' : 'none';
-            if (ok) { shown++; }
-        });
-        var nm = document.getElementById('shipNoMatch');
-        if (nm) { nm.style.display = shown === 0 ? '' : 'none'; }
-        document.getElementById('shipShowing').textContent = 'Showing ' + shown + ' of ' + rows.length + ' shipments';
-    }
-    input.addEventListener('input', apply);
-    filter.addEventListener('change', apply);
-})();
 </script>

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../core/Database.php';
 require_once __DIR__ . '/../Models/Warehouse.php';
+require_once __DIR__ . '/StockPushService.php';
 
 /**
  * Har stock-dependent decision ISI service se guzarti hai — browser/controller
@@ -77,10 +78,11 @@ class InventoryService
 
             $this->logLedger($productId, $variantId, $warehouseId, $available, -$quantity, $newQuantity, $source, $reference, $actor);
 
-            $this->db->prepare("UPDATE products SET stock_quantity = (SELECT COALESCE(SUM(stock_quantity),0) FROM product_warehouse_stock WHERE product_id = ?) WHERE id = ?")
-                ->execute([$productId, $productId]);
+            $this->refreshTotals($productId, $variantId);
 
             $this->db->commit();
+            // Stock badla → store ke platform pe bhi (request ke aakhir mein, StockPushService)
+            StockPushService::queue($productId);
             return ['ok' => true, 'available' => $newQuantity];
         } catch (Throwable $e) {
             $this->db->rollBack();
@@ -182,23 +184,53 @@ class InventoryService
             $before = (int) ($stmt->fetch(PDO::FETCH_ASSOC)['stock_quantity'] ?? 0);
             $after = $before + $quantity;
 
+            // INSERT ... ON DUPLICATE: is warehouse mein row na ho tab bhi stock wapas aaye
+            // (pehle sirf UPDATE tha — row na hoti to wapas aane wala stock gum ho jata)
             if ($variantId) {
-                $this->db->prepare("UPDATE variant_warehouse_stock SET stock_quantity = ? WHERE variant_id = ? AND warehouse_id = ?")
-                    ->execute([$after, $variantId, $warehouseId]);
+                $this->db->prepare(
+                    "INSERT INTO variant_warehouse_stock (variant_id, warehouse_id, stock_quantity) VALUES (?, ?, ?)
+                     ON DUPLICATE KEY UPDATE stock_quantity = VALUES(stock_quantity)"
+                )->execute([$variantId, $warehouseId, $after]);
             } else {
-                $this->db->prepare("UPDATE product_warehouse_stock SET stock_quantity = ? WHERE product_id = ? AND warehouse_id = ?")
-                    ->execute([$after, $productId, $warehouseId]);
+                $this->db->prepare(
+                    "INSERT INTO product_warehouse_stock (product_id, warehouse_id, stock_quantity) VALUES (?, ?, ?)
+                     ON DUPLICATE KEY UPDATE stock_quantity = VALUES(stock_quantity)"
+                )->execute([$productId, $warehouseId, $after]);
             }
 
             $this->logLedger($productId, $variantId, $warehouseId, $before, $quantity, $after, $source, $reference, $actor);
 
-            $this->db->prepare("UPDATE products SET stock_quantity = (SELECT COALESCE(SUM(stock_quantity),0) FROM product_warehouse_stock WHERE product_id = ?) WHERE id = ?")
-                ->execute([$productId, $productId]);
+            $this->refreshTotals($productId, $variantId);
 
             $this->db->commit();
+            StockPushService::queue($productId);
         } catch (Throwable $e) {
             $this->db->rollBack();
             throw $e;
+        }
+    }
+
+    /**
+     * Kul stock dobara jorna. Variant wale product ka kul = us ke variants ka jor
+     * (pehle hamesha product_warehouse_stock se jorta tha — variant ka order aate hi product 0 dikhta tha,
+     * aur variant ka apna stock_quantity purana reh jata tha).
+     */
+    private function refreshTotals(int $productId, ?int $variantId): void
+    {
+        if ($variantId) {
+            $this->db->prepare("UPDATE product_variants SET stock_quantity = (SELECT COALESCE(SUM(stock_quantity),0) FROM variant_warehouse_stock WHERE variant_id = ?) WHERE id = ?")
+                ->execute([$variantId, $variantId]);
+        }
+
+        $hasVariants = $this->db->prepare("SELECT 1 FROM product_variants WHERE product_id = ? LIMIT 1");
+        $hasVariants->execute([$productId]);
+
+        if ($hasVariants->fetchColumn()) {
+            $this->db->prepare("UPDATE products SET stock_quantity = (SELECT COALESCE(SUM(stock_quantity),0) FROM product_variants WHERE product_id = ?) WHERE id = ?")
+                ->execute([$productId, $productId]);
+        } else {
+            $this->db->prepare("UPDATE products SET stock_quantity = (SELECT COALESCE(SUM(stock_quantity),0) FROM product_warehouse_stock WHERE product_id = ?) WHERE id = ?")
+                ->execute([$productId, $productId]);
         }
     }
 

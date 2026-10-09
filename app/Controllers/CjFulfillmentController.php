@@ -83,8 +83,6 @@ class CjFulfillmentController extends Controller
         $this->renderForm($store, $orderId, $address, $result['options']);
     }
 
-    // --------------------------------------------------------- Step 3: submit
-
     public function submit(): void
     {
         $store = $this->getCurrentStore();
@@ -187,11 +185,6 @@ class CjFulfillmentController extends Controller
 
     // ------------------------------------- Step 5: "Sync CJ" (saare orders)
 
-    /**
-     * Orders page ka "Sync CJ" button.
-     * Jo orders CJ ko bheje ja chuke hain aur abhi deliver/cancel nahi hue,
-     * un sab ka status aur tracking number CJ se la ke update karta hai.
-     */
     public function syncAll(): void
     {
         $store = $this->getCurrentStore();

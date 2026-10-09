@@ -1,11 +1,7 @@
 <?php
-/**
- * Sabhi Shopify/WooCommerce/BigCommerce stores ke liye webhooks register
- * karta hai — ek baar chalane se, wo platforms khud Finovo ko naye orders
- * turant bhejna shuru kar dete hain (real-time, polling ki zaroorat nahi).
- * Chalao: C:\xampp\php\php.exe register-webhooks.php
- */
+
 require_once __DIR__ . '/core/Database.php';
+require_once __DIR__ . '/app/Services/WooCommerceAuth.php';
 
 $db = Database::getConnection();
 $baseUrl = $_ENV['APP_URL'] ?? '';
@@ -69,7 +65,8 @@ foreach ($stores as $store) {
 
         $auth = $store['woocommerce_consumer_key'] . ':' . $store['woocommerce_consumer_secret'];
 
-        $ch = curl_init(rtrim($store['woocommerce_store_url'], '/') . '/wp-json/wc/v3/webhooks');
+        // http:// site pe WooCommerce sirf OAuth signature maanta hai
+        $ch = curl_init(WooCommerceAuth::url('POST', rtrim($store['woocommerce_store_url'], '/') . '/wp-json/wc/v3/webhooks', $store['woocommerce_consumer_key'], $store['woocommerce_consumer_secret']));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);

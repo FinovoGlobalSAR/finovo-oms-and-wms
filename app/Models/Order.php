@@ -64,10 +64,6 @@ class Order extends Model
         $storeStmt = $this->query("SELECT name FROM stores WHERE id = ?", [$main['store_id']]);
         $storeRow = $storeStmt->fetch();
 
-        // Currency 2 tarike se decide hoti hai (jo bhi sach ho use lo):
-        // 1. Order khud Shopify/WooCommerce se pull hua ho, YA
-        // 2. Order ke andar jo product hai, uski apni origin Shopify/WooCommerce ho
-        //    (chahe order manual/CSV/API push ke through banaya gaya ho)
         $currency = in_array($main['source'] ?? 'manual', externalOrderSources(), true) ? '$' : 'Rs.';
 
         $items = [];

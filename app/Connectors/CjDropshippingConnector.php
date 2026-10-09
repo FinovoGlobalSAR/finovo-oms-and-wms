@@ -1,17 +1,6 @@
 <?php
 require_once __DIR__ . '/../../core/Database.php';
 
-/**
- * CJdropshipping API (v2).
- *
- * CJ ek supplier/fulfillment platform hai:
- *  - Products sync  → CJ ke products Finovo mein laao
- *  - Order push     → Finovo ka order CJ ko bhejo, CJ product pack karke customer ko bhejta hai
- *
- * Login: sirf API key se access token milta hai (CJ ne email/password wala login band kar diya).
- * CJ baar baar login allow nahi karta, is liye token stores table mein save karke dobara use hota hai.
- * CJ ek second mein sirf 1 request allow karta hai — throttle() khud 1 second ka gap rakhta hai.
- */
 class CjDropshippingConnector
 {
     private string $email;

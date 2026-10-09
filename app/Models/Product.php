@@ -1,6 +1,7 @@
 <?php
 // app/Models/Product.php
 require_once __DIR__ . '/../../core/Model.php';
+require_once __DIR__ . '/../Services/StockPushService.php';
 
 class Product extends Model
 {
@@ -139,13 +140,18 @@ class Product extends Model
 
     public function warehouseStockList(int $productId): array
     {
+        // Warehouses ab store se "store_warehouses" table ke zariye jude hain (warehouses.store_id column nahi raha).
+        // Product ke store se jude saare warehouses + koi bhi aur warehouse jahan is product ka stock pada ho.
         $stmt = $this->query(
             "SELECT w.id as warehouse_id, w.name as warehouse_name, w.location,
-                    COALESCE(pws.stock_quantity, 0) as stock_quantity
+                    COALESCE(pws.stock_quantity, 0) as stock_quantity,
+                    COALESCE(sw.is_default, 0) as is_default
              FROM warehouses w
+             LEFT JOIN store_warehouses sw ON sw.warehouse_id = w.id
+                  AND sw.store_id = (SELECT store_id FROM products WHERE id = ?)
              LEFT JOIN product_warehouse_stock pws ON pws.warehouse_id = w.id AND pws.product_id = ?
-             WHERE w.store_id = (SELECT store_id FROM products WHERE id = ?)
-             ORDER BY w.name ASC",
+             WHERE sw.warehouse_id IS NOT NULL OR pws.product_id IS NOT NULL
+             ORDER BY is_default DESC, w.name ASC",
             [$productId, $productId]
         );
         return $stmt->fetchAll();
@@ -202,6 +208,23 @@ class Product extends Model
         );
         $this->recomputeStock($productId);
     }
+
+    /**
+     * Platform (Shopify, WooCommerce...) se aaya KUL stock Finovo mein lagao.
+     * Platform sirf ek total batata hai, is liye baaki warehouses ka stock jaisa hai waisa rehta hai
+     * aur default warehouse itna rakha jata hai ke kul = platform wala stock.
+     *   jaise platform = 10, Lahore warehouse mein 3 → default (Karachi) = 7
+     */
+    public function applyPlatformStock(int $productId, int $defaultWarehouseId, int $platformTotal): void
+    {
+        $other = (int) $this->query(
+            "SELECT COALESCE(SUM(stock_quantity), 0) FROM product_warehouse_stock WHERE product_id = ? AND warehouse_id <> ?",
+            [$productId, $defaultWarehouseId]
+        )->fetchColumn();
+
+        $this->setWarehouseStock($productId, $defaultWarehouseId, max(0, $platformTotal - $other));
+    }
+
     public function decreaseWarehouseStock(int $productId, int $warehouseId, int $quantity): void
     {
         $this->query(
@@ -245,6 +268,9 @@ class Product extends Model
         }
         $total = (int) ($stmt->fetch()['total'] ?? 0);
         $this->query("UPDATE products SET stock_quantity = ? WHERE id = ?", [$total, $productId]);
+
+        // Stock badla → request ke aakhir mein store ke platform pe bhi bhejo (StockPushService dekho)
+        StockPushService::queue($productId);
     }
     public function lowStockList(int $storeId): array
     {

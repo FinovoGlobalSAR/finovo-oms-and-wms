@@ -31,9 +31,6 @@ class DashboardController extends Controller
         $totalOrdersStmt->execute([$storeId]);
         $data['totalOrders'] = (int) $totalOrdersStmt->fetch()['c'];
 
-        // Revenue ko currency ke hisab se alag-alag jodte hain — order khud
-        // external source se aaya ho, YA uska product khud kisi external
-        // platform se sync hua ho, dono cases mein wo "$" revenue mein aata hai.
         [$data['totalRevenueUsd'], $data['totalRevenuePkr']] = $this->splitRevenueByCurrency($db, $storeId, $productModel);
 
         $recentOrdersStmt = $db->prepare("SELECT * FROM orders WHERE store_id = ? ORDER BY id DESC LIMIT 8");
@@ -103,7 +100,8 @@ class DashboardController extends Controller
                 "SELECT w.name, COALESCE(SUM(pws.stock_quantity), 0) as total
                  FROM warehouses w
                  INNER JOIN store_warehouses sw ON sw.warehouse_id = w.id
-                 LEFT JOIN product_warehouse_stock pws ON pws.warehouse_id = w.id
+                 LEFT JOIN products p ON p.store_id = sw.store_id
+                 LEFT JOIN product_warehouse_stock pws ON pws.warehouse_id = w.id AND pws.product_id = p.id
                  WHERE sw.store_id = ?
                  GROUP BY w.id, w.name"
             );
@@ -138,7 +136,8 @@ class DashboardController extends Controller
                 "SELECT w.name, COALESCE(SUM(pws.stock_quantity), 0) as total
                  FROM warehouses w
                  INNER JOIN store_warehouses sw ON sw.warehouse_id = w.id
-                 LEFT JOIN product_warehouse_stock pws ON pws.warehouse_id = w.id
+                 LEFT JOIN products p ON p.store_id = sw.store_id
+                 LEFT JOIN product_warehouse_stock pws ON pws.warehouse_id = w.id AND pws.product_id = p.id
                  WHERE sw.store_id = ?
                  GROUP BY w.id, w.name"
             );
@@ -170,11 +169,6 @@ class DashboardController extends Controller
         $this->view('dashboard/index', $data);
     }
 
-    /**
-     * Store ke orders ko unke currency ke hisab se do totals mein baantta
-     * hai: [$ wala total, Rs. wala total]. Order khud external source se
-     * aaya ho, ya uska product external ho — dono "$" ban jaate hain.
-     */
     private function splitRevenueByCurrency(PDO $db, int $storeId, Product $productModel): array
     {
         $sourcesList = "'" . implode("','", externalOrderSources()) . "'";

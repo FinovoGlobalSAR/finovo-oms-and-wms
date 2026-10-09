@@ -16,11 +16,11 @@ if (!$name || !$email || !$password) {
 $email = strtolower(trim($email));
 
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    exit("Error: email sahi nahi hai.\n");
+    exit("Error: email is not correct.\n");
 }
 
 if (strlen($password) < 8) {
-    exit("Error: password kam se kam 8 characters ka hona chahiye.\n");
+    exit("Error: minimum 8 characters.\n");
 }
 
 $db = Database::getConnection();
@@ -30,13 +30,13 @@ $roleStmt->execute();
 $roleId = $roleStmt->fetchColumn();
 
 if (!$roleId) {
-    exit("Error: 'Admin' role nahi mila. Pehle `php migrate.php` chalao.\n");
+    exit("Error: Not Found, Run migrations\n");
 }
 
 $existsStmt = $db->prepare("SELECT id FROM users WHERE LOWER(email) = ?");
 $existsStmt->execute([$email]);
 if ($existsStmt->fetchColumn()) {
-    exit("Error: is email ka user pehle se maujood hai.\n");
+    exit("Error: Already exists.\n");
 }
 
 $insert = $db->prepare(
@@ -44,4 +44,4 @@ $insert = $db->prepare(
 );
 $insert->execute([(int) $roleId, trim($name), $email, password_hash($password, PASSWORD_DEFAULT)]);
 
-echo "Admin user ban gaya: {$email}\n";
+echo "Admin user created: {$email}\n";

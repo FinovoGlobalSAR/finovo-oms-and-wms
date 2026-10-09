@@ -7,6 +7,8 @@ require_once __DIR__ . '/../Models/Warehouse.php';
 require_once __DIR__ . '/../Services/InventoryService.php';
 require_once __DIR__ . '/../Middlewares/CanonicalMapper.php';
 require_once __DIR__ . '/../Connectors/WixConnector.php';
+require_once __DIR__ . '/../Services/OrderImportService.php';
+require_once __DIR__ . '/../Services/PlatformOrderMapper.php';
 
 /**
  * Webhooks external duniya se aate hain — koi login session nahi hota.
@@ -19,6 +21,7 @@ class WebhookController extends Controller
     private Product $productModel;
     private Warehouse $warehouseModel;
     private InventoryService $inventoryService;
+    private OrderImportService $importer;
 
     public function __construct()
     {
@@ -27,6 +30,7 @@ class WebhookController extends Controller
         $this->productModel = new Product();
         $this->warehouseModel = new Warehouse();
         $this->inventoryService = new InventoryService();
+        $this->importer = new OrderImportService();
     }
 
     // ---------- Shopify Webhook ----------
@@ -82,37 +86,23 @@ class WebhookController extends Controller
 
     private function ingestShopifyOrder(array $store, array $order, string $externalId): void
     {
-        $db = Database::getConnection();
-        $defaultWarehouse = $this->warehouseModel->getDefault((int) $store['id']);
-
-        $check = $db->prepare("SELECT id FROM orders WHERE external_order_id = ? AND store_id = ?");
-        $check->execute([$externalId, $store['id']]);
-        if ($check->fetch()) {
+        if ($this->importer->exists((int) $store['id'], 'shopify_pull', $externalId)) {
             return;
         }
+
         $customerName = trim(($order['customer']['first_name'] ?? '') . ' ' . ($order['customer']['last_name'] ?? ''));
         if ($customerName === '') {
             $customerName = $order['email'] ?? ('Order #' . ($order['order_number'] ?? $order['id']));
         }
 
-        $productName = $order['line_items'][0]['name'] ?? 'Unknown product';
-        $quantity = $order['line_items'][0]['quantity'] ?? 1;
-        $price = (float) ($order['total_price'] ?? 0);
-        $gateway = $order['gateway'] ?? 'Card';
-
-        $financialStatus = $order['financial_status'] ?? 'pending';
-        $paymentStatus = CanonicalMapper::paymentStatusFromShopify($financialStatus);
-
-        $productId = $this->productModel->findOrCreate((int) $store['id'], $productName, $price);
-
-        $result = $this->inventoryService->reserve($productId, null, (int) $defaultWarehouse['id'], $quantity, 'shopify_webhook', "external:{$externalId}", 'webhook');
-        $stockWarning = $result['ok'] ? 0 : 1;
-
-        $stmt = $db->prepare(
-            "INSERT INTO orders (store_id, customer_name, product_name, quantity, price, source, external_order_id, status, payment_status, product_id, warehouse_id, stock_warning, payment_method)
-             VALUES (?, ?, ?, ?, ?, 'shopify_pull', ?, 'processing', ?, ?, ?, ?, ?)"
-        );
-        $stmt->execute([$store['id'], $customerName, $productName, $quantity, $price, $externalId, $paymentStatus, $productId, $defaultWarehouse['id'], $stockWarning, $gateway]);
+        // Webhook mode: product na ho to ban jata hai, stock kam ho to "stock warning" ke saath aata hai (pehle jaisa)
+        $this->importer->import((int) $store['id'], 'shopify_pull', $externalId, [
+            'customer_name' => $customerName,
+            'status' => 'processing',
+            'payment_status' => CanonicalMapper::paymentStatusFromShopify($order['financial_status'] ?? 'pending'),
+            'payment_method' => $order['gateway'] ?? 'Card',
+            'customer' => PlatformOrderMapper::customer('shopify', $order),
+        ], PlatformOrderMapper::shopifyLines($order), 'webhook', 'webhook');
     }
 
     // ---------- WooCommerce Webhook ----------
@@ -168,12 +158,7 @@ class WebhookController extends Controller
     }
     private function ingestWooOrder(array $store, array $order, string $externalId): void
     {
-        $db = Database::getConnection();
-        $defaultWarehouse = $this->warehouseModel->getDefault((int) $store['id']);
-
-        $check = $db->prepare("SELECT id FROM orders WHERE external_wc_order_id = ? AND store_id = ?");
-        $check->execute([$externalId, $store['id']]);
-        if ($check->fetch()) {
+        if ($this->importer->exists((int) $store['id'], 'woocommerce_pull', $externalId)) {
             return;
         }
 
@@ -183,25 +168,13 @@ class WebhookController extends Controller
             $customerName = $billing['email'] ?? 'Unknown';
         }
 
-        $lineItems = $order['line_items'][0] ?? [];
-        $productName = $lineItems['name'] ?? 'Unknown product';
-        $quantity = $lineItems['quantity'] ?? 1;
-        $price = (float) ($order['total'] ?? 0);
-        $paymentMethodTitle = $order['payment_method_title'] ?? 'Other';
-
-        $wcStatus = $order['status'] ?? 'pending';
-        $paymentStatus = CanonicalMapper::paymentStatusFromWooCommerce($wcStatus);
-
-        $productId = $this->productModel->findOrCreate((int) $store['id'], $productName, $price);
-
-        $result = $this->inventoryService->reserve($productId, null, (int) $defaultWarehouse['id'], $quantity, 'woocommerce_webhook', "external:{$externalId}", 'webhook');
-        $stockWarning = $result['ok'] ? 0 : 1;
-
-        $stmt = $db->prepare(
-            "INSERT INTO orders (store_id, customer_name, product_name, quantity, price, source, external_wc_order_id, status, payment_status, product_id, warehouse_id, stock_warning, payment_method)
-             VALUES (?, ?, ?, ?, ?, 'woocommerce_pull', ?, 'processing', ?, ?, ?, ?, ?)"
-        );
-        $stmt->execute([$store['id'], $customerName, $productName, $quantity, $price, $externalId, $paymentStatus, $productId, $defaultWarehouse['id'], $stockWarning, $paymentMethodTitle]);
+        $this->importer->import((int) $store['id'], 'woocommerce_pull', $externalId, [
+            'customer_name' => $customerName,
+            'status' => 'processing',
+            'payment_status' => CanonicalMapper::paymentStatusFromWooCommerce($order['status'] ?? 'pending'),
+            'payment_method' => $order['payment_method_title'] ?? 'Other',
+            'customer' => PlatformOrderMapper::customer('woocommerce', $order),
+        ], PlatformOrderMapper::wooLines($order), 'webhook', 'webhook');
     }
 
     // ---------- BigCommerce Webhook ----------
@@ -243,12 +216,7 @@ class WebhookController extends Controller
 
     private function ingestBigCommerceOrder(array $store, string $externalId): void
     {
-        $db = Database::getConnection();
-        $defaultWarehouse = $this->warehouseModel->getDefault((int) $store['id']);
-
-        $check = $db->prepare("SELECT id FROM orders WHERE external_bc_order_id = ? AND store_id = ?");
-        $check->execute([$externalId, $store['id']]);
-        if ($check->fetch()) {
+        if ($this->importer->exists((int) $store['id'], 'bigcommerce_pull', $externalId)) {
             return;
         }
 
@@ -260,7 +228,7 @@ class WebhookController extends Controller
         $response = curl_exec($ch);
         curl_close($ch);
 
-        $order = json_decode($response, true);
+        $order = json_decode((string) $response, true);
         if (!$order) {
             return;
         }
@@ -273,29 +241,21 @@ class WebhookController extends Controller
         $productsResponse = curl_exec($pch);
         curl_close($pch);
 
-        $lineItems = json_decode($productsResponse, true) ?? [];
-        $firstItem = $lineItems[0] ?? [];
-
-        $productName = $firstItem['name'] ?? 'Unknown product';
-        $quantity = (int) ($firstItem['quantity'] ?? 1);
-        $price = (float) ($order['total_inc_tax'] ?? 0);
-
         $billing = $order['billing_address'] ?? [];
         $customerName = trim(($billing['first_name'] ?? '') . ' ' . ($billing['last_name'] ?? ''));
         if ($customerName === '') {
             $customerName = $billing['email'] ?? ('Order #' . $externalId);
         }
 
-        $productId = $this->productModel->findOrCreate((int) $store['id'], $productName, $price);
+        [, $paymentStatus] = PlatformOrderMapper::bigCommerceStatus($order['status'] ?? 'Pending');
 
-        $result = $this->inventoryService->reserve($productId, null, (int) $defaultWarehouse['id'], $quantity, 'bigcommerce_webhook', "external:{$externalId}", 'webhook');
-        $stockWarning = $result['ok'] ? 0 : 1;
-
-        $stmt = $db->prepare(
-            "INSERT INTO orders (store_id, customer_name, product_name, quantity, price, source, external_bc_order_id, status, product_id, warehouse_id, stock_warning)
-             VALUES (?, ?, ?, ?, ?, 'bigcommerce_pull', ?, 'processing', ?, ?, ?)"
-        );
-        $stmt->execute([$store['id'], $customerName, $productName, $quantity, $price, $externalId, $productId, $defaultWarehouse['id'], $stockWarning]);
+        $this->importer->import((int) $store['id'], 'bigcommerce_pull', $externalId, [
+            'customer_name' => $customerName,
+            'status' => 'processing',
+            'payment_status' => $paymentStatus,
+            'payment_method' => $order['payment_method'] ?? null,
+            'customer' => PlatformOrderMapper::customer('bigcommerce', $order),
+        ], PlatformOrderMapper::bigCommerceLines(json_decode((string) $productsResponse, true) ?? []), 'webhook', 'webhook');
     }
 
     // ---------- Wix Webhook ----------
@@ -367,36 +327,18 @@ class WebhookController extends Controller
 
     private function ingestWixOrderFromPayload(array $store, array $order, string $externalId): void
     {
-        $db = Database::getConnection();
-        $defaultWarehouse = $this->warehouseModel->getDefault((int) $store['id']);
-
-        $check = $db->prepare("SELECT id FROM orders WHERE external_wix_order_id = ? AND store_id = ?");
-        $check->execute([$externalId, $store['id']]);
-        if ($check->fetch()) {
+        if ($this->importer->exists((int) $store['id'], 'wix_pull', $externalId)) {
             return;
         }
 
-        $lineItems = $order['lineItems'][0] ?? [];
-        $productName = $lineItems['productName']['original'] ?? 'Unknown product';
-        $quantity = (int) ($lineItems['quantity'] ?? 1);
-        $price = (float) ($order['priceSummary']['total']['amount'] ?? 0);
+        [, $paymentStatus] = PlatformOrderMapper::wixStatus($order);
 
-        $billingInfo = $order['billingInfo']['contactDetails'] ?? [];
-        $customerName = trim(($billingInfo['firstName'] ?? '') . ' ' . ($billingInfo['lastName'] ?? ''));
-        if ($customerName === '') {
-            $customerName = $order['buyerInfo']['email'] ?? ('Order #' . $externalId);
-        }
-
-        $productId = $this->productModel->findOrCreate((int) $store['id'], $productName, $price);
-
-        $reserveResult = $this->inventoryService->reserve($productId, null, (int) $defaultWarehouse['id'], $quantity, 'wix_webhook', "external:{$externalId}", 'webhook');
-        $stockWarning = $reserveResult['ok'] ? 0 : 1;
-
-        $stmt = $db->prepare(
-            "INSERT INTO orders (store_id, customer_name, product_name, quantity, price, source, external_wix_order_id, status, product_id, warehouse_id, stock_warning)
-             VALUES (?, ?, ?, ?, ?, 'wix_pull', ?, 'processing', ?, ?, ?)"
-        );
-        $stmt->execute([$store['id'], $customerName, $productName, $quantity, $price, $externalId, $productId, $defaultWarehouse['id'], $stockWarning]);
+        $this->importer->import((int) $store['id'], 'wix_pull', $externalId, [
+            'customer_name' => PlatformOrderMapper::wixCustomerName($order, $externalId),
+            'status' => 'processing',
+            'payment_status' => $paymentStatus,
+            'customer' => PlatformOrderMapper::customer('wix', $order),
+        ], PlatformOrderMapper::wixLines($order), 'webhook', 'webhook');
     }
 
     // ---------- Custom Bridge Webhook ----------
@@ -462,41 +404,19 @@ class WebhookController extends Controller
 
     private function ingestBridgeOrder(array $store, array $order, string $externalId): void
     {
-        $db = Database::getConnection();
-        $defaultWarehouse = $this->warehouseModel->getDefault((int) $store['id']);
-
-        $check = $db->prepare("SELECT id FROM orders WHERE external_order_id = ? AND store_id = ?");
-        $check->execute([$externalId, $store['id']]);
-        if ($check->fetch()) {
+        if ($this->importer->exists((int) $store['id'], 'custom_bridge_pull', $externalId)) {
             return;
         }
-        $customerName = $order['customer_name'] ?? 'Unknown';
-        $externalProductId = (string) ($order['product_id'] ?? '');
-        $quantity = (int) ($order['quantity'] ?? 1);
-        $price = (float) ($order['total_price'] ?? 0);
 
-        $bridgeStatus = $order['status'] ?? 'pending';
-        $canonicalStatus = CanonicalMapper::fromCustomBridge($bridgeStatus);
-        $status = CanonicalMapper::toInternalOrderStatus($canonicalStatus);
+        $canonicalStatus = CanonicalMapper::fromCustomBridge($order['status'] ?? 'pending');
 
-        $productCheck = $db->prepare("SELECT id FROM products WHERE store_id = ? AND external_product_id = ?");
-        $productCheck->execute([$store['id'], $externalProductId]);
-        $productRow = $productCheck->fetch();
-
-        if ($productRow) {
-            $productId = (int) $productRow['id'];
-        } else {
-            $productId = $this->productModel->findOrCreate((int) $store['id'], 'Bridge Product #' . $externalProductId, $price, $externalProductId);
-        }
-
-        $result = $this->inventoryService->reserve($productId, null, (int) $defaultWarehouse['id'], $quantity, 'custom_bridge_webhook', "external:{$externalId}", 'webhook');
-        $stockWarning = $result['ok'] ? 0 : 1;
-
-        $stmt = $db->prepare(
-            "INSERT INTO orders (store_id, customer_name, product_name, quantity, price, source, external_order_id, status, product_id, warehouse_id, stock_warning)
-             VALUES (?, ?, ?, ?, ?, 'custom_bridge_pull', ?, ?, ?, ?, ?)"
-        );
-        $stmt->execute([$store['id'], $customerName, 'Bridge Product #' . $externalProductId, $quantity, $price, $externalId, $status, $productId, $defaultWarehouse['id'], $stockWarning]);
+        // Ek order mein kai products: "items" list (naya), ya purana ek-product format — dono chalte hain
+        $this->importer->import((int) $store['id'], 'custom_bridge_pull', $externalId, [
+            'customer_name' => $order['customer_name'] ?? 'Unknown',
+            'status' => CanonicalMapper::toInternalOrderStatus($canonicalStatus),
+            'payment_status' => 'unpaid',
+            'customer' => PlatformOrderMapper::customer('bridge', $order),
+        ], PlatformOrderMapper::bridgeLines($order), 'webhook', 'webhook');
     }
 
     // ---------- Shared: Idempotency / Replay Protection ----------

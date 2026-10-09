@@ -260,5 +260,55 @@
       });
     </script>
 
+    <script>
+      // CSRF token: har POST form aur fetch() POST ke saath apne aap jata hai (core/Csrf.php)
+      (function () {
+        var token = <?= json_encode(Csrf::token()) ?>;
+        if (!token) { return; }
+
+        function sameOrigin(url) {
+          try { return new URL(url, window.location.href).origin === window.location.origin; } catch (e) { return false; }
+        }
+        function addToken(form) {
+          // getAttribute: form ke andar "method"/"action" naam ka input ho to form.method galat cheez deta hai
+          if (!form || !form.getAttribute) { return; }
+          var method = (form.getAttribute('method') || 'get').toLowerCase();
+          var action = form.getAttribute('action') || window.location.href;
+          if (method !== 'post' || !sameOrigin(action)) { return; }
+          var input = form.querySelector('input[name="_csrf"]');
+          if (!input) {
+            input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = '_csrf';
+            form.appendChild(input);
+          }
+          input.value = token;
+        }
+
+        // Normal submit (button / Enter)
+        document.addEventListener('submit', function (e) { addToken(e.target); }, true);
+
+        // JavaScript se form.submit() (yeh "submit" event nahi chalata)
+        var nativeSubmit = HTMLFormElement.prototype.submit;
+        HTMLFormElement.prototype.submit = function () { addToken(this); return nativeSubmit.call(this); };
+
+        // fetch() POST requests
+        if (window.fetch) {
+          var nativeFetch = window.fetch;
+          window.fetch = function (input, init) {
+            init = init || {};
+            var method = String(init.method || 'GET').toUpperCase();
+            var url = typeof input === 'string' ? input : (input && input.url) || '';
+            if (method !== 'GET' && method !== 'HEAD' && sameOrigin(url)) {
+              var headers = new Headers(init.headers || {});
+              headers.set('X-CSRF-Token', token);
+              init.headers = headers;
+            }
+            return nativeFetch.call(this, input, init);
+          };
+        }
+      })();
+    </script>
+
 </body>
 </html>

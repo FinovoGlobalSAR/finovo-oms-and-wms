@@ -8,7 +8,13 @@ $success = $success ?? null;
 $error = $error ?? null;
 $old = $old ?? [];
 
-$totalEmployees = count($employees);
+$assignableRoles = $assignableRoles ?? $roles;   // Manager ko "Admin" role nahi dikhta
+$stats = $stats ?? ['total' => count($employees), 'active' => 0, 'inactive' => 0];
+$totalEmployees = (int) $stats['total'];
+$search = $search ?? '';
+$roleFilter = $roleFilter ?? '';
+$statusFilter = $statusFilter ?? '';
+$isFiltered = $search !== '' || $roleFilter !== '' || $statusFilter !== '';
 
 $baseUrl = '';
 
@@ -26,12 +32,9 @@ if (!function_exists('employeeInitials')) {
     }
 }
 
-// ---------- Summary numbers (sirf display ke liye, $employees se hi) ----------
-$activeCount = 0;
-foreach ($employees as $emp) {
-    if (strtolower($emp['status'] ?? 'inactive') === 'active') { $activeCount++; }
-}
-$inactiveCount = $totalEmployees - $activeCount;
+// ---------- Upar ke numbers: controller POORI list se deta hai ----------
+$activeCount = (int) $stats['active'];
+$inactiveCount = (int) $stats['inactive'];
 
 $avatarColors = [
     ['bg' => '#dbeafe', 'text' => '#1d4ed8'],
@@ -90,26 +93,32 @@ $avatarColors = [
 </div>
 
 <div class="ui-card">
-    <div class="emp-toolbar">
+    <!-- Search / filters: server pe chalte hain, har page ka result sahi -->
+    <form method="GET" action="<?= $baseUrl ?>/employees" class="emp-toolbar">
         <label class="ui-search emp-search">
             <i class="bi bi-search"></i>
-            <input id="employeeSearch" type="text" placeholder="Search by name or email..." aria-label="Search employees">
+            <input name="q" type="text" value="<?= htmlspecialchars($search) ?>" placeholder="Search by name or email..." aria-label="Search employees">
         </label>
-        <select id="roleFilter" class="ui-btn" aria-label="Filter by role" style="padding-right:10px;">
+        <select name="role" class="ui-btn" aria-label="Filter by role" style="padding-right:10px;" onchange="this.form.submit()">
             <option value="">All Roles</option>
             <?php foreach ($roles as $role): ?>
-                <option value="<?= htmlspecialchars(strtolower($role['name'])) ?>"><?= htmlspecialchars($role['name']) ?></option>
+                <?php $rv = strtolower($role['name']); ?>
+                <option value="<?= htmlspecialchars($rv) ?>" <?= $roleFilter === $rv ? 'selected' : '' ?>><?= htmlspecialchars($role['name']) ?></option>
             <?php endforeach; ?>
         </select>
-        <select id="statusFilter" class="ui-btn" aria-label="Filter by status" style="padding-right:10px;">
+        <select name="status" class="ui-btn" aria-label="Filter by status" style="padding-right:10px;" onchange="this.form.submit()">
             <option value="">All Status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
+            <option value="active" <?= $statusFilter === 'active' ? 'selected' : '' ?>>Active</option>
+            <option value="inactive" <?= $statusFilter === 'inactive' ? 'selected' : '' ?>>Inactive</option>
         </select>
+        <button type="submit" class="ui-btn"><i class="bi bi-search"></i> Search</button>
+        <?php if ($isFiltered): ?>
+            <a href="<?= $baseUrl ?>/employees" class="ui-btn"><i class="bi bi-x"></i> Clear</a>
+        <?php endif; ?>
         <div class="emp-toolbar-actions">
             <button type="button" class="ui-btn ui-btn-primary" onclick="openEmployeeModal()"><i class="bi bi-person-plus"></i> Add Employee</button>
         </div>
-    </div>
+    </form>
 
     <div style="overflow-x:auto;">
         <table class="data-table">
@@ -125,7 +134,11 @@ $avatarColors = [
             </thead>
             <tbody>
                 <?php if (empty($employees)): ?>
-                    <tr><td colspan="6" class="ui-empty"><i class="bi bi-people"></i>No employees found. Click "Add Employee" to create the first account.</td></tr>
+                    <?php if ($isFiltered): ?>
+                        <tr><td colspan="6" class="ui-empty"><i class="bi bi-search"></i>No employees match your filters.</td></tr>
+                    <?php else: ?>
+                        <tr><td colspan="6" class="ui-empty"><i class="bi bi-people"></i>No employees found. Click "Add Employee" to create the first account.</td></tr>
+                    <?php endif; ?>
                 <?php else: ?>
                     <?php $i = 0; foreach ($employees as $employee):
                         $status = strtolower($employee['status'] ?? 'inactive');
@@ -133,17 +146,14 @@ $avatarColors = [
                         $isActive = $status === 'active';
                         $avColor = $avatarColors[$i % count($avatarColors)]; $i++;
                     ?>
-                        <tr class="employee-row"
-                            data-name="<?= htmlspecialchars(strtolower($employee['name'])) ?>"
-                            data-email="<?= htmlspecialchars(strtolower($employee['email'])) ?>"
-                            data-role="<?= htmlspecialchars(strtolower($roleName)) ?>"
-                            data-status="<?= htmlspecialchars($status) ?>">
+                        <tr class="employee-row">
                             <td>
                                 <div style="display:flex; align-items:center; gap:10px;">
                                     <span style="width:34px; height:34px; border-radius:50%; background:<?= $avColor['bg'] ?>; color:<?= $avColor['text'] ?>; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0;">
                                         <?= htmlspecialchars(employeeInitials($employee['name'])) ?>
                                     </span>
                                     <span style="font-weight:600;"><?= htmlspecialchars($employee['name']) ?></span>
+                                    <?php if (!empty($employee['is_self'])): ?><span class="ui-pill ui-pill-blue">You</span><?php endif; ?>
                                 </div>
                             </td>
                             <td style="color:#475569;"><?= htmlspecialchars($employee['email']) ?></td>
@@ -160,37 +170,43 @@ $avatarColors = [
                             </td>
                             <td>
                                 <div style="display:flex; justify-content:flex-end; gap:6px;">
-                                    <button type="button"
-                                        onclick='openEditModal(<?= json_encode([
-                                            'id' => (int) $employee['id'],
-                                            'name' => $employee['name'],
-                                            'email' => $employee['email'],
-                                            'role_id' => (int) $employee['role_id'],
-                                            'status' => $status,
-                                        ], JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'
-                                        class="ui-btn ui-btn-soft ui-btn-sm">
-                                        <i class="bi bi-pencil"></i> Edit
-                                    </button>
-                                    <form method="POST" action="<?= $baseUrl ?>/employees/delete" style="margin:0;"
-                                          onsubmit="return confirm('Are you sure you want to delete this employee?');">
-                                        <input type="hidden" name="id" value="<?= (int) $employee['id'] ?>">
-                                        <button type="submit" class="ui-btn ui-btn-sm" style="border-color:#fecaca; color:#b91c1c;">
-                                            <i class="bi bi-trash"></i> Delete
+                                    <?php if (!empty($employee['can_edit'])): ?>
+                                        <button type="button"
+                                            onclick='openEditModal(<?= json_encode([
+                                                'id' => (int) $employee['id'],
+                                                'name' => $employee['name'],
+                                                'email' => $employee['email'],
+                                                'role_id' => (int) $employee['role_id'],
+                                                'status' => $status,
+                                                'is_self' => !empty($employee['is_self']),
+                                            ], JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP) ?>)'
+                                            class="ui-btn ui-btn-soft ui-btn-sm">
+                                            <i class="bi bi-pencil"></i> Edit
                                         </button>
-                                    </form>
+                                    <?php endif; ?>
+                                    <?php if (!empty($employee['can_delete'])): ?>
+                                        <form method="POST" action="<?= $baseUrl ?>/employees/delete" style="margin:0;"
+                                              onsubmit="return confirm('Are you sure you want to delete this employee?');">
+                                            <input type="hidden" name="id" value="<?= (int) $employee['id'] ?>">
+                                            <button type="submit" class="ui-btn ui-btn-sm" style="border-color:#fecaca; color:#b91c1c;">
+                                                <i class="bi bi-trash"></i> Delete
+                                            </button>
+                                        </form>
+                                    <?php endif; ?>
+                                    <?php if (empty($employee['can_edit'])): ?>
+                                        <!-- Manager kisi Admin ko Edit / Delete nahi kar sakta -->
+                                        <span style="font-size:12px; color:var(--text-muted);" title="Only an Admin can change an Admin account"><i class="bi bi-lock"></i> Admin only</span>
+                                    <?php endif; ?>
                                 </div>
                             </td>
                         </tr>
                     <?php endforeach; ?>
-                    <tr id="empNoMatch" style="display:none;"><td colspan="6" class="ui-empty"><i class="bi bi-search"></i>No employees match your filters.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
     </div>
 
-    <div class="pagination-bar">
-        <span id="empShowing">Showing <?= $totalEmployees ?> of <?= $totalEmployees ?> employees</span>
-    </div>
+    <?php if (!empty($pager)) { $pagerLabel = 'employees'; require __DIR__ . '/../partials/pagination.php'; } ?>
 </div>
 
 <!-- ============================================ -->
@@ -222,7 +238,7 @@ $avatarColors = [
                 <label>Role *</label>
                 <select required name="role_id" class="emp-input">
                     <option value="">Select Role</option>
-                    <?php foreach ($roles as $role): ?>
+                    <?php foreach ($assignableRoles as $role): ?>
                         <option value="<?= (int) $role['id'] ?>" <?= ((int) ($old['role_id'] ?? 0) === (int) $role['id']) ? 'selected' : '' ?>>
                             <?= htmlspecialchars($role['name']) ?>
                         </option>
@@ -276,10 +292,14 @@ $avatarColors = [
             <div class="form-group">
                 <label for="edit_role_id">Role *</label>
                 <select required id="edit_role_id" name="role_id" class="emp-input">
-                    <?php foreach ($roles as $role): ?>
+                    <?php foreach ($assignableRoles as $role): ?>
                         <option value="<?= (int) $role['id'] ?>"><?= htmlspecialchars($role['name']) ?></option>
                     <?php endforeach; ?>
                 </select>
+                <!-- Apna account edit karte waqt role / status badal nahi sakte: select band, yeh hidden fields jaate hain -->
+                <input type="hidden" id="edit_self_role_id" name="role_id" disabled>
+                <input type="hidden" id="edit_self_status" name="status" value="active" disabled>
+                <p id="edit_self_note" class="modal-help" style="display:none; margin:6px 0 0;">You cannot change your own role or status.</p>
             </div>
             <div class="form-group">
                 <label>Status</label>
@@ -334,9 +354,20 @@ function openEditModal(employee) {
     document.getElementById('edit_id').value = employee.id;
     document.getElementById('edit_name').value = employee.name;
     document.getElementById('edit_email').value = employee.email;
-    document.getElementById('edit_role_id').value = employee.role_id;
+    const roleSelect = document.getElementById('edit_role_id');
+    roleSelect.value = employee.role_id;
     document.getElementById('edit_status_active').checked = employee.status === 'active';
     document.getElementById('edit_status_inactive').checked = employee.status === 'inactive';
+
+    // Apna account: role / status band (server bhi rokta hai)
+    const self = !!employee.is_self;
+    roleSelect.disabled = self;
+    document.getElementById('edit_status_active').disabled = self;
+    document.getElementById('edit_status_inactive').disabled = self;
+    document.getElementById('edit_self_role_id').disabled = !self;
+    document.getElementById('edit_self_role_id').value = employee.role_id;
+    document.getElementById('edit_self_status').disabled = !self;
+    document.getElementById('edit_self_note').style.display = self ? '' : 'none';
 
     document.getElementById('editEmployeeModal').classList.add('show');
     document.body.classList.add('overflow-hidden');
@@ -345,31 +376,6 @@ function closeEditModal() {
     document.getElementById('editEmployeeModal').classList.remove('show');
     document.body.classList.remove('overflow-hidden');
 }
-
-function filterEmployees() {
-    const search = document.getElementById('employeeSearch').value.toLowerCase().trim();
-    const role = document.getElementById('roleFilter').value;
-    const status = document.getElementById('statusFilter').value;
-    const rows = document.querySelectorAll('.employee-row');
-    let shown = 0;
-
-    rows.forEach(row => {
-        const matchesSearch = !search || row.dataset.name.includes(search) || row.dataset.email.includes(search);
-        const matchesRole = !role || row.dataset.role === role;
-        const matchesStatus = !status || row.dataset.status === status;
-        const ok = matchesSearch && matchesRole && matchesStatus;
-        row.style.display = ok ? '' : 'none';
-        if (ok) { shown++; }
-    });
-
-    const nm = document.getElementById('empNoMatch');
-    if (nm) { nm.style.display = (rows.length > 0 && shown === 0) ? '' : 'none'; }
-    document.getElementById('empShowing').textContent = 'Showing ' + shown + ' of ' + rows.length + ' employees';
-}
-
-document.getElementById('employeeSearch')?.addEventListener('input', filterEmployees);
-document.getElementById('roleFilter')?.addEventListener('change', filterEmployees);
-document.getElementById('statusFilter')?.addEventListener('change', filterEmployees);
 
 <?php if ($error && !empty($old)): ?>
 openEmployeeModal();

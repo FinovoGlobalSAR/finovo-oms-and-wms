@@ -42,15 +42,12 @@ $shipmentColors = [
 
 $platform = $store['platform'] ?? 'manual';
 
-// ---------- Summary numbers (sirf display ke liye, $orders se hi) ----------
-$pendingCount = 0;
-$unpaidCount = 0;
-$notDispatchedCount = 0;
-foreach ($orders as $o) {
-    if (($o['status'] ?? 'pending') === 'pending') { $pendingCount++; }
-    if (($o['payment_status'] ?? 'unpaid') !== 'paid') { $unpaidCount++; }
-    if (empty($shipmentMap[(int) $o['id']])) { $notDispatchedCount++; }
-}
+// ---------- Summary numbers — controller POORI list se bhejta hai ($orders sirf is page ki rows hain) ----------
+$totalCount = (int) ($stats['total'] ?? count($orders));
+$pendingCount = (int) ($stats['pending'] ?? 0);
+$unpaidCount = (int) ($stats['unpaid'] ?? 0);
+$notDispatchedCount = (int) ($stats['notDispatched'] ?? 0);
+$selectedStatus = $selectedStatus ?? '';
 
 $syncLinks = [
     'shopify'     => ['/orders/sync-shopify', 'Shopify'],
@@ -71,7 +68,7 @@ $showCjSync = ($platform === 'cj') || !empty($store['cj_api_key']);
 <div class="ui-head">
     <div class="ui-head-left">
         <div class="breadcrumb">Finovo <i class="bi bi-chevron-right"></i> <span class="current">Orders</span></div>
-        <h1>Orders <span class="count-badge"><?= count($orders) ?></span></h1>
+        <h1>Orders <span class="count-badge"><?= $totalCount ?></span></h1>
         <p>Manage your orders and track fulfillment across all sources.</p>
     </div>
 </div>
@@ -84,6 +81,9 @@ $showCjSync = ($platform === 'cj') || !empty($store['cj_api_key']);
 <?php endif; ?>
 <?php if (!empty($exported)): ?>
     <div class="banner banner-success"><i class="bi bi-check-circle"></i> Order exported.</div>
+<?php endif; ?>
+<?php if (!empty($_GET['pushed'])): ?>
+    <div class="banner banner-success"><i class="bi bi-check-circle"></i> Order sent to <?= htmlspecialchars($_GET['pushed']) ?> successfully.</div>
 <?php endif; ?>
 <?php if (!empty($imported)): ?>
     <div class="banner banner-success"><i class="bi bi-check-circle"></i> <?= (int)$imported ?> order(s) imported from CSV.</div>
@@ -109,7 +109,7 @@ $showCjSync = ($platform === 'cj') || !empty($store['cj_api_key']);
         <div class="ui-stat-icon"><i class="bi bi-bag-check"></i></div>
         <div>
             <div class="ui-stat-label">Total Orders</div>
-            <div class="ui-stat-value"><b><?= count($orders) ?></b><span class="ui-pill ui-pill-blue"><?= $selectedPlatform === 'all' ? 'All' : 'Filtered' ?></span></div>
+            <div class="ui-stat-value"><b><?= $totalCount ?></b><span class="ui-pill ui-pill-blue"><?= ($selectedPlatform === 'all' && $selectedStatus === '' && trim($_GET['search'] ?? '') === '') ? 'All' : 'Filtered' ?></span></div>
         </div>
     </div>
     <div class="ui-stat">
@@ -160,15 +160,14 @@ $showCjSync = ($platform === 'cj') || !empty($store['cj_api_key']);
             <option value="oscommerce" <?= $selectedPlatform === 'oscommerce' ? 'selected' : '' ?>>osCommerce</option>
             <option value="wix" <?= $selectedPlatform === 'wix' ? 'selected' : '' ?>>Wix</option>
             <option value="ebay" <?= $selectedPlatform === 'ebay' ? 'selected' : '' ?>>eBay</option>
+            <option value="magento" <?= $selectedPlatform === 'magento' ? 'selected' : '' ?>>Magento</option>
             <option value="csv" <?= $selectedPlatform === 'csv' ? 'selected' : '' ?>>CSV import</option>
         </select>
-        <select id="orderStatusFilter" class="orders-select" aria-label="Filter by status">
+        <select name="status" id="orderStatusFilter" class="orders-select" aria-label="Filter by status" onchange="this.form.submit()">
             <option value="">All statuses</option>
-            <option value="pending">Pending</option>
-            <option value="processing">Processing</option>
-            <option value="delivered">Delivered</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
+            <?php foreach (['pending' => 'Pending', 'processing' => 'Processing', 'delivered' => 'Delivered', 'completed' => 'Completed', 'cancelled' => 'Cancelled'] as $sv => $sl): ?>
+                <option value="<?= $sv ?>" <?= $selectedStatus === $sv ? 'selected' : '' ?>><?= $sl ?></option>
+            <?php endforeach; ?>
         </select>
         <button type="submit" class="ui-btn ui-btn-primary"><i class="bi bi-search"></i> Search</button>
 
@@ -290,9 +289,42 @@ $showCjSync = ($platform === 'cj') || !empty($store['cj_api_key']);
                                 <a href="/orders/edit?id=<?= $order['id'] ?>"><i class="bi bi-pencil"></i> Edit</a>
                                 <a href="/orders/invoice?order_id=<?= $order['id'] ?>"><i class="bi bi-file-earmark-pdf"></i> Download Invoice</a>
                                 <a href="/orders/cj-fulfill?id=<?= $order['id'] ?>"><i class="bi bi-truck"></i> Send to CJdropshipping</a>
-                                <div class="row-menu-divider"></div>
-                                <a href="/orders/export-shopify?id=<?= $order['id'] ?>"><i class="bi bi-box-arrow-up-right"></i> Push to Shopify</a>
-                                <a href="/orders/export-woocommerce?id=<?= $order['id'] ?>"><i class="bi bi-box-arrow-up-right"></i> Push to WooCommerce</a>
+                                <?php
+                                // Push sirf usi platform ka dikhao jis ka yeh store hai.
+                                //  - "Push to X": Finovo ka order X pe banao (jo pehle se X pe hai us ka nahi)
+                                //  - "Send tracking to X": X wale order ko shipment ke tracking number ke saath "Shipped" karo
+                                $storePlatform = strtolower($store['platform'] ?? '');
+                                $pushColumns = [
+                                    'shopify' => 'external_order_id', 'woocommerce' => 'external_wc_order_id',
+                                    'bigcommerce' => 'external_bc_order_id', 'wix' => 'external_wix_order_id',
+                                    'magento' => 'external_magento_order_id', 'prestashop' => 'external_ps_order_id',
+                                    'ebay' => 'external_ebay_order_id',
+                                ];
+                                $pushLabels = [
+                                    'shopify' => 'Shopify', 'woocommerce' => 'WooCommerce', 'bigcommerce' => 'BigCommerce',
+                                    'wix' => 'Wix', 'magento' => 'Magento', 'prestashop' => 'PrestaShop', 'ebay' => 'eBay',
+                                ];
+                                $canCreate = in_array($storePlatform, ['shopify', 'woocommerce', 'bigcommerce', 'wix', 'magento', 'prestashop'], true);
+                                $canTrack = in_array($storePlatform, ['shopify', 'woocommerce', 'bigcommerce', 'magento', 'ebay'], true);
+                                $inPlatform = isset($pushColumns[$storePlatform]) && !empty($order[$pushColumns[$storePlatform]]);
+                                $hasTracking = ($shipment && !empty($shipment['tracking_number'])) || !empty($order['cj_tracking_number']);
+                                $pushLabel = $pushLabels[$storePlatform] ?? '';
+                                ?>
+                                <?php if ($canCreate || ($canTrack && $inPlatform && $hasTracking)): ?>
+                                    <div class="row-menu-divider"></div>
+                                    <?php if ($canCreate && !$inPlatform): ?>
+                                        <a href="/orders/push?id=<?= $order['id'] ?>"><i class="bi bi-box-arrow-up-right"></i> Push to <?= $pushLabel ?></a>
+                                    <?php elseif ($canCreate): ?>
+                                        <span class="row-menu-note"><i class="bi bi-check2-circle"></i> Already in <?= $pushLabel ?></span>
+                                    <?php endif; ?>
+                                    <?php if ($canTrack && $inPlatform && $hasTracking): ?>
+                                        <?php if (!empty($order['platform_tracking_pushed_at'])): ?>
+                                            <span class="row-menu-note"><i class="bi bi-check2-circle"></i> Tracking sent to <?= $pushLabel ?></span>
+                                        <?php else: ?>
+                                            <a href="/orders/push-tracking?id=<?= $order['id'] ?>"><i class="bi bi-truck"></i> Send tracking to <?= $pushLabel ?></a>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+                                <?php endif; ?>
                                 <div class="row-menu-divider"></div>
                                 <a href="#" class="row-menu-danger" onclick="if(confirm('Delete this order? Stock will be returned to the warehouse.')){document.getElementById('deleteOrderForm<?= $order['id'] ?>').submit();} return false;"><i class="bi bi-trash"></i> Delete</a>
                             </div>
@@ -302,16 +334,12 @@ $showCjSync = ($platform === 'cj') || !empty($store['cj_api_key']);
                         </td>
                     </tr>
                 <?php endforeach; ?>
-                <tr id="orderNoMatch" style="display:none;"><td colspan="11" class="ui-empty"><i class="bi bi-funnel"></i>No orders with this status.</td></tr>
             <?php endif; ?>
         </tbody>
     </table>
     </div>
 
-    <div class="pagination-bar">
-        <span id="orderShowing">Showing <?= count($orders) ?> of <?= count($orders) ?> orders</span>
-        <div class="pagination-controls" id="orderPager"></div>
-    </div>
+    <?php $pagerLabel = 'order lines'; require __DIR__ . '/../partials/pagination.php'; ?>
 </div>
 
 <div class="modal-backdrop" id="importOrderModal">
@@ -436,6 +464,11 @@ $showCjSync = ($platform === 'cj') || !empty($store['cj_api_key']);
 .row-menu a:hover { background: #f8fafc; }
 .row-menu a.row-menu-danger { color: var(--red); }
 .row-menu a.row-menu-danger:hover { background: #fee2e2; }
+.row-menu-note {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; font-size: 13px; color: var(--text-muted); cursor: default;
+}
+.row-menu-note i { color: #16a34a; }
 .row-menu-divider {
     height: 1px;
     background: var(--border-color);
@@ -489,53 +522,12 @@ window.addEventListener('scroll', function() {
 </script>
 
 <script>
-// ---------- Status filter + 15-per-page pagination (browser only) ----------
+// ---------- "Select all" sirf is page ki rows (pagination ab server pe hoti hai) ----------
 (function () {
-    var PER_PAGE = 15;
-    var page = 1;
-    var rows = Array.prototype.slice.call(document.querySelectorAll('.order-row'));
-    var filter = document.getElementById('orderStatusFilter');
-    var pager = document.getElementById('orderPager');
-    var showing = document.getElementById('orderShowing');
-    var noMatch = document.getElementById('orderNoMatch');
     var selectAll = document.getElementById('orderSelectAll');
-
-    function render() {
-        var st = filter ? filter.value : '';
-        var list = rows.filter(function (r) { return st === '' || r.dataset.status === st; });
-        var pages = Math.max(1, Math.ceil(list.length / PER_PAGE));
-        if (page > pages) { page = pages; }
-        var start = (page - 1) * PER_PAGE;
-        rows.forEach(function (r) { r.style.display = 'none'; });
-        list.slice(start, start + PER_PAGE).forEach(function (r) { r.style.display = ''; });
-        if (noMatch) { noMatch.style.display = (rows.length > 0 && list.length === 0) ? '' : 'none'; }
-        var shown = Math.min(PER_PAGE, Math.max(0, list.length - start));
-        showing.textContent = 'Showing ' + shown + ' of ' + list.length + ' orders';
-
-        pager.innerHTML = '';
-        if (pages <= 1) { return; }
-        function add(label, target, disabled, active) {
-            var b = document.createElement('button');
-            b.type = 'button';
-            b.innerHTML = label;
-            b.disabled = disabled;
-            if (active) { b.className = 'page-num active'; b.setAttribute('aria-current', 'page'); }
-            b.addEventListener('click', function () { page = target; render(); });
-            pager.appendChild(b);
-        }
-        add('<i class="bi bi-arrow-left"></i> Prev', page - 1, page === 1, false);
-        for (var i = 1; i <= pages; i++) { add(String(i), i, false, i === page); }
-        add('Next <i class="bi bi-arrow-right"></i>', page + 1, page === pages, false);
-    }
-
-    if (filter) { filter.addEventListener('change', function () { page = 1; render(); }); }
-    if (selectAll) {
-        selectAll.addEventListener('change', function () {
-            rows.forEach(function (r) {
-                if (r.style.display !== 'none') { r.querySelector('.order-check').checked = selectAll.checked; }
-            });
-        });
-    }
-    render();
+    if (!selectAll) { return; }
+    selectAll.addEventListener('change', function () {
+        document.querySelectorAll('.order-row .order-check').forEach(function (c) { c.checked = selectAll.checked; });
+    });
 })();
 </script>

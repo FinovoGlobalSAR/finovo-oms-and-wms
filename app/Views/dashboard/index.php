@@ -147,7 +147,9 @@ $weekTotal = array_sum($trendCounts);
                     <div class="sub">Total units per warehouse</div>
                 </div>
             </div>
-            <a href="/warehouses" class="ui-btn ui-btn-sm">View</a>
+            <?php if (in_array(strtolower(trim($_SESSION['user']['role'] ?? '')), ['admin', 'manager', 'warehouse staff'], true)): ?>
+                <a href="/warehouses" class="ui-btn ui-btn-sm">View</a>
+            <?php endif; ?>
         </div>
         <canvas id="warehouseChart" height="200"></canvas>
     </div>

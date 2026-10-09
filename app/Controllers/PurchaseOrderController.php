@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../core/Controller.php';
+require_once __DIR__ . '/../../core/Paginator.php';
 require_once __DIR__ . '/../../core/Database.php';
 require_once __DIR__ . '/../Models/PurchaseOrder.php';
 require_once __DIR__ . '/../Models/Supplier.php';
@@ -24,17 +25,51 @@ class PurchaseOrderController extends Controller
         $this->productModel = new Product();
     }
 
+    private static function filterList(array $rows, callable $text): array
+    {
+        $q = mb_strtolower(trim((string) ($_GET['q'] ?? '')));
+        $status = trim((string) ($_GET['status'] ?? ''));
+        return array_values(array_filter($rows, function ($r) use ($q, $status, $text) {
+            if ($status !== '' && ($r['status'] ?? '') !== $status) {
+                return false;
+            }
+            return $q === '' || str_contains(mb_strtolower($text($r)), $q);
+        }));
+    }
+
     public function index(): void
     {
         $store = $this->getCurrentStore();
-        $purchaseOrders = $this->poModel->all((int) $store['id']);
+        $allPurchaseOrders = $this->poModel->all((int) $store['id']);
+
+        // Search mein product ke naam bhi hain — is liye items tabhi pehle laate hain jab search ho
+        $searching = trim((string) ($_GET['q'] ?? '')) !== '';
+        if ($searching) {
+            foreach ($allPurchaseOrders as &$po) {
+                $po['items'] = $this->poModel->items((int) $po['id']);
+            }
+            unset($po);
+        }
+
+        $filtered = self::filterList($allPurchaseOrders, function ($po) {
+            $items = implode(' ', array_map(fn($i) => $i['product_name'], $po['items'] ?? []));
+            return '#' . $po['id'] . ' ' . $po['supplier_name'] . ' ' . $po['warehouse_name'] . ' ' . $items;
+        });
+        $pager = Paginator::make($filtered);
+
+        // Items sirf is page ke POs ke (agar pehle nahi aaye)
+        $purchaseOrders = $pager['items'];
         foreach ($purchaseOrders as &$po) {
-            $po['items'] = $this->poModel->items((int) $po['id']);
+            $po['items'] ??= $this->poModel->items((int) $po['id']);
         }
         unset($po);
 
         $this->view('purchase-orders/index', [
             'purchaseOrders' => $purchaseOrders,
+            'allPurchaseOrders' => $allPurchaseOrders,
+            'pager' => $pager,
+            'search' => trim((string) ($_GET['q'] ?? '')),
+            'statusFilter' => trim((string) ($_GET['status'] ?? '')),
             'suppliers' => $this->supplierModel->all((int) $store['id']),
             'warehouses' => $this->warehouseModel->allByStore((int) $store['id']),
             'products' => $this->productModel->all((int) $store['id']),

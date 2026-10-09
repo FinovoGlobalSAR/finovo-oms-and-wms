@@ -1,13 +1,17 @@
 <?php
+// Upar ke numbers POORI list se ($allPurchaseOrders); table mein sirf is page ki rows ($purchaseOrders)
+$allPurchaseOrders = $allPurchaseOrders ?? $purchaseOrders;
+$search = $search ?? '';
+$statusFilter = $statusFilter ?? '';
 $statusColors = [
     'draft'    => ['bg' => '#f1f5f9', 'text' => '#334155'],
     'ordered'  => ['bg' => '#dbeafe', 'text' => '#1d4ed8'],
     'received' => ['bg' => '#dcfce7', 'text' => '#166534'],
 ];
 
-// ---------- Summary numbers (sirf display ke liye, $purchaseOrders se hi) ----------
+// ---------- Summary numbers (POORI list se — $allPurchaseOrders) ----------
 $poCounts = ['draft' => 0, 'ordered' => 0, 'received' => 0];
-foreach ($purchaseOrders as $po) {
+foreach ($allPurchaseOrders as $po) {
     if (isset($poCounts[$po['status']])) { $poCounts[$po['status']]++; }
 }
 ?>
@@ -15,7 +19,7 @@ foreach ($purchaseOrders as $po) {
 <div class="ui-head">
     <div class="ui-head-left">
         <div class="breadcrumb">Finovo <i class="bi bi-chevron-right"></i> <span class="current">Purchase Orders</span></div>
-        <h1>Purchase Orders <span class="count-badge"><?= count($purchaseOrders) ?></span></h1>
+        <h1>Purchase Orders <span class="count-badge"><?= count($allPurchaseOrders) ?></span></h1>
         <p>Order stock from suppliers and receive it into a warehouse.</p>
     </div>
 </div>
@@ -40,7 +44,7 @@ foreach ($purchaseOrders as $po) {
         <div class="ui-stat-icon"><i class="bi bi-clipboard-check"></i></div>
         <div>
             <div class="ui-stat-label">Total POs</div>
-            <div class="ui-stat-value"><b><?= count($purchaseOrders) ?></b><span class="ui-pill ui-pill-blue">All</span></div>
+            <div class="ui-stat-value"><b><?= count($allPurchaseOrders) ?></b><span class="ui-pill ui-pill-blue">All</span></div>
         </div>
     </div>
     <div class="ui-stat">
@@ -67,24 +71,29 @@ foreach ($purchaseOrders as $po) {
 </div>
 
 <div class="ui-card" style="overflow: visible;">
-    <div class="po-toolbar">
+    <!-- Search / status filter: server pe chalte hain, har page ka result sahi -->
+    <form method="GET" action="/purchase-orders" class="po-toolbar">
         <label class="ui-search po-search">
             <i class="bi bi-search"></i>
-            <input type="text" id="poSearch" placeholder="Search supplier, warehouse or product..." aria-label="Search purchase orders">
+            <input type="text" name="q" value="<?= htmlspecialchars($search) ?>" placeholder="Search supplier, warehouse or product..." aria-label="Search purchase orders">
         </label>
-        <select id="poStatusFilter" class="ui-btn" aria-label="Filter by status" style="padding-right:10px;">
+        <select name="status" onchange="this.form.submit()" class="ui-btn" aria-label="Filter by status" style="padding-right:10px;">
             <option value="">All statuses</option>
             <?php foreach ($statuses as $st): ?>
-                <option value="<?= $st ?>"><?= ucfirst($st) ?></option>
+                <option value="<?= $st ?>" <?= $statusFilter === $st ? 'selected' : '' ?>><?= ucfirst($st) ?></option>
             <?php endforeach; ?>
         </select>
+        <button type="submit" class="ui-btn"><i class="bi bi-search"></i> Search</button>
+        <?php if ($search !== '' || $statusFilter !== ''): ?>
+            <a href="/purchase-orders" class="ui-btn"><i class="bi bi-x"></i> Clear</a>
+        <?php endif; ?>
         <div class="po-toolbar-actions">
             <a href="/suppliers" class="ui-btn"><i class="bi bi-truck"></i> Suppliers</a>
             <button type="button" class="ui-btn ui-btn-primary" onclick="openModal('createPoModal')" <?= empty($suppliers) ? 'disabled title="Add a supplier first"' : '' ?>>
                 <i class="bi bi-plus-lg"></i> New Purchase Order
             </button>
         </div>
-    </div>
+    </form>
 
     <div style="overflow-x:auto;">
         <table class="data-table">
@@ -139,15 +148,12 @@ foreach ($purchaseOrders as $po) {
                             </td>
                         </tr>
                     <?php endforeach; ?>
-                    <tr id="poNoMatch" style="display:none;"><td colspan="6" class="ui-empty"><i class="bi bi-search"></i>No purchase orders match your search.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
     </div>
 
-    <div class="pagination-bar">
-        <span id="poShowing">Showing <?= count($purchaseOrders) ?> of <?= count($purchaseOrders) ?> purchase orders</span>
-    </div>
+    <?php if (!empty($pager)) { $pagerLabel = 'purchase orders'; require __DIR__ . '/../partials/pagination.php'; } ?>
 </div>
 
 <div class="modal-backdrop" id="createPoModal">
@@ -239,24 +245,4 @@ function addPoRow() {
 
 addPoRow();
 
-(function () {
-    var input = document.getElementById('poSearch');
-    var filter = document.getElementById('poStatusFilter');
-    var rows = Array.prototype.slice.call(document.querySelectorAll('.po-row'));
-    function apply() {
-        var q = input.value.trim().toLowerCase();
-        var st = filter.value;
-        var shown = 0;
-        rows.forEach(function (r) {
-            var ok = (q === '' || r.dataset.search.indexOf(q) !== -1) && (st === '' || r.dataset.status === st);
-            r.style.display = ok ? '' : 'none';
-            if (ok) { shown++; }
-        });
-        var nm = document.getElementById('poNoMatch');
-        if (nm) { nm.style.display = shown === 0 ? '' : 'none'; }
-        document.getElementById('poShowing').textContent = 'Showing ' + shown + ' of ' + rows.length + ' purchase orders';
-    }
-    input.addEventListener('input', apply);
-    filter.addEventListener('change', apply);
-})();
 </script>

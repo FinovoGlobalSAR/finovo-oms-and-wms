@@ -46,7 +46,8 @@ class OrderStatusService
             return ['ok' => false, 'message' => "Cannot move order from '{$oldStatus}' to '{$newStatus}'."];
         }
 
-        $this->db->prepare("UPDATE orders SET status = ? WHERE id = ?")->execute([$newStatus, $orderId]);
+        require_once __DIR__ . '/OrderStockService.php';
+        (new OrderStockService())->changeStatusWhere('id = ?', [$orderId], $newStatus, null, $actor ?? $source);
 
         $this->db->prepare(
             "INSERT INTO order_status_history (order_id, old_status, new_status, actor, source, reason) VALUES (?, ?, ?, ?, ?, ?)"

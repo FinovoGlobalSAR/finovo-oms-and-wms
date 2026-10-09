@@ -1,5 +1,6 @@
 <?php
 // app/Controllers/ProductController.php
+require_once __DIR__ . '/../../core/Paginator.php';
 require_once __DIR__ . '/../../core/Controller.php';
 require_once __DIR__ . '/../../core/Database.php';
 require_once __DIR__ . '/../Models/Product.php';
@@ -12,6 +13,11 @@ require_once __DIR__ . '/../Connectors/WixConnector.php';
 require_once __DIR__ . '/../Connectors/EbayConnector.php';
 require_once __DIR__ . '/../Connectors/CjDropshippingConnector.php';
 require_once __DIR__ . '/../Services/IntegrationErrorService.php';
+require_once __DIR__ . '/../Services/WooCommerceAuth.php';
+require_once __DIR__ . '/../Services/ProductPushService.php';
+require_once __DIR__ . '/../Services/PlatformFetcher.php';
+require_once __DIR__ . '/../Services/PlatformStock.php';
+require_once __DIR__ . '/../Services/StockPushService.php';
 
 class ProductController extends Controller
 {
@@ -49,8 +55,40 @@ class ProductController extends Controller
     public function index(): void
     {
         $store = $this->getCurrentStore();
-        $products = $this->productModel->all($store['id']);
+        $allProducts = $this->productModel->all($store['id']);
 
+        // Low stock ginti POORI list se (sirf is page se nahi)
+        $lowStockCount = 0;
+        foreach ($allProducts as $p) {
+            if ((int) ($p['stock_quantity'] ?? 0) <= (int) ($p['low_stock_threshold'] ?? 5)) {
+                $lowStockCount++;
+            }
+        }
+
+        // Search (naam / SKU) aur stock filter — server pe, taake har page sahi ho
+        $search = trim((string) ($_GET['q'] ?? ''));
+        $stockFilter = (string) ($_GET['stock'] ?? '');
+        $products = array_filter($allProducts, function ($p) use ($search, $stockFilter) {
+            if ($search !== '') {
+                $hay = strtolower(($p['name'] ?? '') . ' ' . ($p['sku'] ?? ''));
+                if (!str_contains($hay, strtolower($search))) {
+                    return false;
+                }
+            }
+            $qty = (int) ($p['stock_quantity'] ?? 0);
+            if ($stockFilter === 'low' && $qty > (int) ($p['low_stock_threshold'] ?? 5)) {
+                return false;
+            }
+            if ($stockFilter === 'out' && $qty > 0) {
+                return false;
+            }
+            return true;
+        });
+
+        $pager = Paginator::make($products);
+        $products = $pager['items'];
+
+        // Variants sirf is page ke products ke (pehle har product ke liye query chalti thi)
         $productIds = array_map(fn($p) => (int) $p['id'], $products);
         $variantCounts = $this->productModel->variantCountsForProducts($productIds);
 
@@ -69,20 +107,21 @@ class ProductController extends Controller
         }
         unset($p);
 
-        $lowStockCount = 0;
-        foreach ($products as $p) {
-            $threshold = (int) ($p['low_stock_threshold'] ?? 5);
-            if ((int) ($p['stock_quantity'] ?? 0) <= $threshold) {
-                $lowStockCount++;
-            }
-        }
-
         $this->view('products/index', [
             'products' => $products,
+            'pager' => $pager,
+            'totalProducts' => count($allProducts),
+            'search' => $search,
+            'stockFilter' => $stockFilter,
             'store' => $store,
             'lowStockCount' => $lowStockCount,
             'synced' => $_GET['synced'] ?? null,
+            'stockSynced' => $_GET['stock_synced'] ?? 0,
+            'untracked' => $_GET['untracked'] ?? 0,
             'exported' => $_GET['exported'] ?? null,
+            'pushNote' => $_GET['push_note'] ?? null,
+            // "Push to ..." button store ke platform ke hisaab se (null = is platform pe push nahi hota)
+            'pushTarget' => ProductPushService::PLATFORMS[$store['platform'] ?? 'manual'] ?? null,
             'imported' => $_GET['imported'] ?? null,
             'stockUpdated' => $_GET['stock_updated'] ?? null,
             'error' => $_GET['error'] ?? null,
@@ -217,6 +256,67 @@ class ProductController extends Controller
 
     // ---------- Shopify: Products Pull ----------
 
+    // =====================================================================
+    //  Product sync — saare pages, aur har sync pe STOCK bhi platform se
+    // =====================================================================
+
+    /** Is sync mein kitne products ka stock platform pe gina hi nahi jata (WooCommerce "Manage stock" off waghera) */
+    private int $untrackedCount = 0;
+
+    /**
+     * Platform ka stock Finovo mein lagao — naye AUR purane dono products pe.
+     * (Pehle stock sirf pehli baar import pe aata tha; dobara sync pe nahi badalta tha,
+     *  is liye pehli baar 0 aaya to product hamesha "out of stock" rehta tha.)
+     * $qty = null → platform is product ka stock ginta hi nahi: Finovo ka stock nahi chhedte.
+     */
+    private function applyStock(int $productId, int $warehouseId, ?int $qty): void
+    {
+        if ($qty === null) {
+            $this->untrackedCount++;
+            return;
+        }
+        // Yeh stock platform se hi aaya hai — wapas platform pe bhejne ki zaroorat nahi
+        StockPushService::pause();
+        try {
+            $this->productModel->applyPlatformStock($productId, $warehouseId, $qty);
+        } finally {
+            StockPushService::resume();
+        }
+    }
+
+    private function applyVariantStock(int $variantId, int $warehouseId, ?int $qty): void
+    {
+        if ($qty === null) {
+            $this->untrackedCount++;
+            return;
+        }
+        StockPushService::pause();
+        try {
+            $this->variantModel->applyPlatformStock($variantId, $warehouseId, $qty);
+        } finally {
+            StockPushService::resume();
+        }
+    }
+
+    /** /products?synced=5 — aur jin ka stock platform pe track nahi hota un ki ginti bhi */
+    private function syncedRedirect(int $importedCount, int $updatedCount = 0): void
+    {
+        $url = '/products?synced=' . $importedCount . '&stock_synced=' . $updatedCount;
+        if ($this->untrackedCount > 0) {
+            $url .= '&untracked=' . $this->untrackedCount;
+        }
+        $this->redirect($url);
+    }
+
+    /** Store ka product jis ka platform ID yeh ho (na ho to null) */
+    private function findByExternalId(int $storeId, string $column, string $externalId): ?int
+    {
+        $stmt = Database::getConnection()->prepare("SELECT id FROM products WHERE store_id = ? AND {$column} = ? LIMIT 1");
+        $stmt->execute([$storeId, $externalId]);
+        $id = $stmt->fetchColumn();
+        return $id === false ? null : (int) $id;
+    }
+
     public function syncShopify(): void
     {
         $db = Database::getConnection();
@@ -230,40 +330,30 @@ class ProductController extends Controller
 
         $mapping = $this->fieldMappingModel->allForStore((int) $store['id'], 'shopify', 'product');
 
-        $apiUrl = 'https://' . rtrim($store['store_url'], '/') . '/admin/api/2026-07/products.json?limit=50';
+        // Saare products, 250-250 kar ke (pehle sirf pehle 50)
+        $fetch = PlatformFetcher::shopify($store['store_url'], $store['access_token'], 'products');
 
-        $ch = curl_init($apiUrl);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['X-Shopify-Access-Token: ' . $store['access_token']]);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        if ($httpCode !== 200) {
-            $this->errorService->logFailure((int) $store['id'], 'shopify', 'sync_products', null, null, $httpCode, $response ?: 'No response');
+        if (!$fetch['ok']) {
+            $httpCode = $fetch['code'];
+            $this->errorService->logFailure((int) $store['id'], 'shopify', 'sync_products', null, null, $httpCode, $fetch['body'] ?: 'No response');
             $this->storeModel->markUnhealthy((int) $store['id'], "Shopify API error (HTTP {$httpCode})");
             $this->redirect('/products?error=' . urlencode("Shopify API error (HTTP {$httpCode})."));
             return;
         }
 
-        $data = json_decode($response, true);
-        $shopifyProducts = $data['products'] ?? [];
         $importedCount = 0;
+        $updatedCount = 0;
 
-        foreach ($shopifyProducts as $sp) {
+        foreach ($fetch['items'] as $sp) {
             $externalId = (string) $sp['id'];
             $imageUrl = $sp['image']['src'] ?? null;
             $variants = $sp['variants'] ?? [];
 
-            $check = $db->prepare("SELECT id FROM products WHERE store_id = ? AND external_product_id = ?");
-            $check->execute([$store['id'], $externalId]);
-            $existingProduct = $check->fetch();
-
+            $productId = $this->findByExternalId((int) $store['id'], 'external_product_id', $externalId);
             $isRealVariantProduct = count($variants) > 1 || (isset($variants[0]['title']) && $variants[0]['title'] !== 'Default Title');
 
-            if ($existingProduct) {
-                $productId = (int) $existingProduct['id'];
+            if ($productId !== null) {
+                $updatedCount++;
                 if ($imageUrl) {
                     $this->productModel->updateImage($productId, $imageUrl);
                 }
@@ -298,19 +388,15 @@ class ProductController extends Controller
                         (string) $variant['id']
                     );
 
-                    $stock = (int) ($variant['inventory_quantity'] ?? 0);
-                    $this->variantModel->setWarehouseStock($variantId, $defaultWarehouse['id'], $stock);
+                    $this->applyVariantStock($variantId, (int) $defaultWarehouse['id'], PlatformStock::shopifyVariant($variant));
                 }
             } else {
-                $stock = (int) ($variants[0]['inventory_quantity'] ?? 0);
-                if (!$existingProduct) {
-                    $this->productModel->setWarehouseStock($productId, $defaultWarehouse['id'], $stock);
-                }
+                $this->applyStock($productId, (int) $defaultWarehouse['id'], PlatformStock::shopifyVariant($variants[0] ?? []));
             }
         }
 
         $this->storeModel->markHealthy((int) $store['id']);
-        $this->redirect('/products?synced=' . $importedCount);
+        $this->syncedRedirect($importedCount, $updatedCount);
     }
 
     // ---------- Async Sync (Queue-Based) — all platforms ----------
@@ -363,73 +449,6 @@ class ProductController extends Controller
         $this->redirect('/products?queued=' . $jobId);
     }
 
-    // ---------- Shopify: Product Push ----------
-
-    public function exportToShopify(): void
-    {
-        $db = Database::getConnection();
-        $store = $this->getCurrentStore();
-        $id = (int) ($_GET['id'] ?? 0);
-
-        if (empty($store['store_url']) || empty($store['access_token'])) {
-            $this->redirect('/products?error=' . urlencode('Please save this store\'s Shopify Settings first.'));
-            return;
-        }
-
-        $stmt = $db->prepare("SELECT * FROM products WHERE id = ? AND store_id = ?");
-        $stmt->execute([$id, $store['id']]);
-        $product = $stmt->fetch();
-
-        if (!$product) {
-            $this->redirect('/products?error=' . urlencode('Product not found.'));
-            return;
-        }
-
-        $apiUrl = 'https://' . rtrim($store['store_url'], '/') . '/admin/api/2026-07/products.json';
-
-        $payload = json_encode([
-            'product' => [
-                'title' => $product['name'],
-                'variants' => [
-                    ['price' => (string) $product['price'], 'sku' => $product['sku']],
-                ],
-            ],
-        ]);
-
-        $ch = curl_init($apiUrl);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'X-Shopify-Access-Token: ' . $store['access_token'],
-            'Content-Type: application/json',
-        ]);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        if ($httpCode !== 201) {
-            $this->errorService->logFailure((int) $store['id'], 'shopify', 'export_product', null, (string) $id, $httpCode, $response ?: 'No response');
-            $this->storeModel->markUnhealthy((int) $store['id'], "Shopify export failed (HTTP {$httpCode})");
-            $this->redirect('/products?error=' . urlencode("Shopify export failed (HTTP {$httpCode})."));
-            return;
-        }
-
-        $this->errorService->markResolved((int) $store['id'], 'shopify', 'export_product', (string) $id);
-        $this->storeModel->markHealthy((int) $store['id']);
-
-        $data = json_decode($response, true);
-        $externalId = (string) ($data['product']['id'] ?? '');
-
-        if ($externalId) {
-            $update = $db->prepare("UPDATE products SET external_product_id = ? WHERE id = ?");
-            $update->execute([$externalId, $id]);
-        }
-
-        $this->redirect('/products?exported=1');
-    }
-    
     // ---------- WooCommerce: Products Pull ----------
 
     public function syncWooCommerce(): void
@@ -444,7 +463,8 @@ class ProductController extends Controller
         }
 
         $baseUrl = rtrim($store['woocommerce_store_url'], '/');
-        $auth = $store['woocommerce_consumer_key'] . ':' . $store['woocommerce_consumer_secret'];
+        $key = $store['woocommerce_consumer_key'];
+        $secret = $store['woocommerce_consumer_secret'];
 
         $fixImageProtocol = function (?string $url) use ($baseUrl): ?string {
             if (!$url) {
@@ -458,37 +478,28 @@ class ProductController extends Controller
             return $url;
         };
 
-        $apiUrl = $baseUrl . '/wp-json/wc/v3/products?per_page=50';
+        // Saare products, 100-100 kar ke (pehle sirf pehle 50)
+        $fetch = PlatformFetcher::woo($baseUrl, $key, $secret, '/wp-json/wc/v3/products');
 
-        $ch = curl_init($apiUrl);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_USERPWD, $auth);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, curlVerifySsl());
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        if ($httpCode !== 200) {
-            $this->errorService->logFailure((int) $store['id'], 'woocommerce', 'sync_products', null, null, $httpCode, $response ?: 'No response');
+        if (!$fetch['ok']) {
+            $httpCode = $fetch['code'];
+            $this->errorService->logFailure((int) $store['id'], 'woocommerce', 'sync_products', null, null, $httpCode, $fetch['body'] ?: 'No response');
             $this->storeModel->markUnhealthy((int) $store['id'], "WooCommerce API error (HTTP {$httpCode})");
-            $this->redirect('/products?error=' . urlencode("WooCommerce API error (HTTP {$httpCode}): " . $response));
+            $this->redirect('/products?error=' . urlencode("WooCommerce API error (HTTP {$httpCode}). Please check the store URL and keys."));
             return;
         }
 
-        $wcProducts = json_decode($response, true) ?? [];
         $importedCount = 0;
+        $updatedCount = 0;
 
-        foreach ($wcProducts as $wp) {
+        foreach ($fetch['items'] as $wp) {
             $externalId = (string) $wp['id'];
             $imageUrl = $fixImageProtocol($wp['images'][0]['src'] ?? null);
 
-            $check = $db->prepare("SELECT id FROM products WHERE store_id = ? AND external_wc_product_id = ?");
-            $check->execute([$store['id'], $externalId]);
-            $existingProduct = $check->fetch();
+            $productId = $this->findByExternalId((int) $store['id'], 'external_wc_product_id', $externalId);
 
-            if ($existingProduct) {
-                $productId = (int) $existingProduct['id'];
+            if ($productId !== null) {
+                $updatedCount++;
                 if ($imageUrl) {
                     $this->productModel->updateImage($productId, $imageUrl);
                 }
@@ -506,16 +517,7 @@ class ProductController extends Controller
             }
 
             if (($wp['type'] ?? 'simple') === 'variable') {
-                $variationsUrl = $baseUrl . "/wp-json/wc/v3/products/{$wp['id']}/variations?per_page=50";
-                $vch = curl_init($variationsUrl);
-                curl_setopt($vch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($vch, CURLOPT_USERPWD, $auth);
-                curl_setopt($vch, CURLOPT_TIMEOUT, 15);
-                curl_setopt($vch, CURLOPT_SSL_VERIFYPEER, curlVerifySsl());
-                $vResponse = curl_exec($vch);
-                curl_close($vch);
-
-                $variations = json_decode($vResponse, true) ?? [];
+                $variations = PlatformFetcher::woo($baseUrl, $key, $secret, "/wp-json/wc/v3/products/{$wp['id']}/variations")['items'];
 
                 foreach ($variations as $variation) {
                     $attrs = $variation['attributes'] ?? [];
@@ -535,17 +537,15 @@ class ProductController extends Controller
                         (string) $variation['id']
                     );
 
-                    $stock = (int) ($variation['stock_quantity'] ?? 0);
-                    $this->variantModel->setWarehouseStock($variantId, $defaultWarehouse['id'], $stock);
+                    $this->applyVariantStock($variantId, (int) $defaultWarehouse['id'], PlatformStock::wooCommerce($variation));
                 }
-            } elseif (!$existingProduct) {
-                $stock = (int) ($wp['stock_quantity'] ?? 0);
-                $this->productModel->setWarehouseStock($productId, $defaultWarehouse['id'], $stock);
+            } else {
+                $this->applyStock($productId, (int) $defaultWarehouse['id'], PlatformStock::wooCommerce($wp));
             }
         }
 
         $this->storeModel->markHealthy((int) $store['id']);
-        $this->redirect('/products?synced=' . $importedCount);
+        $this->syncedRedirect($importedCount, $updatedCount);
     }
 
     // ---------- Custom Bridge: Products Pull ----------
@@ -575,16 +575,15 @@ class ProductController extends Controller
         $products = $connector->fetchProducts();
         $db = Database::getConnection();
         $importedCount = 0;
+        $updatedCount = 0;
 
         foreach ($products as $p) {
             $externalId = (string) ($p['id'] ?? '');
             if ($externalId === '') continue;
 
-            $check = $db->prepare("SELECT id FROM products WHERE store_id = ? AND external_product_id = ?");
-            $check->execute([$store['id'], $externalId]);
-            $existing = $check->fetch();
+            $productId = $this->findByExternalId((int) $store['id'], 'external_product_id', $externalId);
 
-            if (!$existing) {
+            if ($productId === null) {
                 $name = $p['name'] ?? 'Unknown product';
                 $price = (float) ($p['price'] ?? 0);
                 $sku = $p['sku'] ?? null;
@@ -593,15 +592,17 @@ class ProductController extends Controller
                 $stmt->execute([$store['id'], $name, $sku, $price, $externalId]);
                 $productId = (int) $db->lastInsertId();
                 $importedCount++;
-
-                $stock = (int) ($p['stock_quantity'] ?? 0);
-                $this->productModel->setWarehouseStock($productId, $defaultWarehouse['id'], $stock);
+            } else {
+                $updatedCount++;
             }
+
+            $qty = isset($p['stock_quantity']) && is_numeric($p['stock_quantity']) ? (int) $p['stock_quantity'] : null;
+            $this->applyStock($productId, (int) $defaultWarehouse['id'], $qty);
         }
 
         $this->errorService->markResolved((int) $store['id'], 'custom_bridge', 'sync_products', null);
         $this->storeModel->markHealthy((int) $store['id']);
-        $this->redirect('/products?synced=' . $importedCount);
+        $this->syncedRedirect($importedCount, $updatedCount);
     }
 
     // ---------- BigCommerce: Products Pull ----------
@@ -616,40 +617,28 @@ class ProductController extends Controller
             return;
         }
 
-        $apiUrl = 'https://api.bigcommerce.com/stores/' . $store['bigcommerce_store_hash'] . '/v3/catalog/products?limit=50';
+        // Saare products, 250-250 kar ke (pehle sirf pehle 50)
+        $fetch = PlatformFetcher::bigCommerceV3($store['bigcommerce_store_hash'], $store['bigcommerce_access_token'], '/v3/catalog/products');
 
-        $ch = curl_init($apiUrl);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'X-Auth-Token: ' . $store['bigcommerce_access_token'],
-            'Accept: application/json',
-        ]);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        if ($httpCode !== 200) {
-            $this->errorService->logFailure((int) $store['id'], 'bigcommerce', 'sync_products', null, null, $httpCode, $response ?: 'No response');
+        if (!$fetch['ok']) {
+            $httpCode = $fetch['code'];
+            $this->errorService->logFailure((int) $store['id'], 'bigcommerce', 'sync_products', null, null, $httpCode, $fetch['body'] ?: 'No response');
             $this->storeModel->markUnhealthy((int) $store['id'], "BigCommerce API error (HTTP {$httpCode})");
             $this->redirect('/products?error=' . urlencode("BigCommerce API error (HTTP {$httpCode})."));
             return;
         }
 
-        $data = json_decode($response, true);
-        $bcProducts = $data['data'] ?? [];
         $db = Database::getConnection();
         $importedCount = 0;
+        $updatedCount = 0;
 
-        foreach ($bcProducts as $bp) {
+        foreach ($fetch['items'] as $bp) {
             $externalId = (string) ($bp['id'] ?? '');
             if ($externalId === '') continue;
 
-            $check = $db->prepare("SELECT id FROM products WHERE store_id = ? AND external_bc_product_id = ?");
-            $check->execute([$store['id'], $externalId]);
-            $existing = $check->fetch();
+            $productId = $this->findByExternalId((int) $store['id'], 'external_bc_product_id', $externalId);
 
-            if (!$existing) {
+            if ($productId === null) {
                 $name = $bp['name'] ?? 'Unknown product';
                 $price = (float) ($bp['price'] ?? 0);
                 $sku = $bp['sku'] ?? null;
@@ -658,15 +647,16 @@ class ProductController extends Controller
                 $stmt->execute([$store['id'], $name, $sku, $price, $externalId]);
                 $productId = (int) $db->lastInsertId();
                 $importedCount++;
-
-                $stock = (int) ($bp['inventory_level'] ?? 0);
-                $this->productModel->setWarehouseStock($productId, $defaultWarehouse['id'], $stock);
+            } else {
+                $updatedCount++;
             }
+
+            $this->applyStock($productId, (int) $defaultWarehouse['id'], PlatformStock::bigCommerce($bp));
         }
 
         $this->errorService->markResolved((int) $store['id'], 'bigcommerce', 'sync_products', null);
         $this->storeModel->markHealthy((int) $store['id']);
-        $this->redirect('/products?synced=' . $importedCount);
+        $this->syncedRedirect($importedCount, $updatedCount);
     }
 
     // ---------- PrestaShop: Products Pull ----------
@@ -682,40 +672,48 @@ class ProductController extends Controller
         }
 
         $baseUrl = rtrim($store['prestashop_store_url'], '/');
-        $apiUrl = $baseUrl . '/api/products?ws_key=' . urlencode($store['prestashop_api_key']) . '&output_format=JSON&display=[id,name,price,reference,active]&filter[active]=1';
+        $wsKey = $store['prestashop_api_key'];
 
-        $ch = curl_init($apiUrl);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, curlVerifySsl());
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+        // Saare active products, 100-100 kar ke
+        $fetch = PlatformFetcher::prestaShop($baseUrl, 'products', [
+            'ws_key' => $wsKey,
+            'display' => '[id,name,price,reference,active]',
+            'filter[active]' => '1',
+        ]);
 
-        if ($httpCode !== 200) {
-            $this->errorService->logFailure((int) $store['id'], 'prestashop', 'sync_products', null, null, $httpCode, $response ?: 'No response');
+        if (!$fetch['ok']) {
+            $httpCode = $fetch['code'];
+            $this->errorService->logFailure((int) $store['id'], 'prestashop', 'sync_products', null, null, $httpCode, $fetch['body'] ?: 'No response');
             $this->storeModel->markUnhealthy((int) $store['id'], "PrestaShop API error (HTTP {$httpCode})");
             $this->redirect('/products?error=' . urlencode("PrestaShop API error (HTTP {$httpCode})."));
             return;
         }
 
-        $data = json_decode($response, true);
-        $psProducts = $data['products'] ?? [];
+        // Saare products ka stock EK hi baar mein (pehle har product ke liye alag request jaati thi)
+        $stockFetch = PlatformFetcher::prestaShop($baseUrl, 'stock_availables', [
+            'ws_key' => $wsKey,
+            'display' => '[id_product,id_product_attribute,quantity]',
+            'filter[id_product_attribute]' => '0',
+        ]);
+        $stockByProduct = [];
+        foreach ($stockFetch['items'] as $sa) {
+            $stockByProduct[(string) ($sa['id_product'] ?? '')] = (int) ($sa['quantity'] ?? 0);
+        }
+
         $db = Database::getConnection();
         $importedCount = 0;
+        $updatedCount = 0;
 
-        foreach ($psProducts as $pp) {
+        foreach ($fetch['items'] as $pp) {
             $externalId = (string) ($pp['id'] ?? '');
             if ($externalId === '') continue;
 
             $nameRaw = $pp['name'] ?? 'Unknown product';
             $name = is_array($nameRaw) ? ($nameRaw[0]['value'] ?? 'Unknown product') : $nameRaw;
 
-            $check = $db->prepare("SELECT id FROM products WHERE store_id = ? AND external_ps_product_id = ?");
-            $check->execute([$store['id'], $externalId]);
-            $existing = $check->fetch();
+            $productId = $this->findByExternalId((int) $store['id'], 'external_ps_product_id', $externalId);
 
-            if (!$existing) {
+            if ($productId === null) {
                 $price = (float) ($pp['price'] ?? 0);
                 $sku = $pp['reference'] ?? null;
 
@@ -723,28 +721,19 @@ class ProductController extends Controller
                 $stmt->execute([$store['id'], $name, $sku, $price, $externalId]);
                 $productId = (int) $db->lastInsertId();
                 $importedCount++;
-
-                $stockUrl = $baseUrl . '/api/stock_availables?ws_key=' . urlencode($store['prestashop_api_key']) . '&output_format=JSON&filter[id_product]=' . $externalId . '&display=[quantity]';
-                $sch = curl_init($stockUrl);
-                curl_setopt($sch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($sch, CURLOPT_TIMEOUT, 10);
-                curl_setopt($sch, CURLOPT_SSL_VERIFYPEER, curlVerifySsl());
-                $stockResponse = curl_exec($sch);
-                curl_close($sch);
-
-                $stockData = json_decode($stockResponse, true);
-                $stockList = $stockData['stock_availables'] ?? [];
-                $stock = (int) ($stockList[0]['quantity'] ?? 0);
-
-                $this->productModel->setWarehouseStock($productId, $defaultWarehouse['id'], $stock);
+            } else {
+                $updatedCount++;
             }
+
+            // Stock list na mil saki (key ko stock_availables ki GET permission nahi) → Finovo ka stock mat chhedo
+            $this->applyStock($productId, (int) $defaultWarehouse['id'], $stockFetch['ok'] ? ($stockByProduct[$externalId] ?? 0) : null);
         }
 
         $this->errorService->markResolved((int) $store['id'], 'prestashop', 'sync_products', null);
         $this->storeModel->markHealthy((int) $store['id']);
-        $this->redirect('/products?synced=' . $importedCount);
+        $this->syncedRedirect($importedCount, $updatedCount);
     }
-    
+
     // ---------- OpenCart: Products Pull (direct DB read) ----------
 
     public function syncOpenCart(): void
@@ -761,31 +750,32 @@ class ProductController extends Controller
         try {
             $ocDb = $this->externalDbConnection($ocDbName);
         } catch (PDOException $e) {
+            // Database ki andar ki detail (SQLSTATE...) user ko nahi dikhate — woh Integration Errors mein save hoti hai
             $this->errorService->logFailure((int) $store['id'], 'opencart', 'sync_products', null, null, 0, $e->getMessage());
             $this->storeModel->markUnhealthy((int) $store['id'], 'Could not connect to OpenCart database.');
-            $this->redirect('/products?error=' . urlencode('Could not connect to OpenCart database: ' . $e->getMessage()));
+            $this->redirect('/products?error=' . urlencode('Could not connect to the OpenCart database. Please check the database name in Stores → Edit (details are in Integration Errors).'));
             return;
         }
 
-        $stmt = $ocDb->query(
-            "SELECT p.product_id, p.model, p.price, p.quantity, pd.name
+        // Ek product ki kai languages ho sakti hain — sirf ek naam lo (warna product dobara aata)
+        $ocProducts = $ocDb->query(
+            "SELECT p.product_id, p.model, p.price, p.quantity, MIN(pd.name) AS name
              FROM oc_product p
              INNER JOIN oc_product_description pd ON pd.product_id = p.product_id
-             WHERE p.status = 1"
-        );
-        $ocProducts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+             WHERE p.status = 1
+             GROUP BY p.product_id, p.model, p.price, p.quantity"
+        )->fetchAll(PDO::FETCH_ASSOC);
 
         $db = Database::getConnection();
         $importedCount = 0;
+        $updatedCount = 0;
 
         foreach ($ocProducts as $op) {
             $externalId = (string) $op['product_id'];
 
-            $check = $db->prepare("SELECT id FROM products WHERE store_id = ? AND external_ocart_product_id = ?");
-            $check->execute([$store['id'], $externalId]);
-            $existing = $check->fetch();
+            $productId = $this->findByExternalId((int) $store['id'], 'external_ocart_product_id', $externalId);
 
-            if (!$existing) {
+            if ($productId === null) {
                 $name = $op['name'] ?? 'Unknown product';
                 $price = (float) ($op['price'] ?? 0);
                 $sku = $op['model'] ?? null;
@@ -794,15 +784,16 @@ class ProductController extends Controller
                 $insert->execute([$store['id'], $name, $sku, $price, $externalId]);
                 $productId = (int) $db->lastInsertId();
                 $importedCount++;
-
-                $stock = (int) ($op['quantity'] ?? 0);
-                $this->productModel->setWarehouseStock($productId, $defaultWarehouse['id'], $stock);
+            } else {
+                $updatedCount++;
             }
+
+            $this->applyStock($productId, (int) $defaultWarehouse['id'], (int) ($op['quantity'] ?? 0));
         }
 
         $this->errorService->markResolved((int) $store['id'], 'opencart', 'sync_products', null);
         $this->storeModel->markHealthy((int) $store['id']);
-        $this->redirect('/products?synced=' . $importedCount);
+        $this->syncedRedirect($importedCount, $updatedCount);
     }
 
     // ---------- osCommerce: Products Pull (direct DB read) ----------
@@ -823,29 +814,27 @@ class ProductController extends Controller
         } catch (PDOException $e) {
             $this->errorService->logFailure((int) $store['id'], 'oscommerce', 'sync_products', null, null, 0, $e->getMessage());
             $this->storeModel->markUnhealthy((int) $store['id'], 'Could not connect to osCommerce database.');
-            $this->redirect('/products?error=' . urlencode('Could not connect to osCommerce database: ' . $e->getMessage()));
+            $this->redirect('/products?error=' . urlencode('Could not connect to the osCommerce database. Please check the database name in Stores → Edit (details are in Integration Errors).'));
             return;
         }
 
-        $stmt = $oscDb->query(
+        $oscProducts = $oscDb->query(
             "SELECT p.products_id, p.products_model, p.products_price, p.products_quantity, pd.products_name
              FROM products p
              INNER JOIN products_description pd ON pd.products_id = p.products_id AND pd.language_id = 1
              WHERE p.products_status = 1"
-        );
-        $oscProducts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        )->fetchAll(PDO::FETCH_ASSOC);
 
         $db = Database::getConnection();
         $importedCount = 0;
+        $updatedCount = 0;
 
         foreach ($oscProducts as $op) {
             $externalId = (string) $op['products_id'];
 
-            $check = $db->prepare("SELECT id FROM products WHERE store_id = ? AND external_osc_product_id = ?");
-            $check->execute([$store['id'], $externalId]);
-            $existing = $check->fetch();
+            $productId = $this->findByExternalId((int) $store['id'], 'external_osc_product_id', $externalId);
 
-            if (!$existing) {
+            if ($productId === null) {
                 $name = $op['products_name'] ?? 'Unknown product';
                 $price = (float) ($op['products_price'] ?? 0);
                 $sku = $op['products_model'] ?? null;
@@ -854,15 +843,16 @@ class ProductController extends Controller
                 $insert->execute([$store['id'], $name, $sku, $price, $externalId]);
                 $productId = (int) $db->lastInsertId();
                 $importedCount++;
-
-                $stock = (int) ($op['products_quantity'] ?? 0);
-                $this->productModel->setWarehouseStock($productId, $defaultWarehouse['id'], $stock);
+            } else {
+                $updatedCount++;
             }
+
+            $this->applyStock($productId, (int) $defaultWarehouse['id'], (int) ($op['products_quantity'] ?? 0));
         }
 
         $this->errorService->markResolved((int) $store['id'], 'oscommerce', 'sync_products', null);
         $this->storeModel->markHealthy((int) $store['id']);
-        $this->redirect('/products?synced=' . $importedCount);
+        $this->syncedRedirect($importedCount, $updatedCount);
     }
 
     // ---------- Wix: Products Pull ----------
@@ -889,31 +879,33 @@ class ProductController extends Controller
 
         $db = Database::getConnection();
         $importedCount = 0;
+        $updatedCount = 0;
 
         foreach ($result['products'] as $wp) {
             $externalId = (string) ($wp['id'] ?? '');
             if ($externalId === '') continue;
 
-            $check = $db->prepare("SELECT id FROM products WHERE store_id = ? AND external_wix_product_id = ?");
-            $check->execute([$store['id'], $externalId]);
-            if ($check->fetch()) continue;
+            $productId = $this->findByExternalId((int) $store['id'], 'external_wix_product_id', $externalId);
 
-            $name = $wp['name'] ?? 'Unknown product';
-            $price = (float) ($wp['actualPriceRange']['minValue']['amount'] ?? $wp['basePrice']['price']['amount'] ?? 0);
-            $sku = $wp['physicalProperties']['sku'] ?? null;
+            if ($productId === null) {
+                $name = $wp['name'] ?? 'Unknown product';
+                $price = (float) ($wp['actualPriceRange']['minValue']['amount'] ?? $wp['basePrice']['price']['amount'] ?? 0);
+                $sku = $wp['physicalProperties']['sku'] ?? null;
 
-            $stmt = $db->prepare("INSERT INTO products (store_id, name, sku, price, external_wix_product_id) VALUES (?, ?, ?, ?, ?)");
-            $stmt->execute([$store['id'], $name, $sku, $price, $externalId]);
-            $productId = (int) $db->lastInsertId();
-            $importedCount++;
+                $stmt = $db->prepare("INSERT INTO products (store_id, name, sku, price, external_wix_product_id) VALUES (?, ?, ?, ?, ?)");
+                $stmt->execute([$store['id'], $name, $sku, $price, $externalId]);
+                $productId = (int) $db->lastInsertId();
+                $importedCount++;
+            } else {
+                $updatedCount++;
+            }
 
-            $stock = (int) ($wp['inventory']['availableQuantity'] ?? $wp['stock']['quantity'] ?? 0);
-            $this->productModel->setWarehouseStock($productId, $defaultWarehouse['id'], $stock);
+            $this->applyStock($productId, (int) $defaultWarehouse['id'], PlatformStock::wix($wp));
         }
 
         $this->errorService->markResolved((int) $store['id'], 'wix', 'sync_products', null);
         $this->storeModel->markHealthy((int) $store['id']);
-        $this->redirect('/products?synced=' . $importedCount);
+        $this->syncedRedirect($importedCount, $updatedCount);
     }
 
     // ---------- eBay: Products Pull ----------
@@ -945,30 +937,33 @@ class ProductController extends Controller
 
         $db = Database::getConnection();
         $importedCount = 0;
+        $updatedCount = 0;
 
         foreach ($result['products'] as $ep) {
             $externalId = (string) ($ep['sku'] ?? '');
             if ($externalId === '') continue;
 
-            $check = $db->prepare("SELECT id FROM products WHERE store_id = ? AND external_ebay_product_id = ?");
-            $check->execute([$store['id'], $externalId]);
-            if ($check->fetch()) continue;
-
-            $name = $ep['product']['title'] ?? 'Unknown product';
-            $price = (float) ($ep['product']['aspects']['price'][0] ?? 0);
             $stock = (int) ($ep['availability']['shipToLocationAvailability']['quantity'] ?? 0);
+            $productId = $this->findByExternalId((int) $store['id'], 'external_ebay_product_id', $externalId);
 
-            $stmt = $db->prepare("INSERT INTO products (store_id, name, sku, price, external_ebay_product_id) VALUES (?, ?, ?, ?, ?)");
-            $stmt->execute([$store['id'], $name, $externalId, $price, $externalId]);
-            $productId = (int) $db->lastInsertId();
-            $importedCount++;
+            if ($productId === null) {
+                $name = $ep['product']['title'] ?? 'Unknown product';
+                $price = (float) ($ep['product']['aspects']['price'][0] ?? 0);
 
-            $this->productModel->setWarehouseStock($productId, $defaultWarehouse['id'], $stock);
+                $stmt = $db->prepare("INSERT INTO products (store_id, name, sku, price, external_ebay_product_id) VALUES (?, ?, ?, ?, ?)");
+                $stmt->execute([$store['id'], $name, $externalId, $price, $externalId]);
+                $productId = (int) $db->lastInsertId();
+                $importedCount++;
+            } else {
+                $updatedCount++;
+            }
+
+            $this->applyStock($productId, (int) $defaultWarehouse['id'], $stock);
         }
 
         $this->errorService->markResolved((int) $store['id'], 'ebay', 'sync_products', null);
         $this->storeModel->markHealthy((int) $store['id']);
-        $this->redirect('/products?synced=' . $importedCount);
+        $this->syncedRedirect($importedCount, $updatedCount);
     }
 
     // ---------- CJdropshipping: Products Pull ----------
@@ -1020,16 +1015,24 @@ class ProductController extends Controller
         $this->redirect('/products?synced=' . $importedCount);
     }
 
-    // ---------- WooCommerce: Product Push ----------
+    // ---------- Product Push (store ke apne platform pe) ----------
 
-    public function exportToWooCommerce(): void
+    /**
+     * Products page ka "Push to <platform>" button — product isi store ke platform pe banta hai
+     * (Shopify store → Shopify, WooCommerce store → WooCommerce, ...). Pehle har store pe sirf
+     * "Push to Shopify" tha.
+     */
+    public function push(): void
     {
         $db = Database::getConnection();
         $store = $this->getCurrentStore();
         $id = (int) ($_GET['id'] ?? 0);
+        $platform = $store['platform'] ?? 'manual';
 
-        if (empty($store['woocommerce_store_url']) || empty($store['woocommerce_consumer_key']) || empty($store['woocommerce_consumer_secret'])) {
-            $this->redirect('/products?error=' . urlencode('Please save this store\'s WooCommerce Settings first.'));
+        $target = ProductPushService::PLATFORMS[$platform] ?? null;
+        if ($target === null) {
+            $reason = ProductPushService::NOT_SUPPORTED[$platform] ?? 'This store is not connected to any platform, so there is nowhere to push the product.';
+            $this->redirect('/products?error=' . urlencode($reason));
             return;
         }
 
@@ -1042,48 +1045,78 @@ class ProductController extends Controller
             return;
         }
 
-        $auth = $store['woocommerce_consumer_key'] . ':' . $store['woocommerce_consumer_secret'];
-        $apiUrl = rtrim($store['woocommerce_store_url'], '/') . '/wp-json/wc/v3/products';
-
-        $payload = json_encode([
-            'name' => $product['name'],
-            'type' => 'simple',
-            'regular_price' => (string) $product['price'],
-            'sku' => $product['sku'] ?: '',
-            'manage_stock' => true,
-            'stock_quantity' => (int) ($product['stock_quantity'] ?? 0),
-        ]);
-
-        $ch = curl_init($apiUrl);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-        curl_setopt($ch, CURLOPT_USERPWD, $auth);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, curlVerifySsl());
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        if ($httpCode !== 201) {
-            $this->errorService->logFailure((int) $store['id'], 'woocommerce', 'export_product', null, (string) $id, $httpCode, $response ?: 'No response');
-            $this->storeModel->markUnhealthy((int) $store['id'], "WooCommerce export failed (HTTP {$httpCode})");
-            $this->redirect('/products?error=' . urlencode("WooCommerce export failed (HTTP {$httpCode}): " . $response));
+        // Pehle se platform pe hai → dobara push nahi (warna wahan duplicate product ban jata)
+        $column = $target['column'];
+        if (!empty($product[$column])) {
+            $this->redirect('/products?error=' . urlencode("This product is already on {$target['label']}."));
             return;
         }
 
-        $this->errorService->markResolved((int) $store['id'], 'woocommerce', 'export_product', (string) $id);
-        $this->storeModel->markHealthy((int) $store['id']);
+        // Finovo ka kul stock (saare warehouses / variants jor ke). Push khud stock bhejta hai — alag stock push nahi chahiye.
+        StockPushService::pause();
+        try {
+            $this->productModel->recomputeStock($id);
+        } finally {
+            StockPushService::resume();
+        }
+        $stock = max(0, (int) ($this->productModel->find($id)['stock_quantity'] ?? 0));
 
-        $data = json_decode($response, true);
-        $externalId = (string) ($data['id'] ?? '');
+        // Variants (size / color...) — Shopify aur WooCommerce pe har variant alag banta hai
+        $variants = $this->variantModel->allByProduct($id);
 
-        if ($externalId) {
-            $update = $db->prepare("UPDATE products SET external_wc_product_id = ? WHERE id = ?");
-            $update->execute([$externalId, $id]);
+        $service = new ProductPushService();
+        switch ($platform) {
+            case 'shopify':     $result = $service->pushShopify($store, $product, $stock, $variants); break;
+            case 'woocommerce': $result = $service->pushWooCommerce($store, $product, $stock, $variants); break;
+            case 'bigcommerce': $result = $service->pushBigCommerce($store, $product, $stock); break;
+            case 'wix':         $result = $service->pushWix($store, $product, $stock); break;
+            case 'magento':     $result = $service->pushMagento($store, $product, $stock); break;
+            case 'prestashop':  $result = $service->pushPrestaShop($store, $product, $stock); break;
+            case 'ebay':
+                require_once __DIR__ . '/../Services/EbayAuthService.php';
+                $token = EbayAuthService::getValidAccessToken($store);
+                $result = $token === null
+                    ? ['ok' => false, 'message' => 'This store is not connected to eBay. Use "Connect eBay" on the Stores page.']
+                    : $service->pushEbay($token, $product, $stock);
+                break;
         }
 
-        $this->redirect('/products?exported=1');
+        if (!$result['ok']) {
+            $this->errorService->logFailure((int) $store['id'], $platform, 'export_product', null, (string) $id, 0, $result['message']);
+            $this->redirect('/products?error=' . urlencode($result['message']));
+            return;
+        }
+
+        // Platform wala ID save karo (agli sync mein yahi product pehchana jayega, duplicate nahi banega)
+        $db->prepare("UPDATE products SET {$column} = ? WHERE id = ?")->execute([$result['external_id'], $id]);
+
+        // Variants ke platform IDs bhi (stock push har variant ka alag kar sake)
+        $variantColumn = $platform === 'woocommerce' ? 'external_wc_variant_id' : 'external_variant_id';
+        foreach ($result['variant_ids'] ?? [] as $variantId => $externalVariantId) {
+            $db->prepare("UPDATE product_variants SET {$variantColumn} = ? WHERE id = ? AND product_id = ?")
+                ->execute([$externalVariantId, (int) $variantId, $id]);
+        }
+        if (!empty($variants) && !in_array($platform, ['shopify', 'woocommerce'], true)) {
+            $result['warning'] = trim(($result['warning'] ?? '') . ' This product has ' . count($variants)
+                . " variant(s); {$target['label']} received it as one product with the total stock. Add the variants in {$target['label']} admin.");
+        }
+
+        // Magento/eBay pe SKU hi pehchaan hai — product ka SKU khali tha to jo SKU bheja woh Finovo mein bhi likh do
+        if (in_array($platform, ['magento', 'ebay'], true) && trim((string) ($product['sku'] ?? '')) === '') {
+            $db->prepare("UPDATE products SET sku = ? WHERE id = ?")->execute([ProductPushService::skuFor($product), $id]);
+        }
+
+        $this->errorService->markResolved((int) $store['id'], $platform, 'export_product', (string) $id);
+
+        $notes = [];
+        if (!empty($result['warning'])) {
+            $notes[] = $result['warning'];
+        }
+
+        $query = 'exported=' . urlencode($target['label']);
+        if ($notes) {
+            $query .= '&push_note=' . urlencode(implode(' ', $notes));
+        }
+        $this->redirect('/products?' . $query);
     }
 }

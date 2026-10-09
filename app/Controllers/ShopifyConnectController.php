@@ -7,7 +7,10 @@ class ShopifyConnectController extends Controller
 {
     private Store $storeModel;
 
-    private const SCOPES = 'read_products,write_products,read_orders,write_orders,read_inventory,write_inventory,read_customers,write_customers';
+    // *_fulfillment_orders: order ko tracking number ke saath "Fulfilled" karne ke liye ("Send tracking to Shopify").
+    // Purane connected stores ko ek baar dobara "Connect Shopify" karna padega taake yeh nayi permission mile.
+    private const SCOPES = 'read_products,write_products,read_orders,write_orders,read_inventory,write_inventory,read_customers,write_customers,'
+        . 'read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_assigned_fulfillment_orders,write_assigned_fulfillment_orders';
 
     public function __construct()
     {

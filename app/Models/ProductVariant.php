@@ -67,7 +67,8 @@ class ProductVariant extends Model
         $stmt = $this->query(
             "SELECT pv.id as variant_id, pv.label, pv.sku,
                     w.id as warehouse_id, w.name as warehouse_name,
-                    COALESCE(vws.stock_quantity, 0) as stock_quantity
+                    COALESCE(vws.stock_quantity, 0) as stock_quantity,
+                    sw.is_default
              FROM product_variants pv
              CROSS JOIN warehouses w
              LEFT JOIN variant_warehouse_stock vws ON vws.variant_id = pv.id AND vws.warehouse_id = w.id
@@ -101,6 +102,17 @@ class ProductVariant extends Model
             [$variantId, $warehouseId, $quantity]
         );
         $this->recomputeVariantStock($variantId);
+    }
+
+    /** Product::applyPlatformStock jaisa hi, variant ke liye (platform ka kul stock → default warehouse) */
+    public function applyPlatformStock(int $variantId, int $defaultWarehouseId, int $platformTotal): void
+    {
+        $other = (int) $this->query(
+            "SELECT COALESCE(SUM(stock_quantity), 0) FROM variant_warehouse_stock WHERE variant_id = ? AND warehouse_id <> ?",
+            [$variantId, $defaultWarehouseId]
+        )->fetchColumn();
+
+        $this->setWarehouseStock($variantId, $defaultWarehouseId, max(0, $platformTotal - $other));
     }
 
     public function decreaseWarehouseStock(int $variantId, int $warehouseId, int $quantity): void

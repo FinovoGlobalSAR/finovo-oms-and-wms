@@ -13,7 +13,7 @@ $platform = $store['platform'] ?? 'manual';
 <div class="breadcrumb"><a href="/dashboard" class="breadcrumb-link">Finovo</a> <i class="bi bi-chevron-right"></i> Products</div>
 
 <div class="page-header-row">
-    <h1>Products <span class="count-badge"><?= count($products) ?></span></h1>
+    <h1>Products <span class="count-badge"><?= (int) ($totalProducts ?? count($products)) ?></span></h1>
 </div>
 <p class="page-subtitle">Manage your product catalog and inventory here.</p>
 
@@ -23,11 +23,25 @@ $platform = $store['platform'] ?? 'manual';
 <?php if (!empty($_GET['queued'])): ?>
     <div class="banner banner-success">Sync queued (Job #<?= (int) $_GET['queued'] ?>). Run <code>php worker.php</code> in a terminal to process it.</div>
 <?php endif; ?>
-<?php if (!empty($synced)): ?>
-    <div class="banner banner-success"><?= (int)$synced ?> product(s) synced.</div>
+<?php if ($synced !== null && $synced !== ''): ?>
+    <div class="banner banner-success">
+        <i class="bi bi-check-circle"></i>
+        Sync done: <?= (int) $synced ?> new product(s) added<?php if ((int) $stockSynced > 0): ?>, stock updated for <?= (int) $stockSynced ?> existing product(s)<?php endif; ?>.
+    </div>
+<?php endif; ?>
+<?php if ((int) $untracked > 0): ?>
+    <div class="banner banner-error">
+        <i class="bi bi-info-circle"></i>
+        <?= (int) $untracked ?> product(s) / variant(s) do not track stock quantity on the store's platform, so their Finovo stock was not changed.
+        To sync their stock, turn on stock tracking on the platform (WooCommerce: Product → Inventory → "Manage stock";
+        Shopify: Product → "Track quantity"), then sync again.
+    </div>
 <?php endif; ?>
 <?php if (!empty($exported)): ?>
-    <div class="banner banner-success">Product exported.</div>
+    <div class="banner banner-success">Product pushed to <?= htmlspecialchars($exported === '1' ? 'the store' : $exported) ?>.</div>
+<?php endif; ?>
+<?php if (!empty($pushNote)): ?>
+    <div class="banner banner-error"><i class="bi bi-info-circle"></i> <?= htmlspecialchars($pushNote) ?></div>
 <?php endif; ?>
 <?php if (!empty($imported)): ?>
     <div class="banner banner-success"><?= (int)$imported ?> product(s) imported from CSV.</div>
@@ -44,6 +58,19 @@ $platform = $store['platform'] ?? 'manual';
 
 <div class="card" style="overflow: visible;">
     <div class="filter-row">
+        <!-- Search + stock filter: server pe chalta hai, har page pe sahi result -->
+        <form method="GET" action="/products" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <input type="text" name="q" value="<?= htmlspecialchars($search ?? '') ?>" placeholder="Search name or SKU..." aria-label="Search products" style="padding:7px 10px; border:1px solid #d1d5db; border-radius:8px; min-width:200px;">
+            <select name="stock" onchange="this.form.submit()" aria-label="Stock filter" style="padding:7px 10px; border:1px solid #d1d5db; border-radius:8px;">
+                <option value="" <?= ($stockFilter ?? '') === '' ? 'selected' : '' ?>>All stock</option>
+                <option value="low" <?= ($stockFilter ?? '') === 'low' ? 'selected' : '' ?>>Low stock</option>
+                <option value="out" <?= ($stockFilter ?? '') === 'out' ? 'selected' : '' ?>>Out of stock</option>
+            </select>
+            <button type="submit" class="toolbar-btn"><i class="bi bi-search"></i> Search</button>
+            <?php if (($search ?? '') !== '' || ($stockFilter ?? '') !== ''): ?>
+                <a href="/products" class="toolbar-btn"><i class="bi bi-x"></i> Clear</a>
+            <?php endif; ?>
+        </form>
         <div class="push-right" style="margin-left:0;">
             <a href="/warehouses" class="toolbar-btn"><i class="bi bi-building"></i> Warehouses</a>
 
@@ -167,8 +194,14 @@ $platform = $store['platform'] ?? 'manual';
                             </button>
                             <div class="row-menu" id="product-menu-<?= $product['id'] ?>">
                                 <a href="/products/edit?id=<?= $product['id'] ?>"><i class="bi bi-pencil"></i> Edit</a>
-                                <div class="row-menu-divider"></div>
-                                <a href="/products/export-shopify?id=<?= $product['id'] ?>"><i class="bi bi-box-arrow-up-right"></i> Push to Shopify</a>
+                                <?php if ($pushTarget): ?>
+                                    <div class="row-menu-divider"></div>
+                                    <?php if (!empty($product[$pushTarget['column']])): ?>
+                                        <span class="row-menu-note"><i class="bi bi-check2-circle"></i> Already on <?= htmlspecialchars($pushTarget['label']) ?></span>
+                                    <?php else: ?>
+                                        <a href="/products/push?id=<?= $product['id'] ?>"><i class="bi bi-box-arrow-up-right"></i> Push to <?= htmlspecialchars($pushTarget['label']) ?></a>
+                                    <?php endif; ?>
+                                <?php endif; ?>
                                 <div class="row-menu-divider"></div>
                                 <a href="#" class="row-menu-danger" onclick="if(confirm('Delete this product? This cannot be undone.')){document.getElementById('deleteProductForm<?= $product['id'] ?>').submit();} return false;"><i class="bi bi-trash"></i> Delete</a>
                             </div>
@@ -214,14 +247,7 @@ $platform = $store['platform'] ?? 'manual';
         </tbody>
     </table>
 
-    <div class="pagination-bar">
-        <span>Rows per page 15 &nbsp;&nbsp; 1-<?= count($products) ?> of <?= count($products) ?> rows</span>
-        <div class="pagination-controls">
-            <button><i class="bi bi-chevron-left"></i></button>
-            <span class="page-num active">1</span>
-            <button><i class="bi bi-chevron-right"></i></button>
-        </div>
-    </div>
+    <?php if (!empty($pager)) { $pagerLabel = 'products'; require __DIR__ . '/../partials/pagination.php'; } ?>
 </div>
 
 <div class="modal-backdrop" id="importProductModal">
@@ -288,6 +314,15 @@ $platform = $store['platform'] ?? 'manual';
     white-space: nowrap;
 }
 .row-menu a:hover { background: #f3f4f6; }
+.row-menu-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    font-size: 13px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
 .row-menu a.row-menu-danger { color: var(--red); }
 .row-menu a.row-menu-danger:hover { background: #fee2e2; }
 .row-menu-divider {

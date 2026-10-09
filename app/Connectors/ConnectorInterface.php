@@ -1,9 +1,5 @@
 <?php
-/**
- * Har platform (Shopify, WooCommerce, Custom Bridge, Generic API) ye
- * interface implement karta hai. Baaki business logic (controllers)
- * ko kabhi pata nahi hota ke background mein kaunsa platform hai.
- */
+
 interface ConnectorInterface
 {
     public function testConnection(): array;

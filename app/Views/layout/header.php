@@ -37,6 +37,9 @@ $lowStockCountForBell = count($lowStockProducts) + $warehouseAlertItemCount;
 
 // ---------- Global page search: same page list as the sidebar, filtered by role ----------
 $headerCurrentRole = strtolower(trim($_SESSION['user']['role'] ?? ''));
+// Low-stock list ke links sirf un ke liye jo Products / Warehouses page khol sakte hain (Sales Staff nahi)
+$canOpenStockPages = in_array($headerCurrentRole, ['admin', 'manager', 'warehouse staff'], true);
+$stockLinkTag = $canOpenStockPages ? 'a' : 'div';
 
 $searchablePages = [
     ['label' => 'Dashboard', 'url' => '/dashboard', 'icon' => 'bi-grid'],
@@ -233,7 +236,7 @@ $searchablePages = array_values(array_filter($searchablePages, function ($page) 
                             $stock = (int) $lp['stock_quantity'];
                             $isOut = $stock <= 0;
                             ?>
-                            <a href="/products" class="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 border-b border-gray-50">
+                            <<?= $stockLinkTag ?> <?= $canOpenStockPages ? 'href="/products"' : '' ?> class="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 border-b border-gray-50">
                                 <div>
                                     <p class="text-[13px] font-medium text-gray-800"><?= htmlspecialchars($lp['name']) ?></p>
                                     <p class="text-[11px] text-gray-400"><?= htmlspecialchars($lp['sku'] ?: '-') ?></p>
@@ -241,7 +244,7 @@ $searchablePages = array_values(array_filter($searchablePages, function ($page) 
                                 <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full <?= $isOut ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600' ?>">
                                     <?= $isOut ? 'Out of stock' : 'Low stock (' . $stock . ')' ?>
                                 </span>
-                            </a>
+                            </<?= $stockLinkTag ?>>
                         <?php endforeach; ?>
                     <?php endif; ?>
 
@@ -250,7 +253,7 @@ $searchablePages = array_values(array_filter($searchablePages, function ($page) 
                             <?= htmlspecialchars($wh['warehouse_name']) ?>
                         </div>
                         <?php foreach ($wh['items'] as $item): ?>
-                            <a href="/warehouses/view?id=<?= $wh['warehouse_id'] ?>" class="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 border-b border-gray-50">
+                            <<?= $stockLinkTag ?> <?= $canOpenStockPages ? 'href="/warehouses/view?id=' . (int) $wh['warehouse_id'] . '"' : '' ?> class="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 border-b border-gray-50">
                                 <div>
                                     <p class="text-[13px] font-medium text-gray-800"><?= htmlspecialchars($item['name']) ?></p>
                                     <p class="text-[11px] text-gray-400"><?= htmlspecialchars($item['sku'] ?: '-') ?></p>
@@ -258,15 +261,17 @@ $searchablePages = array_values(array_filter($searchablePages, function ($page) 
                                 <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full <?= $item['is_out'] ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600' ?>">
                                     <?= $item['is_out'] ? 'Out of stock' : 'Low stock (' . $item['stock'] . ')' ?>
                                 </span>
-                            </a>
+                            </<?= $stockLinkTag ?>>
                         <?php endforeach; ?>
                     <?php endforeach; ?>
 
                 </div>
 
-                <a href="/warehouses" class="block text-center text-[13px] font-semibold text-blue-700 py-2.5 border-t border-gray-100 hover:bg-blue-50">
-                    View all warehouses
-                </a>
+                <?php if ($canOpenStockPages): ?>
+                    <a href="/warehouses" class="block text-center text-[13px] font-semibold text-blue-700 py-2.5 border-t border-gray-100 hover:bg-blue-50">
+                        View all warehouses
+                    </a>
+                <?php endif; ?>
             </div>
 
         </div>

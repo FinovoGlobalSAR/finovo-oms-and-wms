@@ -8,6 +8,8 @@ require_once __DIR__ . '/../Services/InventoryService.php';
 require_once __DIR__ . '/../Services/IntegrationErrorService.php';
 require_once __DIR__ . '/../Middlewares/ProductAvailabilityGuard.php';
 require_once __DIR__ . '/../Connectors/MagentoConnector.php';
+require_once __DIR__ . '/../Services/OrderImportService.php';
+require_once __DIR__ . '/../Services/PlatformOrderMapper.php';
 
 /**
  * Magento 2: Products pull + Orders pull.
@@ -50,6 +52,7 @@ class MagentoController extends Controller
 
     public function syncProducts(): void
     {
+        $this->requireRole(['admin', 'manager', 'warehouse staff']);
         $store = $this->getCurrentStore();
         $defaultWarehouse = $this->warehouseModel->getDefault((int) $store['id']);
         $connector = $this->connector($store);
@@ -69,35 +72,51 @@ class MagentoController extends Controller
 
         $db = Database::getConnection();
         $importedCount = 0;
+        $updatedCount = 0;
+        $untracked = 0;
 
         foreach ($result['products'] as $mp) {
             if ($mp['id'] === '') continue;
 
             $check = $db->prepare("SELECT id FROM products WHERE store_id = ? AND external_magento_product_id = ?");
             $check->execute([$store['id'], $mp['id']]);
-            if ($check->fetch()) continue;
+            $existingId = $check->fetchColumn();
 
-            $stmt = $db->prepare("INSERT INTO products (store_id, name, sku, price, external_magento_product_id) VALUES (?, ?, ?, ?, ?)");
-            $stmt->execute([$store['id'], $mp['name'], $mp['sku'], $mp['price'], $mp['id']]);
-            $productId = (int) $db->lastInsertId();
-            $importedCount++;
+            if ($existingId === false) {
+                $stmt = $db->prepare("INSERT INTO products (store_id, name, sku, price, external_magento_product_id) VALUES (?, ?, ?, ?, ?)");
+                $stmt->execute([$store['id'], $mp['name'], $mp['sku'], $mp['price'], $mp['id']]);
+                $productId = (int) $db->lastInsertId();
+                $importedCount++;
+            } else {
+                $productId = (int) $existingId;
+                $updatedCount++;
+            }
 
-            if ($defaultWarehouse) {
-                $this->productModel->setWarehouseStock($productId, (int) $defaultWarehouse['id'], $mp['qty']);
+            // Har sync pe stock bhi (pehle sirf naye product pe aata tha). null = Magento stock ginta hi nahi.
+            if ($mp['qty'] === null) {
+                $untracked++;
+            } elseif ($defaultWarehouse) {
+                // Stock Magento se hi aaya hai — wapas Magento pe mat bhejo
+                StockPushService::pause();
+                try {
+                    $this->productModel->applyPlatformStock($productId, (int) $defaultWarehouse['id'], (int) $mp['qty']);
+                } finally {
+                    StockPushService::resume();
+                }
             }
         }
 
         $this->errorService->markResolved((int) $store['id'], 'magento', 'sync_products', null);
         $this->storeModel->markHealthy((int) $store['id']);
-        $this->redirect('/products?synced=' . $importedCount);
+        $this->redirect('/products?synced=' . $importedCount . '&stock_synced=' . $updatedCount . ($untracked > 0 ? '&untracked=' . $untracked : ''));
     }
 
     // ---------- Orders Pull ----------
 
     public function syncOrders(): void
     {
+        $this->requireRole(['admin', 'manager', 'sales staff']);
         $store = $this->getCurrentStore();
-        $defaultWarehouse = $this->warehouseModel->getDefault((int) $store['id']);
         $connector = $this->connector($store);
 
         if (!$connector) {
@@ -113,7 +132,7 @@ class MagentoController extends Controller
             return;
         }
 
-        $db = Database::getConnection();
+        $importer = new OrderImportService();
         $importedCount = 0;
 
         foreach ($result['orders'] as $order) {
@@ -129,37 +148,9 @@ class MagentoController extends Controller
             };
             $paymentStatus = in_array($magentoStatus, ['processing', 'complete'], true) ? 'paid' : 'unpaid';
 
-            // Pehle se aaya hua order → sirf status update
-            $check = $db->prepare("SELECT id FROM orders WHERE external_magento_order_id = ? AND store_id = ?");
-            $check->execute([$externalId, $store['id']]);
-            $existing = $check->fetch();
-            if ($existing) {
-                $db->prepare("UPDATE orders SET status = ?, payment_status = ? WHERE id = ?")
-                   ->execute([$orderStatus, $paymentStatus, $existing['id']]);
-                continue;
-            }
-
-            // Pehla asli line item (configurable ke "child" rows chhod do)
-            $line = null;
-            foreach (($order['items'] ?? []) as $item) {
-                if (empty($item['parent_item_id'])) {
-                    $line = $item;
-                    break;
-                }
-            }
-            if (!$line) continue;
-
-            $productName = $line['name'] ?? 'Unknown product';
-            $quantity = max(1, (int) ($line['qty_ordered'] ?? 1));
-
-            $guard = $this->availabilityGuard->check((int) $store['id'], $productName);
-            if (!$guard['allowed'] || !$defaultWarehouse) {
-                continue;
-            }
-            $productId = $guard['product_id'];
-
-            $available = $this->inventoryService->checkAvailability($productId, null, (int) $defaultWarehouse['id']);
-            if ($available < $quantity) {
+            // Pehle se aaya hua order → sirf status update (us ki saari rows ka)
+            if ($importer->exists((int) $store['id'], 'magento_pull', $externalId)) {
+                $importer->updateStatus((int) $store['id'], 'magento_pull', $externalId, $orderStatus, $paymentStatus);
                 continue;
             }
 
@@ -172,21 +163,18 @@ class MagentoController extends Controller
                 $customerName = $order['customer_email'] ?? ('Order #' . ($order['increment_id'] ?? $externalId));
             }
 
-            $price = (float) ($order['grand_total'] ?? 0);
-            $paymentMethod = $order['payment']['method'] ?? 'Other';
+            // Order ke SAARE products (pehle sirf pehla aata tha)
+            $import = $importer->import((int) $store['id'], 'magento_pull', $externalId, [
+                'customer_name' => $customerName,
+                'status' => $orderStatus,
+                'payment_status' => $paymentStatus,
+                'payment_method' => $order['payment']['method'] ?? 'Other',
+                'customer' => PlatformOrderMapper::customer('magento', $order),
+            ], PlatformOrderMapper::magentoLines($order), 'strict', 'magento_sync');
 
-            $reserve = $this->inventoryService->reserve($productId, null, (int) $defaultWarehouse['id'], $quantity, 'magento_pull', "external:{$externalId}", 'magento_sync');
-            if (!$reserve['ok']) {
-                continue;
+            if ($import['ok']) {
+                $importedCount++;
             }
-
-            $stmt = $db->prepare(
-                "INSERT INTO orders (store_id, customer_name, product_name, quantity, price, source, external_magento_order_id, status, payment_status, product_id, warehouse_id, payment_method)
-                 VALUES (?, ?, ?, ?, ?, 'magento_pull', ?, ?, ?, ?, ?, ?)"
-            );
-            $stmt->execute([$store['id'], $customerName, $productName, $quantity, $price, $externalId, $orderStatus, $paymentStatus, $productId, $defaultWarehouse['id'], $paymentMethod]);
-
-            $importedCount++;
         }
 
         $this->errorService->markResolved((int) $store['id'], 'magento', 'sync_orders', null);

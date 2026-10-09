@@ -57,6 +57,19 @@ abstract class Controller
 
     protected function getCurrentStore(): array
     {
+        $store = $this->pickCurrentStore();
+
+        // Sales / Warehouse Staff ke paas Stores page ("Manage" button) nahi hota,
+        // is liye un ka store khud hi "manage" mode mein khol do — warna sidebar khaali rehta
+        if (!$this->isAdminOrManager()) {
+            $_SESSION['store_context_active'] = true;
+        }
+
+        return $store;
+    }
+
+    private function pickCurrentStore(): array
+    {
         require_once __DIR__ . '/../app/Models/Store.php';
         $storeModel = new Store();
 
@@ -70,6 +83,12 @@ abstract class Controller
         $store = $storeModel->first();
         $_SESSION['current_store_id'] = $store['id'];
         return $store;
+    }
+
+    /** Admin ya Manager? (yehi do Stores page khol kar store "Manage" kar sakte hain) */
+    protected function isAdminOrManager(): bool
+    {
+        return in_array($this->currentRole(), ['admin', 'manager'], true);
     }
 
     protected function requireLogin(): void
@@ -101,6 +120,11 @@ abstract class Controller
         $this->requireLogin();
 
         if (empty($_SESSION['store_context_active'])) {
+            // Sales / Warehouse Staff ke paas Stores page nahi hota — un ka store khud chun lo
+            if (!$this->isAdminOrManager()) {
+                $this->getCurrentStore();
+                return;
+            }
             $_SESSION['error'] = 'Please select a store to manage first.';
             $this->stopAndGo('/stores');
         }

@@ -6,16 +6,19 @@ $currentPath = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
 $currentRole = strtolower(trim($_SESSION['user']['role'] ?? ''));
 
-// Orders/Products/Shipments waghera sirf tabhi dikhte hain jab
-// kisi store pe "Manage" dabaya gaya ho.
 $storeContextActive = !empty($_SESSION['store_context_active']);
 $managedStoreName = null;
+
+$sidebarStores = [];
+$isAdminOrManager = in_array($currentRole, ['admin', 'manager'], true);
 
 if ($storeContextActive && !empty($_SESSION['current_store_id'])) {
     require_once __DIR__ . '/../../Models/Store.php';
     $sidebarStoreModel = new Store();
     $sidebarStore = $sidebarStoreModel->find((int) $_SESSION['current_store_id']);
     $managedStoreName = $sidebarStore['name'] ?? null;
+    // Store badalne ka dropdown (sab roles — Sales / Warehouse Staff bhi doosre store pe ja sakte hain)
+    $sidebarStores = $sidebarStoreModel->all();
 }
 
 $navigation = [
@@ -107,13 +110,6 @@ $navigation = [
             'requires_store' => true,
         ],
         [
-            'label' => 'Customers',
-            'url'   => '/customers',
-            'icon'  => 'users',
-            'roles' => ['admin', 'manager', 'sales staff'],
-            'requires_store' => true,
-        ],
-        [
             'label' => 'Integration Settings',
             'icon'  => 'mapping',
             'roles' => ['admin', 'manager'],
@@ -146,6 +142,13 @@ $navigation = [
     ],
 
     'Management' => [
+        [
+            // Hamesha dikhta hai (store "Manage" karna zaroori nahi) — saare stores ke customers
+            'label' => 'Customers',
+            'url'   => '/customers',
+            'icon'  => 'users',
+            'roles' => ['admin', 'manager', 'sales staff'],
+        ],
         [
             'label' => 'Employees',
             'url'   => '/employees',
@@ -228,19 +231,41 @@ function sidebarIcon(array $icons, string $name, string $class = 'w-[17px] h-[17
     <!-- Store being managed -->
     <?php if ($storeContextActive && $managedStoreName): ?>
         <div class="px-4 pb-2">
-            <div class="flex items-center gap-2.5 pl-3 pr-2 py-2.5 rounded-[10px] bg-blue-50 border border-blue-100">
-                <a href="/stores" class="flex items-center gap-2.5 min-w-0 flex-1" title="Go to Stores">
+            <div class="pl-3 pr-2 py-2.5 rounded-[10px] bg-blue-50 border border-blue-100">
+                <div class="flex items-center gap-2.5">
                     <span class="w-[30px] h-[30px] rounded-lg bg-white text-blue-700 flex items-center justify-center flex-shrink-0">
                         <?= sidebarIcon($sidebarIcons, 'store', 'w-4 h-4') ?>
                     </span>
-                    <span class="min-w-0 leading-tight">
+                    <span class="min-w-0 leading-tight flex-1">
                         <span class="block text-[11px] font-semibold text-blue-700">Managing</span>
                         <span class="block text-[13px] font-bold text-blue-900 truncate"><?= htmlspecialchars($managedStoreName) ?></span>
                     </span>
-                </a>
-                <a href="/stores/exit-management" title="Exit store management" aria-label="Exit store management" class="w-7 h-7 rounded-md flex items-center justify-center text-blue-500 hover:bg-white hover:text-blue-800 flex-shrink-0">
-                    <i class="bi bi-x-lg text-[12px]"></i>
-                </a>
+                    <?php if ($isAdminOrManager): ?>
+                        <!-- Stores page aur "Exit" sirf Admin / Manager ke liye (staff ke paas Stores page nahi hai) -->
+                        <a href="/stores" title="Go to Stores" aria-label="Go to Stores" class="w-7 h-7 rounded-md flex items-center justify-center text-blue-500 hover:bg-white hover:text-blue-800 flex-shrink-0">
+                            <i class="bi bi-grid text-[12px]"></i>
+                        </a>
+                        <a href="/stores/exit-management" title="Exit store management" aria-label="Exit store management" class="w-7 h-7 rounded-md flex items-center justify-center text-blue-500 hover:bg-white hover:text-blue-800 flex-shrink-0">
+                            <i class="bi bi-x-lg text-[12px]"></i>
+                        </a>
+                    <?php endif; ?>
+                </div>
+                <?php if (count($sidebarStores) > 1): ?>
+                    <!-- Doosre store pe jana: isi page pe wapas aata hai, naye store ke data ke saath -->
+                    <form method="GET" action="/stores/switch" class="mt-2">
+                        <input type="hidden" name="redirect" value="<?= htmlspecialchars($currentPath ?: '/dashboard') ?>">
+                        <label for="sidebarStoreSwitch" class="sr-only">Switch store</label>
+                        <select id="sidebarStoreSwitch" name="store_id" onchange="this.form.submit()"
+                                class="w-full h-8 px-2 text-[12.5px] bg-white border border-blue-200 rounded-md text-slate-800 cursor-pointer">
+                            <?php foreach ($sidebarStores as $st): ?>
+                                <option value="<?= (int) $st['id'] ?>" <?= (int) $st['id'] === (int) $_SESSION['current_store_id'] ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($st['name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <noscript><button type="submit" class="mt-1 text-[12px] text-blue-700">Switch</button></noscript>
+                    </form>
+                <?php endif; ?>
             </div>
         </div>
     <?php endif; ?>

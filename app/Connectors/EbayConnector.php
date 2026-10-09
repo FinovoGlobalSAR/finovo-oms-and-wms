@@ -1,8 +1,5 @@
 <?php
-/**
- * eBay API (sandbox ya production, .env ke EBAY_ENV se) — Sell Inventory (products) aur Sell Fulfillment (orders).
- * Token ab EbayAuthService deta hai ("Connect eBay" ke baad khud refresh hota hai).
- */
+
 class EbayConnector
 {
     private string $userToken;
@@ -36,31 +33,47 @@ class EbayConnector
         return ['code' => $httpCode, 'data' => json_decode((string) $response, true)];
     }
 
+    /** Saare inventory items (pehle sirf 50) — eBay "next" link deta hai jab tak aur hon */
     public function fetchProducts(): array
     {
-        $result = $this->request('GET', $this->baseUrl . '/sell/inventory/v1/inventory_item?limit=50');
-
-        if ($result['code'] !== 200) {
-            return ['ok' => false, 'message' => "eBay API error (HTTP {$result['code']}): " . json_encode($result['data'])];
-        }
-
-        return ['ok' => true, 'products' => $result['data']['inventoryItems'] ?? []];
+        $result = $this->fetchAll($this->baseUrl . '/sell/inventory/v1/inventory_item?limit=100', 'inventoryItems');
+        return $result['ok'] ? ['ok' => true, 'products' => $result['items']] : $result;
     }
 
+    /** Saare orders (pehle sirf 50) */
     public function fetchOrders(): array
     {
-        $result = $this->request('GET', $this->baseUrl . '/sell/fulfillment/v1/order?limit=50');
-
-        if ($result['code'] !== 200) {
-            return ['ok' => false, 'message' => "eBay API error (HTTP {$result['code']}): " . json_encode($result['data'])];
-        }
-
-        return ['ok' => true, 'orders' => $result['data']['orders'] ?? []];
+        $result = $this->fetchAll($this->baseUrl . '/sell/fulfillment/v1/order?limit=200', 'orders');
+        return $result['ok'] ? ['ok' => true, 'orders' => $result['items']] : $result;
     }
 
-    /**
-     * Ek order ki poori detail (webhook ke baad isse lete hain).
-     */
+    private function fetchAll(string $url, string $key, int $maxPages = 40): array
+    {
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(300);
+        }
+
+        $items = [];
+        for ($page = 0; $page < $maxPages && $url !== ''; $page++) {
+            $result = $this->request('GET', $url);
+            if ($result['code'] !== 200) {
+                if ($page === 0) {
+                    return ['ok' => false, 'message' => "eBay API error (HTTP {$result['code']}): " . json_encode($result['data'])];
+                }
+                break; // jitna aa gaya woh rakho
+            }
+            foreach ($result['data'][$key] ?? [] as $row) {
+                $items[] = $row;
+            }
+            $url = (string) ($result['data']['next'] ?? '');
+            if (empty($result['data'][$key])) {
+                break;
+            }
+        }
+
+        return ['ok' => true, 'items' => $items];
+    }
+
     public function fetchOrder(string $orderId): array
     {
         $result = $this->request('GET', $this->baseUrl . '/sell/fulfillment/v1/order/' . rawurlencode($orderId));

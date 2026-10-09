@@ -23,6 +23,10 @@ class AuthMiddleware
         }
 
         $role = strtolower(trim($user['role'] ?? ''));
+        // Login jaisa hi: purana "Company Admin" naam bhi "admin" hi hai
+        if ($role === 'company admin') {
+            $role = 'admin';
+        }
         $allowedRoles = ['admin', 'manager', 'sales staff', 'warehouse staff'];
 
         if (!in_array($role, $allowedRoles, true)) {

@@ -1,10 +1,6 @@
 <?php
 require_once __DIR__ . '/ConnectorInterface.php';
 
-/**
- * Custom Store Bridge se baat karne wala connector — koi bhi PHP/MySQL
- * website jismein oms-bridge package install hua ho, isse connect hota hai.
- */
 class BridgeConnector implements ConnectorInterface
 {
     private string $baseUrl;

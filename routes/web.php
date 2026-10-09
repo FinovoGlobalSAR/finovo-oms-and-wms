@@ -28,13 +28,15 @@ $router->post('/orders/delete', ['OrderController', 'delete']);
 $router->get('/orders/settings', ['OrderController', 'showSettingsForm']);
 $router->post('/orders/settings', ['OrderController', 'saveSettings']);
 $router->get('/orders/sync-shopify', ['OrderController', 'syncShopify']);
-$router->get('/orders/export-shopify', ['OrderController', 'exportToShopify']);
+$router->get('/orders/export-shopify', ['OrderPushController', 'push']);
 $router->get('/orders/invoice', ['InvoiceController', 'download']);
 $router->get('/orders/export-csv', ['OrderController', 'exportCsv']);
 $router->get('/orders/sync-woocommerce', ['OrderController', 'syncWooCommerce']);
-$router->get('/orders/export-woocommerce', ['OrderController', 'exportToWooCommerce']);
+$router->get('/orders/export-woocommerce', ['OrderPushController', 'push']);
+$router->get('/orders/push', ['OrderPushController', 'push']);
+$router->get('/orders/push-tracking', ['OrderPushController', 'pushTracking']);
 $router->get('/products/sync-woocommerce', ['ProductController', 'syncWooCommerce']);
-$router->get('/products/export-woocommerce', ['ProductController', 'exportToWooCommerce']);
+$router->get('/products/export-woocommerce', ['ProductController', 'push']); // purana link — ab store ke platform pe push
 
 $router->get('/orders/import', ['OrderController', 'showImportForm']);
 $router->post('/orders/import', ['OrderController', 'handleImport']);
@@ -47,7 +49,8 @@ $router->get('/products/import', ['ProductController', 'showImportForm']);
 $router->post('/products/import', ['ProductController', 'handleImport']);
 $router->get('/products/export-csv', ['ProductController', 'exportCsv']);
 $router->get('/products/sync-shopify', ['ProductController', 'syncShopify']);
-$router->get('/products/export-shopify', ['ProductController', 'exportToShopify']);
+$router->get('/products/export-shopify', ['ProductController', 'push']); // purana link — ab store ke platform pe push
+$router->get('/products/push', ['ProductController', 'push']);
 $router->post('/products/update-stock', ['ProductController', 'updateStock']);
 
 $router->get('/warehouses', ['WarehouseController', 'index']);
@@ -62,7 +65,7 @@ $router->get('/stores', ['StoreController', 'index']);
 $router->post('/stores/create', ['StoreController', 'create']);
 $router->post('/stores/update', ['StoreController', 'update']);
 $router->post('/stores/delete', ['StoreController', 'delete']);
-$router->get('/stores/switch', ['StoreController', 'switchStore']);
+$router->get('/stores/switch', ['StoreSwitchController', 'switchStore']);
 $router->get('/stores/manage', ['StoreController', 'manage']);
 $router->get('/stores/exit-management', ['StoreController', 'exitManagement']);
 
@@ -88,6 +91,8 @@ $router->post('/returns/update-status', ['ReturnController', 'updateStatus']);
 
 $router->get('/customers', ['CustomerController', 'index']);
 $router->get('/customers/view', ['CustomerController', 'show']);
+$router->post('/customers/update', ['CustomerController', 'update']);
+$router->post('/customers/delete', ['CustomerController', 'delete']);
 
 $router->get('/picking', ['PickingController', 'index']);
 $router->post('/picking/update-status', ['PickingController', 'updateStatus']);

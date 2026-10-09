@@ -32,10 +32,6 @@ class BigCommerceConnectController extends Controller
         return appUrl();
     }
 
-    /**
-     * Auth Callback — BigCommerce install/authorize hone par yahan redirect
-     * karta hai: ?code=...&scope=...&context=stores/{store_hash}
-     */
     public function authCallback(): void
     {
         $code = $_GET['code'] ?? '';

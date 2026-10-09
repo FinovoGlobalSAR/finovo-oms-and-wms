@@ -118,7 +118,9 @@ class Shipment extends Model
             'returned' => 'cancelled',
             default => 'pending',
         };
-        $this->query("UPDATE orders SET status = ? WHERE shipment_id = ?", [$orderStatus, $id]);
+                // Shipment "returned" → order cancelled → us ka stock warehouse mein wapas (OrderStockService)
+        require_once __DIR__ . '/../Services/OrderStockService.php';
+        (new OrderStockService())->changeStatusWhere('shipment_id = ?', [$id], $orderStatus, null, $_SESSION['user']['name'] ?? 'shipment');
     }
 
     public function shipmentsByOrderIds(array $orderIds): array

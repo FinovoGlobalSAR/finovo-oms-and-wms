@@ -15,14 +15,26 @@ class Role extends Model
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /**
+     * Sirf yehi 4 roles valid hain (database mein koi purana / junk role ho to woh assign nahi ho sakta).
+     * "Company Admin" = Admin ka purana naam (kuch databases mein abhi bhi yehi hai).
+     */
     public function exists(int $roleId): bool
     {
         $role = $this->query(
-            "SELECT id FROM roles WHERE id = :id LIMIT 1",
+            "SELECT id FROM roles WHERE id = :id AND name IN ('Admin', 'Company Admin', 'Manager', 'Sales Staff', 'Warehouse Staff') LIMIT 1",
             ['id' => $roleId]
         )->fetch(PDO::FETCH_ASSOC);
 
         return (bool) $role;
+    }
+
+    /** Role ka naam chhote huruf mein ('admin', 'manager'...). Purana "Company Admin" bhi 'admin'. */
+    public function slugOf(int $roleId): string
+    {
+        $name = $this->query("SELECT name FROM roles WHERE id = :id LIMIT 1", ['id' => $roleId])->fetchColumn();
+        $slug = strtolower(trim((string) $name));
+        return $slug === 'company admin' ? 'admin' : $slug;
     }
 
     public function ensureDefaultSetup(): void

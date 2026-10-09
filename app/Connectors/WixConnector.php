@@ -1,9 +1,5 @@
 <?php
-/**
- * Wix Stores REST API — API key based, koi OAuth flow nahi chahiye. Har
- * request mein wix-site-id header dena zaroori hai (API key kisi ek site
- * se bound nahi hota, isliye target site batana padta hai).
- */
+
 class WixConnector
 {
     private string $apiKey;
@@ -38,29 +34,50 @@ class WixConnector
         return ['code' => $httpCode, 'data' => json_decode($response, true)];
     }
 
+    /** Saare products — Wix ek page mein 100 tak deta hai, agla page "cursor" se */
     public function fetchProducts(): array
     {
-        $result = $this->request('POST', 'https://www.wixapis.com/stores/v3/products/search', [
-            'search' => ['cursorPaging' => ['limit' => 50]],
-        ]);
-
-        if ($result['code'] !== 200) {
-            return ['ok' => false, 'message' => "Wix API error (HTTP {$result['code']}): " . json_encode($result['data'])];
-        }
-
-        return ['ok' => true, 'products' => $result['data']['products'] ?? []];
+        return $this->searchAll('https://www.wixapis.com/stores/v3/products/search', 'products');
     }
 
+    /** Saare orders (pehle sirf 20 aate the) */
     public function fetchOrders(): array
     {
-        $result = $this->request('POST', 'https://www.wixapis.com/ecom/v1/orders/search', [
-            'search' => ['cursorPaging' => ['limit' => 20]],
-        ]);
+        return $this->searchAll('https://www.wixapis.com/ecom/v1/orders/search', 'orders');
+    }
 
-        if ($result['code'] !== 200) {
-            return ['ok' => false, 'message' => "Wix API error (HTTP {$result['code']}): " . json_encode($result['data'])];
+    /** Wix search API: pagingMetadata.cursors.next mile to agla page maango */
+    private function searchAll(string $url, string $key, int $maxPages = 40): array
+    {
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(300);
         }
 
-        return ['ok' => true, 'orders' => $result['data']['orders'] ?? []];
+        $items = [];
+        $cursor = null;
+        for ($page = 0; $page < $maxPages; $page++) {
+            $paging = ['limit' => 100];
+            if ($cursor !== null) {
+                $paging['cursor'] = $cursor;
+            }
+            $result = $this->request('POST', $url, ['search' => ['cursorPaging' => $paging]]);
+
+            if ($result['code'] !== 200) {
+                if ($page === 0) {
+                    return ['ok' => false, 'message' => "Wix API error (HTTP {$result['code']}): " . json_encode($result['data'])];
+                }
+                break; // jitna aa gaya woh rakho
+            }
+
+            foreach ($result['data'][$key] ?? [] as $row) {
+                $items[] = $row;
+            }
+            $cursor = $result['data']['pagingMetadata']['cursors']['next'] ?? null;
+            if (empty($cursor) || empty($result['data'][$key])) {
+                break;
+            }
+        }
+
+        return ['ok' => true, $key => $items];
     }
 }

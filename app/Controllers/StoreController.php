@@ -206,15 +206,6 @@ class StoreController extends Controller
         $this->redirect('/stores?deleted=1');
     }
 
-    public function switchStore(): void
-    {
-        $id = (int) ($_GET['store_id'] ?? 0);
-        if ($id > 0 && $this->storeModel->find($id)) {
-            $_SESSION['current_store_id'] = $id;
-        }
-        $this->redirect($_GET['redirect'] ?? '/orders');
-    }
-
     public function manage(): void
     {
         $id = (int) ($_GET['store_id'] ?? 0);

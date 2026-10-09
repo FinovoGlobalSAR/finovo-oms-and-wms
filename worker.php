@@ -7,6 +7,7 @@ require_once __DIR__ . '/app/Models/Product.php';
 require_once __DIR__ . '/app/Models/Warehouse.php';
 require_once __DIR__ . '/app/Models/FieldMapping.php';
 require_once __DIR__ . '/app/Services/StoreSyncRunner.php';
+require_once __DIR__ . '/app/Services/WooCommerceAuth.php';
 
 $jobQueue = new JobQueue();
 $storeModel = new Store();
@@ -129,7 +130,8 @@ function runSyncJob(string $type, array $store): string
         $auth = $store['woocommerce_consumer_key'] . ':' . $store['woocommerce_consumer_secret'];
         $apiUrl = $baseUrl . '/wp-json/wc/v3/products?per_page=50';
 
-        $ch = curl_init($apiUrl);
+        // http:// site pe WooCommerce sirf OAuth signature maanta hai
+        $ch = curl_init(WooCommerceAuth::url('GET', $apiUrl, $store['woocommerce_consumer_key'], $store['woocommerce_consumer_secret']));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_USERPWD, $auth);
         curl_setopt($ch, CURLOPT_TIMEOUT, 15);

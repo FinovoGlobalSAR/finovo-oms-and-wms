@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../core/Controller.php';
+require_once __DIR__ . '/../../core/Paginator.php';
 require_once __DIR__ . '/../../core/Database.php';
 require_once __DIR__ . '/../Models/ReturnRequest.php';
 require_once __DIR__ . '/../Models/Product.php';
@@ -24,6 +25,19 @@ class ReturnController extends Controller
         $this->inventoryService = new InventoryService();
     }
 
+    /** Search (?q=) + status (?status=) — $text(row) = row ka search wala text */
+    private static function filterList(array $rows, callable $text): array
+    {
+        $q = mb_strtolower(trim((string) ($_GET['q'] ?? '')));
+        $status = trim((string) ($_GET['status'] ?? ''));
+        return array_values(array_filter($rows, function ($r) use ($q, $status, $text) {
+            if ($status !== '' && ($r['status'] ?? '') !== $status) {
+                return false;
+            }
+            return $q === '' || str_contains(mb_strtolower($text($r)), $q);
+        }));
+    }
+
     public function index(): void
     {
         $store = $this->getCurrentStore();
@@ -36,10 +50,16 @@ class ReturnController extends Controller
         $allOrders = $stmt->fetchAll();
 
         $recentOrders = array_values(array_filter($allOrders, function ($o) use ($alreadyReturned) {
-            return !in_array((int) $o['id'], $alreadyReturned, true);
+            return !in_array((int) $o['id'], $alreadyReturned, true) && ($o['status'] ?? '') !== 'cancelled';
         }));
 
-        $returns = $this->returnModel->all((int) $store['id']);
+        $allReturns = $this->returnModel->all((int) $store['id']);
+
+        // Search + status filter server pe, phir 25-25 ke pages
+        $filtered = self::filterList($allReturns, fn($r) => '#' . $r['id'] . ' #' . $r['order_id'] . ' ' . ($r['customer_name'] ?? '') . ' ' . ($r['product_name'] ?? ''));
+        $pager = Paginator::make($filtered);
+
+        $returns = $pager['items'];
         foreach ($returns as &$r) {
             $r['currency_symbol'] = in_array($r['order_source'] ?? 'manual', externalOrderSources(), true) ? '$' : 'Rs.';
         }
@@ -47,6 +67,10 @@ class ReturnController extends Controller
 
         $this->view('returns/index', [
             'returns' => $returns,
+            'allReturns' => $allReturns,
+            'pager' => $pager,
+            'search' => trim((string) ($_GET['q'] ?? '')),
+            'statusFilter' => trim((string) ($_GET['status'] ?? '')),
             'recentOrders' => $recentOrders,
             'statuses' => ReturnRequest::$statuses,
             'conditions' => ReturnRequest::$conditions,
@@ -77,6 +101,16 @@ class ReturnController extends Controller
 
         if (!$order) {
             $this->redirect('/returns?error=' . urlencode('Order not found.'));
+            return;
+        }
+
+        // Cancelled order ka stock pehle hi warehouse mein wapas aa chuka hai — return se dobara judta
+        if (($order['status'] ?? '') === 'cancelled') {
+            $this->redirect('/returns?error=' . urlencode('This order is cancelled, its stock is already back in the warehouse. A return is not needed.'));
+            return;
+        }
+        if ($quantity > (int) $order['quantity']) {
+            $this->redirect('/returns?error=' . urlencode('Return quantity cannot be more than the ordered quantity (' . (int) $order['quantity'] . ').'));
             return;
         }
 

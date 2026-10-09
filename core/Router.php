@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/Csrf.php';
 
 class Router
 {
@@ -28,6 +29,9 @@ class Router
         }
 
         $route = $this->routes[$method][$uri];
+
+        // CSRF: POST pe token, aur doosri website se aayi requests band (core/Csrf.php)
+        Csrf::check($uri, $method);
 
         foreach ($route['middleware'] as $middleware) {
             $middlewareFile = __DIR__ . "/../app/Middlewares/{$middleware}.php";

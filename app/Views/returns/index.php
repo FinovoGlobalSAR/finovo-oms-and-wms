@@ -1,4 +1,8 @@
 <?php
+// Upar ke numbers POORI list se ($allReturns); table mein sirf is page ki rows ($returns)
+$allReturns = $allReturns ?? $returns;
+$search = $search ?? '';
+$statusFilter = $statusFilter ?? '';
 $statusColors = [
     'requested' => ['bg' => '#fef3c7', 'text' => '#92400e'],
     'approved'  => ['bg' => '#dbeafe', 'text' => '#1d4ed8'],
@@ -6,9 +10,9 @@ $statusColors = [
     'completed' => ['bg' => '#dcfce7', 'text' => '#166534'],
 ];
 
-// ---------- Summary numbers (sirf display ke liye, $returns se hi) ----------
+// ---------- Summary numbers (POORI list se — $allReturns) ----------
 $returnCounts = ['requested' => 0, 'approved' => 0, 'rejected' => 0, 'completed' => 0];
-foreach ($returns as $r) {
+foreach ($allReturns as $r) {
     if (isset($returnCounts[$r['status']])) { $returnCounts[$r['status']]++; }
 }
 ?>
@@ -16,7 +20,7 @@ foreach ($returns as $r) {
 <div class="ui-head">
     <div class="ui-head-left">
         <div class="breadcrumb">Finovo <i class="bi bi-chevron-right"></i> <span class="current">Returns</span></div>
-        <h1>Returns <span class="count-badge"><?= count($returns) ?></span></h1>
+        <h1>Returns <span class="count-badge"><?= count($allReturns) ?></span></h1>
         <p>Track returned items and refunds. Completing a resellable return restores warehouse stock.</p>
     </div>
 </div>
@@ -59,21 +63,26 @@ foreach ($returns as $r) {
 </div>
 
 <div class="ui-card" style="overflow: visible;">
-    <div class="ret-toolbar">
+    <!-- Search / status filter: server pe chalte hain, har page ka result sahi -->
+    <form method="GET" action="/returns" class="ret-toolbar">
         <label class="ui-search ret-search">
             <i class="bi bi-search"></i>
-            <input type="text" id="retSearch" placeholder="Search order, customer or product..." aria-label="Search returns">
+            <input type="text" name="q" value="<?= htmlspecialchars($search) ?>" placeholder="Search order, customer or product..." aria-label="Search returns">
         </label>
-        <select id="retStatusFilter" class="ui-btn" aria-label="Filter by status" style="padding-right:10px;">
+        <select name="status" onchange="this.form.submit()" class="ui-btn" aria-label="Filter by status" style="padding-right:10px;">
             <option value="">All statuses</option>
             <?php foreach ($statuses as $st): ?>
-                <option value="<?= $st ?>"><?= ucfirst($st) ?></option>
+                <option value="<?= $st ?>" <?= $statusFilter === $st ? 'selected' : '' ?>><?= ucfirst($st) ?></option>
             <?php endforeach; ?>
         </select>
+        <button type="submit" class="ui-btn"><i class="bi bi-search"></i> Search</button>
+        <?php if ($search !== '' || $statusFilter !== ''): ?>
+            <a href="/returns" class="ui-btn"><i class="bi bi-x"></i> Clear</a>
+        <?php endif; ?>
         <div class="ret-toolbar-actions">
             <button type="button" class="ui-btn ui-btn-primary" onclick="openModal('createReturnModal')"><i class="bi bi-arrow-return-left"></i> New Return</button>
         </div>
-    </div>
+    </form>
 
     <div style="overflow-x:auto;">
         <table class="data-table">
@@ -135,15 +144,12 @@ foreach ($returns as $r) {
                             </td>
                         </tr>
                     <?php endforeach; ?>
-                    <tr id="retNoMatch" style="display:none;"><td colspan="7" class="ui-empty"><i class="bi bi-search"></i>No returns match your search.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
     </div>
 
-    <div class="pagination-bar">
-        <span id="retShowing">Showing <?= count($returns) ?> of <?= count($returns) ?> returns</span>
-    </div>
+    <?php if (!empty($pager)) { $pagerLabel = 'returns'; require __DIR__ . '/../partials/pagination.php'; } ?>
 </div>
 
 <div class="modal-backdrop" id="createReturnModal">
@@ -196,24 +202,4 @@ foreach ($returns as $r) {
 function openModal(id) { document.getElementById(id).classList.add('show'); }
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
 
-(function () {
-    var input = document.getElementById('retSearch');
-    var filter = document.getElementById('retStatusFilter');
-    var rows = Array.prototype.slice.call(document.querySelectorAll('.ret-row'));
-    function apply() {
-        var q = input.value.trim().toLowerCase();
-        var st = filter.value;
-        var shown = 0;
-        rows.forEach(function (r) {
-            var ok = (q === '' || r.dataset.search.indexOf(q) !== -1) && (st === '' || r.dataset.status === st);
-            r.style.display = ok ? '' : 'none';
-            if (ok) { shown++; }
-        });
-        var nm = document.getElementById('retNoMatch');
-        if (nm) { nm.style.display = shown === 0 ? '' : 'none'; }
-        document.getElementById('retShowing').textContent = 'Showing ' + shown + ' of ' + rows.length + ' returns';
-    }
-    input.addEventListener('input', apply);
-    filter.addEventListener('change', apply);
-})();
 </script>

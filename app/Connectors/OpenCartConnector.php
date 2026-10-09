@@ -1,9 +1,5 @@
 <?php
-/**
- * OpenCart ka REST API login-token based hai — pehle login karke ek token
- * milta hai, phir har request mein wo token bhejna padta hai (query param
- * ya header ke through). Ye class ye poora flow handle karta hai.
- */
+
 class OpenCartConnector
 {
     private string $baseUrl;
@@ -18,9 +14,7 @@ class OpenCartConnector
         $this->apiKey = $apiKey;
     }
 
-    /**
-     * Login karke token le aata hai. Fail hone par null return karta hai.
-     */
+    
     public function login(): ?string
     {
         $url = $this->baseUrl . '/index.php?route=api/login';
@@ -56,9 +50,6 @@ class OpenCartConnector
         return $this->token;
     }
 
-    /**
-     * Login ke baad products list laata hai.
-     */
     public function fetchProducts(): array
     {
         if (!$this->token) {

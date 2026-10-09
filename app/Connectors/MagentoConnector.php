@@ -1,15 +1,5 @@
 <?php
-/**
- * Magento 2 REST API.
- *
- * Magento Admin mein: System → Extensions → Integrations → "Add New Integration"
- *   → API tab mein "Resource Access: All" → Save → "Activate" → "Access Token" copy karo.
- *
- * Note (Magento 2.4.4+): Integration token ko "Bearer" ki tarah use karne ke liye
- * Magento admin mein ye setting ON karni padti hai:
- *   Stores → Configuration → Services → OAuth → Consumer Settings →
- *   "Allow OAuth Access Tokens to be used as standalone Bearer tokens" = Yes
- */
+
 class MagentoConnector
 {
     private string $baseUrl;
@@ -57,27 +47,28 @@ class MagentoConnector
      * Products (sirf simple/virtual/downloadable — configurable "parent" products ka stock/price nahi hota).
      * Har product ke saath uska stock (qty) bhi.
      */
-    public function fetchProducts(int $limit = 50): array
+    public function fetchProducts(int $pageSize = 100): array
     {
-        $result = $this->request('/products?' . http_build_query([
-            'searchCriteria' => ['pageSize' => $limit, 'currentPage' => 1],
-        ]));
+        $result = $this->fetchAllPages('/products', ['pageSize' => $pageSize]);
         if (!$result['ok']) {
             return $result;
         }
 
         $products = [];
-        foreach (($result['data']['items'] ?? []) as $item) {
+        foreach ($result['items'] as $item) {
             $type = $item['type_id'] ?? 'simple';
             if (!in_array($type, ['simple', 'virtual', 'downloadable'], true)) {
                 continue;
             }
 
+            // null = Magento is product ka stock ginta hi nahi ("Manage Stock" = No)
             $qty = 0;
             if (!empty($item['sku'])) {
                 $stock = $this->request('/stockItems/' . rawurlencode($item['sku']));
                 if ($stock['ok']) {
-                    $qty = (int) ($stock['data']['qty'] ?? 0);
+                    $managed = $stock['data']['manage_stock'] ?? true;
+                    $inStock = $stock['data']['is_in_stock'] ?? true;
+                    $qty = ($managed === false && $inStock) ? null : (int) ($stock['data']['qty'] ?? 0);
                 }
             }
 
@@ -96,19 +87,47 @@ class MagentoConnector
     /**
      * Naye orders (sab se naye pehle).
      */
-    public function fetchOrders(int $limit = 20): array
+    public function fetchOrders(int $pageSize = 100): array
     {
-        $result = $this->request('/orders?' . http_build_query([
-            'searchCriteria' => [
-                'pageSize' => $limit,
-                'currentPage' => 1,
-                'sortOrders' => [['field' => 'created_at', 'direction' => 'DESC']],
-            ],
-        ]));
+        $result = $this->fetchAllPages('/orders', [
+            'pageSize' => $pageSize,
+            'sortOrders' => [['field' => 'created_at', 'direction' => 'DESC']],
+        ]);
         if (!$result['ok']) {
             return $result;
         }
 
-        return ['ok' => true, 'orders' => $result['data']['items'] ?? []];
+        return ['ok' => true, 'orders' => $result['items']];
+    }
+
+    /** searchCriteria[currentPage] = 1, 2, 3... jab tak total_count poora na ho (pehle sirf pehla page aata tha) */
+    private function fetchAllPages(string $path, array $criteria, int $maxPages = 40): array
+    {
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(300);
+        }
+
+        $items = [];
+        for ($page = 1; $page <= $maxPages; $page++) {
+            $result = $this->request($path . '?' . http_build_query(['searchCriteria' => $criteria + ['currentPage' => $page]]));
+            if (!$result['ok']) {
+                if ($page === 1) {
+                    return $result;
+                }
+                break;
+            }
+
+            $rows = $result['data']['items'] ?? [];
+            foreach ($rows as $row) {
+                $items[] = $row;
+            }
+            $total = (int) ($result['data']['total_count'] ?? 0);
+            // Magento aakhri page ke baad bhi aakhri page dobara bhej deta hai — is liye total_count se roko
+            if ($rows === [] || count($items) >= $total || count($rows) < (int) $criteria['pageSize']) {
+                break;
+            }
+        }
+
+        return ['ok' => true, 'items' => $items];
     }
 }
