@@ -1,5 +1,5 @@
 <?php
-// Upar ke numbers POORI list se ($allShipments); table mein sirf is page ki rows ($shipments)
+// Upar ke numbers POORI list se ($allShipments); table mein sirf latest 5 rows ($shipments)
 $allShipments = $allShipments ?? $shipments;
 $search = $search ?? '';
 $statusFilter = $statusFilter ?? '';
@@ -28,6 +28,9 @@ foreach ($allShipments as $s) {
         <div class="breadcrumb">Finovo <i class="bi bi-chevron-right"></i> <span class="current">Shipments</span></div>
         <h1>Shipments <span class="count-badge"><?= count($allShipments) ?></span></h1>
         <p>Dispatch orders with a courier and track them until delivery.</p>
+    </div>
+    <div class="ui-head-right">
+        <button type="button" class="ui-btn ui-btn-primary" onclick="openModal('createShipmentModal')" <?= empty($unassignedUnits) ? 'disabled title="No orders waiting for dispatch"' : '' ?>><i class="bi bi-truck"></i> Dispatch Order</button>
     </div>
 </div>
 
@@ -69,29 +72,37 @@ foreach ($allShipments as $s) {
     </div>
 </div>
 
-<div class="ui-card" style="overflow: visible;">
+<div class="ui-card tbl-card">
     <!-- Search / status filter: server pe chalte hain, har page ka result sahi -->
-    <form method="GET" action="/shipments" class="ship-toolbar">
-        <label class="ui-search ship-search">
-            <i class="bi bi-search"></i>
-            <input type="text" name="q" value="<?= htmlspecialchars($search) ?>" placeholder="Search customer, courier or tracking number..." aria-label="Search shipments">
-        </label>
-        <select name="status" onchange="this.form.submit()" class="ui-btn" aria-label="Filter by status" style="padding-right:10px;">
-            <option value="">All statuses</option>
-            <?php foreach ($statuses as $st): ?>
-                <option value="<?= $st ?>" <?= $statusFilter === $st ? 'selected' : '' ?>><?= ucwords(str_replace('_', ' ', $st)) ?></option>
-            <?php endforeach; ?>
-        </select>
-        <button type="submit" class="ui-btn"><i class="bi bi-search"></i> Search</button>
-        <?php if ($search !== '' || $statusFilter !== ''): ?>
-            <a href="/shipments" class="ui-btn"><i class="bi bi-x"></i> Clear</a>
-        <?php endif; ?>
-        <div class="ship-toolbar-actions">
-            <a href="/3pl/scan" class="ui-btn"><i class="bi bi-upc-scan"></i> LM Scan</a>
-            <a href="/3pl/remittance" class="ui-btn"><i class="bi bi-cash-coin"></i> Remittance</a>
-            <button type="button" class="ui-btn ui-btn-primary" onclick="openModal('createShipmentModal')" <?= empty($unassignedUnits) ? 'disabled title="No orders waiting for dispatch"' : '' ?>>
-                <i class="bi bi-truck"></i> Dispatch Order
-            </button>
+    <form method="GET" action="/shipments">
+        <div class="tbl-head">
+            <h2>All Shipments</h2>
+            <div class="tbl-tools">
+                <a href="/3pl/scan" class="tbl-btn"><i class="bi bi-upc-scan"></i> LM Scan</a>
+                <a href="/3pl/remittance" class="tbl-btn"><i class="bi bi-cash-coin"></i> Remittance</a>
+                <div class="ui-menu">
+                    <button type="button" class="tbl-btn" data-menu-toggle><i class="bi bi-sliders"></i> Filters<?php if ($statusFilter !== ''): ?> <span class="tbl-count">1</span><?php endif; ?></button>
+                    <div class="ui-menu-list tbl-filter-panel">
+                        <label for="shipStatus">Status</label>
+                        <select name="status" id="shipStatus" onchange="this.form.submit()">
+                            <option value="">All statuses</option>
+                            <?php foreach ($statuses as $st): ?>
+                                <option value="<?= $st ?>" <?= $statusFilter === $st ? 'selected' : '' ?>><?= ucwords(str_replace('_', ' ', $st)) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="tbl-filter-actions">
+                            <a href="/shipments" class="tbl-btn">Clear</a>
+                            <button type="submit" class="tbl-btn tbl-btn-soft">Apply</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="tbl-search">
+            <label class="ui-search">
+                <i class="bi bi-search"></i>
+                <input type="text" name="q" value="<?= htmlspecialchars($search) ?>" placeholder="Search customer, courier or tracking number..." aria-label="Search shipments">
+            </label>
         </div>
     </form>
 
@@ -101,30 +112,22 @@ foreach ($allShipments as $s) {
                 <tr>
                     <th>Shipment</th>
                     <th>Customer</th>
-                    <th>Items</th>
                     <th>Courier</th>
-                    <th>Tracking #</th>
                     <th>Status</th>
                     <th style="width:230px;">Update Status</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($shipments)): ?>
-                    <tr><td colspan="7" class="ui-empty"><i class="bi bi-truck"></i>No shipments yet. Click "Dispatch Order" to send your first one.</td></tr>
+                    <tr><td colspan="5" class="ui-empty"><i class="bi bi-truck"></i>No shipments yet. Click "Dispatch Order" to send your first one.</td></tr>
                 <?php else: ?>
                     <?php foreach ($shipments as $s):
                         $statusColor = $statusColors[$s['status']] ?? ['bg' => '#f1f5f9', 'text' => '#334155'];
                     ?>
-                        <tr class="ship-row" data-status="<?= htmlspecialchars($s['status']) ?>" data-search="<?= htmlspecialchars(strtolower(($s['customer_name'] ?? '') . ' ' . $s['courier_name'] . ' ' . ($s['tracking_number'] ?? '') . ' #' . $s['id'])) ?>">
+                        <tr class="ship-row">
                             <td style="font-weight:700;">#<?= (int) $s['id'] ?></td>
                             <td style="color:#334155; font-weight:500;"><?= htmlspecialchars($s['customer_name'] ?? '-') ?></td>
-                            <td>
-                                <span class="ui-tag ui-pill-gray" title="<?= htmlspecialchars(implode(', ', array_map(fn($o) => $o['product_name'], $s['orders']))) ?>">
-                                    <i class="bi bi-box"></i> <?= (int) $s['item_count'] ?> item(s)
-                                </span>
-                            </td>
                             <td style="color:#334155;"><?= htmlspecialchars($s['courier_name']) ?></td>
-                            <td style="color:#334155; font-family:ui-monospace, 'Cascadia Code', Consolas, monospace; font-size:12.5px;"><?= htmlspecialchars($s['tracking_number'] ?: '-') ?></td>
                             <td>
                                 <span class="ui-tag" style="background:<?= $statusColor['bg'] ?>; color:<?= $statusColor['text'] ?>; white-space:nowrap;">
                                     <?= htmlspecialchars(ucwords(str_replace('_', ' ', $s['status']))) ?>
@@ -196,13 +199,6 @@ foreach ($allShipments as $s) {
     </div>
 </div>
 
-<style>
-.ship-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; padding: 14px 20px; border-bottom: 1px solid var(--border-color); overflow-x: auto; }
-.ship-search { flex: 1 1 auto; min-width: 180px; height: 34px; }
-.ship-toolbar-actions { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; flex-shrink: 0; margin-left: auto; }
-.ship-toolbar .ui-btn { height: 34px; padding: 0 10px; font-size: 12.5px; white-space: nowrap; }
-.ship-toolbar .ui-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-</style>
 
 <script>
 function openModal(id) { document.getElementById(id).classList.add('show'); }

@@ -57,9 +57,9 @@ class PurchaseOrderController extends Controller
             $items = implode(' ', array_map(fn($i) => $i['product_name'], $po['items'] ?? []));
             return '#' . $po['id'] . ' ' . $po['supplier_name'] . ' ' . $po['warehouse_name'] . ' ' . $items;
         });
-        $pager = Paginator::make($filtered);
+        $pager = Paginator::latest($filtered, $allPurchaseOrders);
 
-        // Items sirf is page ke POs ke (agar pehle nahi aaye)
+        // Items sirf table wale (latest 5) POs ke (agar pehle nahi aaye)
         $purchaseOrders = $pager['items'];
         foreach ($purchaseOrders as &$po) {
             $po['items'] ??= $this->poModel->items((int) $po['id']);

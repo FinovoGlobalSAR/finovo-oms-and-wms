@@ -11,6 +11,11 @@ foreach ($warehouses as $w) {
     $totalProducts += (int) $w['product_count'];
     if (empty($w['stores'])) { $notLinkedCount++; } else { $linkedCount++; }
 }
+
+// Table mein sirf latest 5 warehouses (sab se naye pehle). Upar ke numbers phir bhi saare warehouses se.
+$latestWarehouses = $warehouses;
+usort($latestWarehouses, fn($a, $b) => (int) $b['id'] <=> (int) $a['id']);
+$latestWarehouses = array_slice($latestWarehouses, 0, 5);
 ?>
 
 <div class="ui-head" style="align-items:center;">
@@ -23,7 +28,7 @@ foreach ($warehouses as $w) {
         <?php if (in_array(strtolower(trim($_SESSION['user']['role'] ?? '')), ['admin', 'manager'], true)): ?>
             <!-- Naya warehouse sirf Admin / Manager -->
             <button type="button" class="ui-btn ui-btn-primary" onclick="openModal('createWarehouseModal')"><i class="bi bi-plus-lg"></i> Add Warehouse</button>
-        <?php endif; ?>    
+        <?php endif; ?>
     </div>
 </div>
 
@@ -73,7 +78,7 @@ foreach ($warehouses as $w) {
             <div class="ui-card-title-icon"><i class="bi bi-house-door"></i></div>
             <div>
                 <h2>All Warehouses</h2>
-                <div class="sub">Locations, linked stores and stock levels.</div>
+                <div class="sub">Latest 5 warehouses with their location and stock.</div>
             </div>
         </div>
         <label class="ui-search" style="width:260px;">
@@ -88,17 +93,15 @@ foreach ($warehouses as $w) {
                 <tr>
                     <th>Warehouse</th>
                     <th>Location</th>
-                    <th>Linked Stores</th>
-                    <th>Products</th>
                     <th>Total Stock</th>
                     <th style="text-align:right;">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($warehouses)): ?>
-                    <tr><td colspan="6" class="ui-empty"><i class="bi bi-house-door"></i>No warehouses yet. Click "Add Warehouse" to create your first one.</td></tr>
+                    <tr><td colspan="4" class="ui-empty"><i class="bi bi-house-door"></i>No warehouses yet. Click "Add Warehouse" to create your first one.</td></tr>
                 <?php else: ?>
-                    <?php foreach ($warehouses as $w): ?>
+                    <?php foreach ($latestWarehouses as $w): ?>
                         <tr class="wh-row" data-search="<?= htmlspecialchars(strtolower($w['name'] . ' ' . ($w['location'] ?? ''))) ?>">
                             <td>
                                 <a href="/warehouses/view?id=<?= $w['id'] ?>" style="display:flex; align-items:center; gap:10px; text-decoration:none; color:inherit;">
@@ -113,35 +116,20 @@ foreach ($warehouses as $w) {
                                     <span style="color:#94a3b8;">—</span>
                                 <?php endif; ?>
                             </td>
-                            <td>
-                                <?php if (empty($w['stores'])): ?>
-                                    <span class="ui-tag ui-pill-red"><i class="bi bi-exclamation-circle"></i> Not linked</span>
-                                <?php else: ?>
-                                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                                        <?php foreach ($w['stores'] as $s): ?>
-                                            <span class="ui-tag" style="background:var(--primary-light); color:var(--primary-dark); border:1px solid var(--primary-border); font-weight:500;" <?= (int) $s['is_default'] === 1 ? 'title="Default warehouse for this store"' : '' ?>>
-                                                <?= htmlspecialchars($s['name']) ?>
-                                                <?php if ((int) $s['is_default'] === 1): ?><i class="bi bi-star-fill" style="color:#b45309; font-size:10px;"></i><?php endif; ?>
-                                            </span>
-                                        <?php endforeach; ?>
-                                    </div>
-                                <?php endif; ?>
-                            </td>
-                            <td style="font-weight:600;"><?= (int) $w['product_count'] ?></td>
                             <td style="white-space:nowrap;"><b><?= number_format((int) $w['total_stock']) ?></b> <span style="color:#64748b;">units</span></td>
                             <td style="text-align:right;">
                                 <a href="/warehouses/view?id=<?= $w['id'] ?>" class="ui-btn ui-btn-soft ui-btn-sm"><i class="bi bi-eye"></i> View</a>
                             </td>
                         </tr>
                     <?php endforeach; ?>
-                    <tr id="whNoMatch" style="display:none;"><td colspan="6" class="ui-empty"><i class="bi bi-search"></i>No warehouses match your search.</td></tr>
+                    <tr id="whNoMatch" style="display:none;"><td colspan="4" class="ui-empty"><i class="bi bi-search"></i>No warehouses match your search.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
     </div>
 
     <div class="pagination-bar">
-        <span id="whShowing">Showing <?= count($warehouses) ?> of <?= count($warehouses) ?> warehouses</span>
+        <span id="whShowing">Showing latest <?= count($latestWarehouses) ?> of <?= count($warehouses) ?> warehouses</span>
     </div>
 </div>
 
@@ -202,7 +190,7 @@ function closeModal(id) { document.getElementById(id).classList.remove('show'); 
         });
         var nm = document.getElementById('whNoMatch');
         if (nm) { nm.style.display = shown === 0 ? '' : 'none'; }
-        document.getElementById('whShowing').textContent = 'Showing ' + shown + ' of ' + rows.length + ' warehouses';
+        document.getElementById('whShowing').textContent = 'Showing latest ' + shown + ' of <?= count($warehouses) ?> warehouses';
     });
 })();
 </script>

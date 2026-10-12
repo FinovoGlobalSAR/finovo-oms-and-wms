@@ -57,6 +57,12 @@ $searchablePages = [
     ['label' => 'Customers', 'url' => '/customers', 'icon' => 'bi-people', 'roles' => ['admin', 'manager', 'sales staff']],
     ['label' => 'Stores', 'url' => '/stores', 'icon' => 'bi-shop', 'roles' => ['admin', 'manager']],
     ['label' => 'Employees', 'url' => '/employees', 'icon' => 'bi-person-badge', 'roles' => ['admin', 'manager']],
+    ['label' => 'SKU Mappings', 'url' => '/sku-mappings', 'icon' => 'bi-diagram-3', 'roles' => ['admin', 'manager']],
+    ['label' => 'Field Mapping', 'url' => '/field-mappings', 'icon' => 'bi-sliders', 'roles' => ['admin', 'manager']],
+    ['label' => 'Integration Errors', 'url' => '/integration-errors', 'icon' => 'bi-exclamation-triangle', 'roles' => ['admin', 'manager']],
+    ['label' => 'Audit Log', 'url' => '/audit-log', 'icon' => 'bi-list-check', 'roles' => ['admin', 'manager']],
+    ['label' => 'LM Inventory Scan', 'url' => '/3pl/scan', 'icon' => 'bi-upc-scan', 'roles' => ['admin', 'manager', 'warehouse staff']],
+    ['label' => '3PL Remittance', 'url' => '/3pl/remittance', 'icon' => 'bi-cash-stack', 'roles' => ['admin', 'manager', 'warehouse staff']],
 ];
 
 $searchablePages = array_values(array_filter($searchablePages, function ($page) use ($headerCurrentRole) {
@@ -65,265 +71,126 @@ $searchablePages = array_values(array_filter($searchablePages, function ($page) 
     }
     return in_array($headerCurrentRole, $page['roles'], true);
 }));
+
+// ---------- Profile menu: woh pages jo Figma ke sidebar mein nahi, lekin kaam ke hain ----------
+$headerStoreContext = !empty($_SESSION['store_context_active']);
+$profileMenuLinks = [
+    ['label' => 'Employees', 'url' => '/employees', 'icon' => 'bi-person-badge', 'roles' => ['admin', 'manager']],
+    ['label' => 'SKU Mappings', 'url' => '/sku-mappings', 'icon' => 'bi-diagram-3', 'roles' => ['admin', 'manager'], 'requires_store' => true],
+    ['label' => 'Field Mapping', 'url' => '/field-mappings', 'icon' => 'bi-sliders', 'roles' => ['admin', 'manager'], 'requires_store' => true],
+    ['label' => 'Integration Errors', 'url' => '/integration-errors', 'icon' => 'bi-exclamation-triangle', 'roles' => ['admin', 'manager'], 'requires_store' => true],
+    ['label' => 'Audit Log', 'url' => '/audit-log', 'icon' => 'bi-list-check', 'roles' => ['admin', 'manager'], 'requires_store' => true],
+    ['label' => 'LM Inventory Scan', 'url' => '/3pl/scan', 'icon' => 'bi-upc-scan', 'roles' => ['admin', 'manager', 'warehouse staff'], 'requires_store' => true],
+    ['label' => '3PL Remittance', 'url' => '/3pl/remittance', 'icon' => 'bi-cash-stack', 'roles' => ['admin', 'manager', 'warehouse staff'], 'requires_store' => true],
+    ['label' => 'Exit store management', 'url' => '/stores/exit-management', 'icon' => 'bi-box-arrow-left', 'roles' => ['admin', 'manager'], 'requires_store' => true],
+];
+$profileMenuLinks = array_values(array_filter($profileMenuLinks, function ($link) use ($headerCurrentRole, $headerStoreContext) {
+    if (!empty($link['requires_store']) && !$headerStoreContext) {
+        return false;
+    }
+    return in_array($headerCurrentRole, $link['roles'], true);
+}));
+$headerUserName = (string) ($_SESSION['user']['name'] ?? 'User');
 ?>
-<header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-5 lg:px-8 sticky top-0 z-30">
+<header class="hd">
 
-    <div class="flex items-center gap-4">
-
-        <button
-            id="mobileMenuButton"
-            type="button"
-            class="lg:hidden w-10 h-10 flex items-center justify-center rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition"
-        >
-            <svg
-                class="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-            >
-                <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M4 6h16M4 12h16M4 18h16"
-                />
-            </svg>
+    <div class="hd-left">
+        <button id="mobileMenuButton" type="button" class="hd-icon-btn lg:hidden" aria-label="Open menu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
 
-
-        <div class="hidden sm:flex items-center">
-
-            <div class="relative w-[260px] lg:w-[340px]">
-
-                <svg
-                    class="absolute left-3.5 top-1/2 -translate-y-1/2 w-[17px] h-[17px] text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="1.8"
-                        d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"
-                    />
-                </svg>
-
-                <input
-                    id="pageSearchInput"
-                    type="text"
-                    placeholder="Search anything..."
-                    autocomplete="off"
-                    aria-label="Search pages"
-                    class="w-full h-[38px] pl-10 pr-14 bg-slate-50 border border-gray-200 rounded-[9px] text-[13px] text-slate-800 placeholder-slate-400 outline-none transition focus:bg-white focus:border-blue-300 focus:ring-[3px] focus:ring-blue-100"
-                >
-
-                <span
-                    class="absolute right-2.5 top-1/2 -translate-y-1/2 hidden lg:flex items-center justify-center h-6 px-1.5 rounded-md bg-white border border-gray-200 text-[11px] font-medium text-gray-400"
-                >
-                    ⌘ K
-                </span>
-
-                <div
-                    id="pageSearchDropdown"
-                    class="hidden absolute left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-50 max-h-[360px] overflow-y-auto"
-                ></div>
-
-            </div>
-
+        <div class="hd-search">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input id="pageSearchInput" type="text" placeholder="Search anything..." autocomplete="off" aria-label="Search pages">
+            <div id="pageSearchDropdown" class="hidden hd-search-results"></div>
         </div>
-
     </div>
 
-
-    <div class="flex items-center gap-2">
-
-
-        <button
-            type="button"
-            class="hidden md:flex w-10 h-10 items-center justify-center rounded-xl text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition"
-            title="Help"
-            aria-label="Help"
-        >
-            <svg
-                class="w-[19px] h-[19px]"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-            >
-                <circle
-                    cx="12"
-                    cy="12"
-                    r="9"
-                    stroke-width="1.8"
-                />
-                <path
-                    stroke-linecap="round"
-                    stroke-width="1.8"
-                    d="M9.8 9a2.2 2.2 0 1 1 3.8 1.5c-.9.8-1.6 1.2-1.6 2.5"
-                />
-                <circle
-                    cx="12"
-                    cy="16.5"
-                    r=".8"
-                    fill="currentColor"
-                    stroke="none"
-                />
-            </svg>
-        </button>
-
-
-        <div class="relative">
-
-            <button
-                id="notificationButton"
-                type="button"
-                aria-label="Stock alerts"
-                class="relative w-10 h-10 flex items-center justify-center rounded-xl text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition"
-            >
-
-                <svg
-                    class="w-[19px] h-[19px]"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="1.7"
-                        d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"
-                    />
-
-                    <path
-                        stroke-linecap="round"
-                        stroke-width="1.7"
-                        d="M10 21h4"
-                    />
-                </svg>
-
-                <?php if ($lowStockCountForBell > 0): ?>
-                    <span
-                        class="absolute top-1 right-1 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-red-600 text-white text-[10px] font-semibold ring-2 ring-white"
-                    ><?= $lowStockCountForBell > 9 ? '9+' : $lowStockCountForBell ?></span>
-                <?php endif; ?>
-
+    <div class="hd-right">
+        <div class="hd-icons">
+            <button type="button" class="hd-icon-btn" title="Help" aria-label="Help">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M9.6 9.2a2.5 2.5 0 0 1 4.8 1c0 1.7-2.4 2.2-2.4 3.6"/><path d="M12 17.2h.01"/></svg>
             </button>
 
-            <div
-                id="notificationDropdown"
-                class="hidden absolute right-0 mt-2 w-[340px] bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-40"
-            >
-                <div class="px-4 py-3 border-b border-gray-100">
-                    <p class="text-sm font-semibold text-gray-800">Stock alerts</p>
-                    <p class="text-[12px] text-gray-400"><?= $lowStockCountForBell ?> item(s) need attention</p>
-                </div>
-
-                <div class="max-h-[360px] overflow-y-auto">
-
-                    <?php if (empty($lowStockProducts) && empty($warehouseAlerts)): ?>
-                        <div class="px-4 py-6 text-center text-sm text-gray-400">
-                            All products are well stocked.
-                        </div>
+            <div class="hd-menu-wrap">
+                <button id="notificationButton" type="button" class="hd-icon-btn" aria-label="Stock alerts">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8.5a6 6 0 0 0-12 0c0 6.5-2.5 8-2.5 8h17S18 15 18 8.5"/><path d="M10.3 20a1.9 1.9 0 0 0 3.4 0"/></svg>
+                    <?php if ($lowStockCountForBell > 0): ?>
+                        <span class="hd-badge"><?= $lowStockCountForBell > 9 ? '9+' : $lowStockCountForBell ?></span>
                     <?php endif; ?>
+                </button>
 
-                    <?php if (!empty($lowStockProducts)): ?>
-                        <div class="px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-                            Overall (all warehouses combined)
-                        </div>
-                        <?php foreach ($lowStockProducts as $lp): ?>
-                            <?php
-                            $stock = (int) $lp['stock_quantity'];
-                            $isOut = $stock <= 0;
+                <div id="notificationDropdown" class="hidden hd-dropdown hd-dropdown-wide">
+                    <div class="hd-dropdown-head">
+                        <p class="hd-dropdown-title">Stock alerts</p>
+                        <p class="hd-dropdown-sub"><?= $lowStockCountForBell ?> item(s) need attention</p>
+                    </div>
+
+                    <div class="hd-dropdown-body">
+                        <?php if (empty($lowStockProducts) && empty($warehouseAlerts)): ?>
+                            <div class="hd-empty">All products are well stocked.</div>
+                        <?php endif; ?>
+
+                        <?php if (!empty($lowStockProducts)): ?>
+                            <div class="hd-group">Overall (all warehouses combined)</div>
+                            <?php foreach ($lowStockProducts as $lp):
+                                $stock = (int) $lp['stock_quantity'];
+                                $isOut = $stock <= 0;
                             ?>
-                            <<?= $stockLinkTag ?> <?= $canOpenStockPages ? 'href="/products"' : '' ?> class="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 border-b border-gray-50">
-                                <div>
-                                    <p class="text-[13px] font-medium text-gray-800"><?= htmlspecialchars($lp['name']) ?></p>
-                                    <p class="text-[11px] text-gray-400"><?= htmlspecialchars($lp['sku'] ?: '-') ?></p>
-                                </div>
-                                <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full <?= $isOut ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600' ?>">
-                                    <?= $isOut ? 'Out of stock' : 'Low stock (' . $stock . ')' ?>
-                                </span>
-                            </<?= $stockLinkTag ?>>
+                                <<?= $stockLinkTag ?> <?= $canOpenStockPages ? 'href="/products"' : '' ?> class="hd-alert-row">
+                                    <span>
+                                        <span class="hd-alert-name"><?= htmlspecialchars($lp['name']) ?></span>
+                                        <span class="hd-alert-sku"><?= htmlspecialchars($lp['sku'] ?: '-') ?></span>
+                                    </span>
+                                    <span class="hd-alert-pill <?= $isOut ? 'out' : 'low' ?>"><?= $isOut ? 'Out of stock' : 'Low stock (' . $stock . ')' ?></span>
+                                </<?= $stockLinkTag ?>>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+
+                        <?php foreach ($warehouseAlerts as $wh): ?>
+                            <div class="hd-group"><?= htmlspecialchars($wh['warehouse_name']) ?></div>
+                            <?php foreach ($wh['items'] as $item): ?>
+                                <<?= $stockLinkTag ?> <?= $canOpenStockPages ? 'href="/warehouses/view?id=' . (int) $wh['warehouse_id'] . '"' : '' ?> class="hd-alert-row">
+                                    <span>
+                                        <span class="hd-alert-name"><?= htmlspecialchars($item['name']) ?></span>
+                                        <span class="hd-alert-sku"><?= htmlspecialchars($item['sku'] ?: '-') ?></span>
+                                    </span>
+                                    <span class="hd-alert-pill <?= $item['is_out'] ? 'out' : 'low' ?>"><?= $item['is_out'] ? 'Out of stock' : 'Low stock (' . $item['stock'] . ')' ?></span>
+                                </<?= $stockLinkTag ?>>
+                            <?php endforeach; ?>
                         <?php endforeach; ?>
+                    </div>
+
+                    <?php if ($canOpenStockPages): ?>
+                        <a href="/warehouses" class="hd-dropdown-foot">View all warehouses</a>
                     <?php endif; ?>
-
-                    <?php foreach ($warehouseAlerts as $wh): ?>
-                        <div class="px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-                            <?= htmlspecialchars($wh['warehouse_name']) ?>
-                        </div>
-                        <?php foreach ($wh['items'] as $item): ?>
-                            <<?= $stockLinkTag ?> <?= $canOpenStockPages ? 'href="/warehouses/view?id=' . (int) $wh['warehouse_id'] . '"' : '' ?> class="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 border-b border-gray-50">
-                                <div>
-                                    <p class="text-[13px] font-medium text-gray-800"><?= htmlspecialchars($item['name']) ?></p>
-                                    <p class="text-[11px] text-gray-400"><?= htmlspecialchars($item['sku'] ?: '-') ?></p>
-                                </div>
-                                <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full <?= $item['is_out'] ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600' ?>">
-                                    <?= $item['is_out'] ? 'Out of stock' : 'Low stock (' . $item['stock'] . ')' ?>
-                                </span>
-                            </<?= $stockLinkTag ?>>
-                        <?php endforeach; ?>
-                    <?php endforeach; ?>
-
                 </div>
-
-                <?php if ($canOpenStockPages): ?>
-                    <a href="/warehouses" class="block text-center text-[13px] font-semibold text-blue-700 py-2.5 border-t border-gray-100 hover:bg-blue-50">
-                        View all warehouses
-                    </a>
-                <?php endif; ?>
             </div>
-
         </div>
 
-
-        <div class="h-8 w-px bg-gray-200 mx-2"></div>
-
-
-        <button
-            id="profileButton"
-            type="button"
-            class="flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-gray-50 transition"
-        >
-
-            <div
-                class="w-[34px] h-[34px] rounded-full bg-slate-800 flex items-center justify-center"
-            >
-                <span class="text-[12px] font-semibold text-white">
-                    <?= htmlspecialchars(strtoupper(substr($_SESSION['user']['name'] ?? 'U', 0, 1))) ?>
+        <div class="hd-menu-wrap">
+            <button id="profileButton" type="button" class="hd-profile" aria-haspopup="true" aria-expanded="false">
+                <span class="hd-avatar"><?= htmlspecialchars(strtoupper(substr($headerUserName, 0, 1))) ?></span>
+                <span class="hd-profile-text">
+                    <span class="hd-profile-name"><?= htmlspecialchars($headerUserName) ?></span>
+                    <span class="hd-profile-role"><?= htmlspecialchars(ucwords($headerCurrentRole)) ?></span>
                 </span>
+            </button>
+
+            <div id="profileDropdown" class="hidden hd-dropdown">
+                <?php foreach ($profileMenuLinks as $link): ?>
+                    <a href="<?= htmlspecialchars($link['url']) ?>" class="hd-menu-link">
+                        <i class="bi <?= htmlspecialchars($link['icon']) ?>"></i>
+                        <?= htmlspecialchars($link['label']) ?>
+                    </a>
+                <?php endforeach; ?>
+                <?php if (!empty($profileMenuLinks)): ?><div class="hd-menu-sep"></div><?php endif; ?>
+                <a href="/logout" class="hd-menu-link danger" onclick="return confirm('Are you sure you want to logout?');">
+                    <i class="bi bi-box-arrow-right"></i>
+                    Logout
+                </a>
             </div>
-
-
-            <div class="hidden sm:block text-left leading-tight">
-
-                <p class="text-[13px] font-semibold text-slate-900">
-                    <?= htmlspecialchars($_SESSION['user']['name'] ?? 'User') ?>
-                </p>
-
-                <p class="text-[11px] text-slate-500 mt-0.5">
-                    <?= htmlspecialchars(ucwords($_SESSION['user']['role'] ?? '')) ?>
-                </p>
-
-            </div>
-
-
-            <svg
-                class="hidden sm:block w-4 h-4 text-gray-400 ml-1"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-            >
-                <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="1.8"
-                    d="m6 9 6 6 6-6"
-                />
-            </svg>
-
-        </button>
-
+        </div>
     </div>
 
 </header>
@@ -335,26 +202,37 @@ $searchablePages = array_values(array_filter($searchablePages, function ($page) 
     const sidebar = document.getElementById('sidebar');
 
     if (mobileMenuButton && sidebar) {
-
-        mobileMenuButton.addEventListener('click', () => {
-
+        mobileMenuButton.addEventListener('click', (e) => {
+            e.stopPropagation();
             sidebar.classList.toggle('-translate-x-full');
-
         });
 
+        // Mobile: sidebar ke bahar click karo to band ho jaye
+        document.addEventListener('click', (e) => {
+            if (window.innerWidth < 1024 && !sidebar.contains(e.target) && !sidebar.classList.contains('-translate-x-full')) {
+                sidebar.classList.add('-translate-x-full');
+            }
+        });
     }
 
 
+    // Profile menu (Employees, Audit Log, Logout waghera)
     const profileButton = document.getElementById('profileButton');
+    const profileDropdown = document.getElementById('profileDropdown');
 
-    if (profileButton) {
-
-        profileButton.addEventListener('click', () => {
-
-            console.log('Profile clicked');
-
+    if (profileButton && profileDropdown) {
+        profileButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            profileDropdown.classList.toggle('hidden');
+            profileButton.setAttribute('aria-expanded', profileDropdown.classList.contains('hidden') ? 'false' : 'true');
         });
 
+        document.addEventListener('click', (e) => {
+            if (!profileDropdown.contains(e.target) && !profileButton.contains(e.target)) {
+                profileDropdown.classList.add('hidden');
+                profileButton.setAttribute('aria-expanded', 'false');
+            }
+        });
     }
 
 

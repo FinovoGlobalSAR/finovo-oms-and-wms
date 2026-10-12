@@ -1,49 +1,52 @@
-<div class="breadcrumb">Finovo <i class="bi bi-chevron-right"></i> Suppliers</div>
-
-<div class="page-header-row">
-    <h1>Suppliers <span class="count-badge"><?= (int) ($totalSuppliers ?? count($suppliers)) ?></span></h1>
+<div class="ui-head">
+    <div class="ui-head-left">
+        <div class="breadcrumb">Finovo <i class="bi bi-chevron-right"></i> <span class="current">Suppliers</span></div>
+        <h1>Suppliers <span class="count-badge"><?= (int) ($totalSuppliers ?? count($suppliers)) ?></span></h1>
+        <p>Manage the suppliers you order stock from.</p>
+    </div>
+    <div class="ui-head-right">
+        <button type="button" class="ui-btn ui-btn-primary" onclick="openModal('createSupplierModal')"><i class="bi bi-plus-lg"></i> Add Supplier</button>
+    </div>
 </div>
-<p class="page-subtitle">Manage the suppliers you order stock from.</p>
 
 <?php if (!empty($created)): ?><div class="banner banner-success">Supplier added.</div><?php endif; ?>
 <?php if (!empty($deleted)): ?><div class="banner banner-success">Supplier deleted.</div><?php endif; ?>
 <?php if (!empty($error)): ?><div class="banner banner-error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
-<div class="card">
-    <div class="filter-row">
-        <!-- Search server pe (har page ka result sahi) -->
-        <form method="GET" action="/suppliers" style="display:flex; gap:8px; align-items:center; flex:1 1 260px;">
-            <input type="text" name="q" value="<?= htmlspecialchars($search ?? '') ?>" placeholder="Search name, contact, email or phone..." aria-label="Search suppliers" style="flex:1; max-width:340px; height:36px; border:1px solid var(--border-color); border-radius:8px; padding:0 12px; font:inherit; font-size:13px;">
-            <button type="submit" class="toolbar-btn">Search</button>
-            <?php if (($search ?? '') !== ''): ?>
-                <a href="/suppliers" class="toolbar-btn">Clear</a>
-            <?php endif; ?>
-        </form>
-        <div class="push-right" style="margin-left:0;">
-            <a href="/purchase-orders" class="toolbar-btn"><i class="bi bi-clipboard-check"></i> Purchase Orders</a>
-            <button type="button" class="toolbar-btn btn-dark" onclick="openModal('createSupplierModal')"><i class="bi bi-plus-lg"></i> Add supplier</button>
+<div class="ui-card tbl-card">
+    <!-- Search server pe (har page ka result sahi) -->
+    <form method="GET" action="/suppliers">
+        <div class="tbl-head">
+            <h2>All Suppliers</h2>
+            <div class="tbl-tools">
+                <a href="/purchase-orders" class="tbl-btn"><i class="bi bi-clipboard-check"></i> Purchase Orders</a>
+            </div>
         </div>
-    </div>
+        <div class="tbl-search">
+            <label class="ui-search">
+                <i class="bi bi-search"></i>
+                <input type="text" name="q" value="<?= htmlspecialchars($search ?? '') ?>" placeholder="Search name, contact, email or phone..." aria-label="Search suppliers">
+            </label>
+        </div>
+    </form>
 
     <table class="data-table">
         <thead>
             <tr>
                 <th>Name</th>
                 <th>Contact Person</th>
-                <th>Email</th>
                 <th>Phone</th>
                 <th style="width:60px;">Actions</th>
             </tr>
         </thead>
         <tbody>
             <?php if (empty($suppliers)): ?>
-                <tr><td colspan="5" style="text-align:center; color:#6b7280; padding:30px;"><?= ($search ?? '') !== '' ? 'No suppliers match your search.' : 'No suppliers yet.' ?></td></tr>
+                <tr><td colspan="4" class="ui-empty"><i class="bi bi-truck"></i><?= ($search ?? '') !== '' ? 'No suppliers match your search.' : 'No suppliers yet.' ?></td></tr>
             <?php else: ?>
                 <?php foreach ($suppliers as $s): ?>
                     <tr>
                         <td><?= htmlspecialchars($s['name']) ?></td>
                         <td><?= htmlspecialchars($s['contact_person'] ?? '-') ?></td>
-                        <td><?= htmlspecialchars($s['email'] ?? '-') ?></td>
                         <td><?= htmlspecialchars($s['phone'] ?? '-') ?></td>
                         <td>
                             <?php if (!empty($canDelete)): ?>

@@ -21,12 +21,12 @@ class SupplierController extends Controller
         $store = $this->getCurrentStore();
         $allSuppliers = $this->supplierModel->all((int) $store['id']);
 
-        // Search (?q=) server pe, phir 25-25 ke pages
+        // Search (?q=) server pe, phir sirf latest 5 records (Paginator::latest)
         $search = trim((string) ($_GET['q'] ?? ''));
         $needle = mb_strtolower($search);
         $filtered = array_filter($allSuppliers, fn($s) => $needle === ''
             || str_contains(mb_strtolower($s['name'] . ' ' . ($s['contact_person'] ?? '') . ' ' . ($s['email'] ?? '') . ' ' . ($s['phone'] ?? '')), $needle));
-        $pager = Paginator::make($filtered);
+        $pager = Paginator::latest($filtered, $allSuppliers);
 
         $this->view('suppliers/index', [
             'suppliers' => $pager['items'],

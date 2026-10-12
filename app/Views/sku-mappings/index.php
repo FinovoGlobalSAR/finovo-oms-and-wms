@@ -23,6 +23,9 @@ foreach ($allMappings as $m) {
         <h1>SKU Mappings <span class="count-badge"><?= count($allMappings) ?></span></h1>
         <p>Map your internal products to external store product IDs, SKUs, and barcodes.</p>
     </div>
+    <div class="ui-head-right">
+        <button type="button" class="ui-btn ui-btn-primary" onclick="openModal('createMappingModal')"><i class="bi bi-plus-lg"></i> Add Mapping</button>
+    </div>
 </div>
 
 <?php if (!empty($created)): ?><div class="banner banner-success"><i class="bi bi-check-circle"></i> Mapping created.</div><?php endif; ?>
@@ -73,29 +76,37 @@ foreach ($allMappings as $m) {
     </div>
 </div>
 
-<div class="ui-card" style="overflow: visible;">
-    <div class="sku-toolbar">
-        <!-- Search / state filter server pe (har page ka result sahi) -->
-        <form method="GET" action="/sku-mappings" style="display:flex; gap:8px; align-items:center; flex:1 1 auto; min-width:0;">
-            <label class="ui-search sku-search">
+<div class="ui-card tbl-card">
+    <!-- Search / state filter server pe (har page ka result sahi) -->
+    <form method="GET" action="/sku-mappings">
+        <div class="tbl-head">
+            <h2>All Mappings</h2>
+            <div class="tbl-tools">
+                <a href="/field-mappings" class="tbl-btn"><i class="bi bi-sliders2"></i> Field Mapping</a>
+                <div class="ui-menu">
+                    <button type="button" class="tbl-btn" data-menu-toggle><i class="bi bi-sliders"></i> Filters<?php if ($stateFilter !== ''): ?> <span class="tbl-count">1</span><?php endif; ?></button>
+                    <div class="ui-menu-list tbl-filter-panel">
+                        <label for="skuState">State</label>
+                        <select name="state" id="skuState" onchange="this.form.submit()">
+                            <?php foreach (['' => 'All states', 'mapped' => 'Mapped', 'unmapped' => 'Unmapped', 'conflict' => 'Conflict', 'disabled' => 'Disabled'] as $value => $label): ?>
+                                <option value="<?= $value ?>" <?= $stateFilter === $value ? 'selected' : '' ?>><?= $label ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="tbl-filter-actions">
+                            <a href="/sku-mappings" class="tbl-btn">Clear</a>
+                            <button type="submit" class="tbl-btn tbl-btn-soft">Apply</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="tbl-search">
+            <label class="ui-search">
                 <i class="bi bi-search"></i>
                 <input type="text" name="q" value="<?= htmlspecialchars($search) ?>" placeholder="Search product, external ID, SKU or barcode..." aria-label="Search mappings">
             </label>
-            <select name="state" class="ui-btn" aria-label="Filter by state" style="padding-right:10px;" onchange="this.form.submit()">
-                <?php foreach (['' => 'All states', 'mapped' => 'Mapped', 'unmapped' => 'Unmapped', 'conflict' => 'Conflict', 'disabled' => 'Disabled'] as $value => $label): ?>
-                    <option value="<?= $value ?>" <?= $stateFilter === $value ? 'selected' : '' ?>><?= $label ?></option>
-                <?php endforeach; ?>
-            </select>
-            <button type="submit" class="ui-btn">Search</button>
-            <?php if ($search !== '' || $stateFilter !== ''): ?>
-                <a href="/sku-mappings" class="ui-btn">Clear</a>
-            <?php endif; ?>
-        </form>
-        <div class="sku-toolbar-actions">
-            <a href="/field-mappings" class="ui-btn"><i class="bi bi-sliders"></i> Field Mapping</a>
-            <button type="button" class="ui-btn ui-btn-primary" onclick="openModal('createMappingModal')"><i class="bi bi-plus-lg"></i> Add Mapping</button>
         </div>
-    </div>
+    </form>
 
     <div style="overflow-x:auto;">
         <table class="data-table">
@@ -103,24 +114,21 @@ foreach ($allMappings as $m) {
                 <tr>
                     <th>Product</th>
                     <th>External Product ID</th>
-                    <th>External SKU</th>
-                    <th>Barcode</th>
                     <th>State</th>
-                    <th>Mapped By</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($mappings)): ?>
                     <?php if ($search !== '' || $stateFilter !== ''): ?>
-                        <tr><td colspan="6" class="ui-empty"><i class="bi bi-search"></i>No mappings match your search.</td></tr>
+                        <tr><td colspan="3" class="ui-empty"><i class="bi bi-search"></i>No mappings match your search.</td></tr>
                     <?php else: ?>
-                        <tr><td colspan="6" class="ui-empty"><i class="bi bi-link-45deg"></i>No mappings yet. Click "Add Mapping" to link a product to its external store ID.</td></tr>
+                        <tr><td colspan="3" class="ui-empty"><i class="bi bi-link-45deg"></i>No mappings yet. Click "Add Mapping" to link a product to its external store ID.</td></tr>
                     <?php endif; ?>
                 <?php else: ?>
                     <?php foreach ($mappings as $m):
                         $color = $stateColors[$m['mapping_state']] ?? ['bg' => '#f1f5f9', 'text' => '#334155'];
                     ?>
-                        <tr class="sku-row" data-state="<?= htmlspecialchars($m['mapping_state']) ?>" data-search="<?= htmlspecialchars(strtolower($m['product_name'] . ' ' . ($m['external_product_id'] ?? '') . ' ' . ($m['external_sku'] ?? '') . ' ' . ($m['barcode'] ?? ''))) ?>">
+                        <tr class="sku-row">
                             <td>
                                 <div style="display:flex; align-items:center; gap:10px;">
                                     <span style="width:28px; height:28px; border-radius:8px; background:var(--primary-light); color:var(--primary); display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="bi bi-box-seam"></i></span>
@@ -128,14 +136,11 @@ foreach ($allMappings as $m) {
                                 </div>
                             </td>
                             <td class="sku-code"><?= htmlspecialchars($m['external_product_id'] ?? '-') ?></td>
-                            <td class="sku-code"><?= htmlspecialchars($m['external_sku'] ?? '-') ?></td>
-                            <td class="sku-code"><?= htmlspecialchars($m['barcode'] ?? '-') ?></td>
                             <td>
                                 <span class="ui-tag" style="background:<?= $color['bg'] ?>; color:<?= $color['text'] ?>;">
                                     <?= ucfirst($m['mapping_state']) ?>
                                 </span>
                             </td>
-                            <td style="color:#334155;"><?= htmlspecialchars($m['mapped_by'] ?? '-') ?></td>
                         </tr>
                     <?php endforeach; ?>
                 <?php endif; ?>
@@ -183,10 +188,6 @@ foreach ($allMappings as $m) {
 </div>
 
 <style>
-.sku-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; padding: 14px 20px; border-bottom: 1px solid var(--border-color); overflow-x: auto; }
-.sku-search { flex: 1 1 auto; min-width: 180px; height: 34px; }
-.sku-toolbar-actions { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; flex-shrink: 0; margin-left: auto; }
-.sku-toolbar .ui-btn { height: 34px; padding: 0 10px; font-size: 12.5px; white-space: nowrap; }
 td.sku-code { color: #334155; font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; font-size: 12.5px; }
 </style>
 

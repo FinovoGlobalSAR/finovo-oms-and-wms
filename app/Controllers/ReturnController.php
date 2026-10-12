@@ -59,9 +59,9 @@ class ReturnController extends Controller
 
         $allReturns = $this->returnModel->all((int) $store['id']);
 
-        // Search + status filter server pe, phir 25-25 ke pages
+        // Search + status filter server pe, phir sirf latest 5 records (Paginator::latest)
         $filtered = self::filterList($allReturns, fn($r) => '#' . $r['id'] . ' #' . $r['order_id'] . ' ' . ($r['customer_name'] ?? '') . ' ' . ($r['product_name'] ?? ''));
-        $pager = Paginator::make($filtered);
+        $pager = Paginator::latest($filtered, $allReturns);
 
         $returns = $pager['items'];
         foreach ($returns as &$r) {

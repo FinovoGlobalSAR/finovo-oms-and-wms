@@ -65,7 +65,7 @@ class ThreePlController extends Controller
         $store = $this->getCurrentStore();
         $allShipments = $this->shipmentModel->allForRemittance((int) $store['id']);
 
-        // Search (?q=) + status (?status=) server pe, phir 25-25 ke pages
+        // Search (?q=) + status (?status=) server pe, phir sirf latest 5 records (Paginator::latest)
         $search = trim((string) ($_GET['q'] ?? ''));
         $statusFilter = in_array($_GET['status'] ?? '', ['remitted', 'not_remitted'], true) ? $_GET['status'] : '';
         $needle = mb_strtolower($search);
@@ -75,7 +75,7 @@ class ThreePlController extends Controller
             }
             return $needle === '' || str_contains(mb_strtolower($s['tracking_number'] . ' ' . $s['courier_name'] . ' ' . ($s['customer_name'] ?? '')), $needle);
         });
-        $pager = Paginator::make($filtered);
+        $pager = Paginator::latest($filtered, $allShipments);
 
         $this->view('threepl/remittance', [
             'shipments' => $pager['items'],

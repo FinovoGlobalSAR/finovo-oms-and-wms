@@ -10,12 +10,13 @@ $avatarColors = [
 $platform = $store['platform'] ?? 'manual';
 ?>
 
-<div class="breadcrumb"><a href="/dashboard" class="breadcrumb-link">Finovo</a> <i class="bi bi-chevron-right"></i> Products</div>
-
-<div class="page-header-row">
-    <h1>Products <span class="count-badge"><?= (int) ($totalProducts ?? count($products)) ?></span></h1>
+<div class="ui-head">
+    <div class="ui-head-left">
+        <div class="breadcrumb">Finovo <i class="bi bi-chevron-right"></i> <span class="current">Products</span></div>
+        <h1>Products <span class="count-badge"><?= (int) ($totalProducts ?? count($products)) ?></span></h1>
+        <p>Manage your product catalog and inventory here.</p>
+    </div>
 </div>
-<p class="page-subtitle">Manage your product catalog and inventory here.</p>
 
 <?php if (!empty($lowStockCount)): ?>
     <div class="banner banner-error"><i class="bi bi-exclamation-triangle"></i> <?= (int)$lowStockCount ?> product(s) are low on stock or out of stock.</div>
@@ -56,69 +57,76 @@ $platform = $store['platform'] ?? 'manual';
     <div class="banner banner-error"><?= htmlspecialchars($error) ?></div>
 <?php endif; ?>
 
-<div class="card" style="overflow: visible;">
-    <div class="filter-row">
-        <!-- Search + stock filter: server pe chalta hai, har page pe sahi result -->
-        <form method="GET" action="/products" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-            <input type="text" name="q" value="<?= htmlspecialchars($search ?? '') ?>" placeholder="Search name or SKU..." aria-label="Search products" style="padding:7px 10px; border:1px solid #d1d5db; border-radius:8px; min-width:200px;">
-            <select name="stock" onchange="this.form.submit()" aria-label="Stock filter" style="padding:7px 10px; border:1px solid #d1d5db; border-radius:8px;">
-                <option value="" <?= ($stockFilter ?? '') === '' ? 'selected' : '' ?>>All stock</option>
-                <option value="low" <?= ($stockFilter ?? '') === 'low' ? 'selected' : '' ?>>Low stock</option>
-                <option value="out" <?= ($stockFilter ?? '') === 'out' ? 'selected' : '' ?>>Out of stock</option>
-            </select>
-            <button type="submit" class="toolbar-btn"><i class="bi bi-search"></i> Search</button>
-            <?php if (($search ?? '') !== '' || ($stockFilter ?? '') !== ''): ?>
-                <a href="/products" class="toolbar-btn"><i class="bi bi-x"></i> Clear</a>
-            <?php endif; ?>
-        </form>
-        <div class="push-right" style="margin-left:0;">
-            <a href="/warehouses" class="toolbar-btn"><i class="bi bi-building"></i> Warehouses</a>
+<div class="ui-card tbl-card">
+    <!-- Search + stock filter: server pe chalta hai, har page pe sahi result -->
+    <form method="GET" action="/products">
+        <div class="tbl-head">
+            <h2>All Products</h2>
+            <div class="tbl-tools">
+                <?php if ($platform === 'shopify'): ?>
+                    <a href="/products/sync-shopify" class="tbl-btn tbl-btn-soft"><i class="bi bi-arrow-repeat"></i> Pull from Shopify</a>
+                    <a href="/products/sync-shopify-async" class="tbl-btn"><i class="bi bi-lightning"></i> Sync (Async)</a>
+                <?php elseif ($platform === 'woocommerce'): ?>
+                    <a href="/products/sync-woocommerce" class="tbl-btn tbl-btn-soft"><i class="bi bi-arrow-repeat"></i> Pull from WooCommerce</a>
+                    <a href="/products/sync-woocommerce-async" class="tbl-btn"><i class="bi bi-lightning"></i> Sync (Async)</a>
+                <?php elseif ($platform === 'bigcommerce'): ?>
+                    <a href="/products/sync-bigcommerce" class="tbl-btn tbl-btn-soft"><i class="bi bi-arrow-repeat"></i> Sync BigCommerce</a>
+                    <a href="/products/sync-bigcommerce-async" class="tbl-btn"><i class="bi bi-lightning"></i> Sync (Async)</a>
+                <?php elseif ($platform === 'prestashop'): ?>
+                    <a href="/products/sync-prestashop" class="tbl-btn tbl-btn-soft"><i class="bi bi-arrow-repeat"></i> Sync PrestaShop</a>
+                    <a href="/products/sync-prestashop-async" class="tbl-btn"><i class="bi bi-lightning"></i> Sync (Async)</a>
+                <?php elseif ($platform === 'opencart'): ?>
+                    <a href="/products/sync-opencart" class="tbl-btn tbl-btn-soft"><i class="bi bi-arrow-repeat"></i> Sync OpenCart</a>
+                    <a href="/products/sync-opencart-async" class="tbl-btn"><i class="bi bi-lightning"></i> Sync (Async)</a>
+                <?php elseif ($platform === 'oscommerce'): ?>
+                    <a href="/products/sync-oscommerce" class="tbl-btn tbl-btn-soft"><i class="bi bi-arrow-repeat"></i> Sync osCommerce</a>
+                    <a href="/products/sync-oscommerce-async" class="tbl-btn"><i class="bi bi-lightning"></i> Sync (Async)</a>
+                <?php elseif ($platform === 'wix'): ?>
+                    <a href="/products/sync-wix" class="tbl-btn tbl-btn-soft"><i class="bi bi-arrow-repeat"></i> Sync Wix</a>
+                <?php elseif ($platform === 'ebay'): ?>
+                    <a href="/products/sync-ebay" class="tbl-btn tbl-btn-soft"><i class="bi bi-arrow-repeat"></i> Sync eBay</a>
+                <?php elseif ($platform === 'cj'): ?>
+                    <a href="/products/sync-cj" class="tbl-btn tbl-btn-soft"><i class="bi bi-arrow-repeat"></i> Sync CJ</a>
+                <?php elseif ($platform === 'magento'): ?>
+                    <a href="/products/sync-magento" class="tbl-btn tbl-btn-soft"><i class="bi bi-arrow-repeat"></i> Sync Magento</a>
+                <?php elseif ($platform === 'custom'): ?>
+                    <a href="/products/sync-custom-bridge" class="tbl-btn tbl-btn-soft"><i class="bi bi-arrow-repeat"></i> Sync Custom Store</a>
+                <?php endif; ?>
 
-            <?php if ($platform === 'shopify'): ?>
-                <a href="/products/sync-shopify" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Pull from Shopify</a>
-                <a href="/products/sync-shopify-async" class="toolbar-btn"><i class="bi bi-lightning"></i> Sync (Async)</a>
-            <?php elseif ($platform === 'woocommerce'): ?>
-                <a href="/products/sync-woocommerce" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Pull from WooCommerce</a>
-                <a href="/products/sync-woocommerce-async" class="toolbar-btn"><i class="bi bi-lightning"></i> Sync (Async)</a>
-            <?php elseif ($platform === 'bigcommerce'): ?>
-                <a href="/products/sync-bigcommerce" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync BigCommerce</a>
-                <a href="/products/sync-bigcommerce-async" class="toolbar-btn"><i class="bi bi-lightning"></i> Sync (Async)</a>
-            <?php elseif ($platform === 'prestashop'): ?>
-                <a href="/products/sync-prestashop" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync PrestaShop</a>
-                <a href="/products/sync-prestashop-async" class="toolbar-btn"><i class="bi bi-lightning"></i> Sync (Async)</a>
-            <?php elseif ($platform === 'opencart'): ?>
-                <a href="/products/sync-opencart" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync OpenCart</a>
-                <a href="/products/sync-opencart-async" class="toolbar-btn"><i class="bi bi-lightning"></i> Sync (Async)</a>
-            <?php elseif ($platform === 'oscommerce'): ?>
-                <a href="/products/sync-oscommerce" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync osCommerce</a>
-                <a href="/products/sync-oscommerce-async" class="toolbar-btn"><i class="bi bi-lightning"></i> Sync (Async)</a>
-            <?php elseif ($platform === 'wix'): ?>
-                <a href="/products/sync-wix" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync Wix</a>
-            <?php elseif ($platform === 'ebay'): ?>
-                <a href="/products/sync-ebay" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync eBay</a>
-            <?php elseif ($platform === 'cj'): ?>
-                <a href="/products/sync-cj" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync CJ</a>
-            <?php elseif ($platform === 'magento'): ?>
-                <a href="/products/sync-magento" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync Magento</a>
-            <?php elseif ($platform === 'custom'): ?>
-                <a href="/products/sync-custom-bridge" class="toolbar-btn"><i class="bi bi-arrow-repeat"></i> Sync Custom Store</a>
-            <?php endif; ?>
-
-            <button type="button" class="toolbar-btn" id="autoRefreshBtn" onclick="toggleAutoRefresh()">
-                <i class="bi bi-clock-history"></i> <span id="autoRefreshLabel">Auto-sync: Off</span>
-            </button>
-            <button type="button" class="toolbar-btn" onclick="openModal('importProductModal')"><i class="bi bi-upload"></i> Import CSV</button>
-            <a href="/products/export-csv" class="toolbar-btn"><i class="bi bi-download"></i> Export CSV</a>
+                <button type="button" class="tbl-btn" id="autoRefreshBtn" onclick="toggleAutoRefresh()">
+                    <i class="bi bi-clock-history"></i> <span id="autoRefreshLabel">Auto-sync: Off</span>
+                </button>
+                <div class="ui-menu">
+                    <button type="button" class="tbl-btn" data-menu-toggle><i class="bi bi-sliders"></i> Filters<?php if (($stockFilter ?? '') !== ''): ?> <span class="tbl-count">1</span><?php endif; ?></button>
+                    <div class="ui-menu-list tbl-filter-panel">
+                        <label for="prodStock">Stock</label>
+                        <select name="stock" id="prodStock" onchange="this.form.submit()">
+                            <option value="" <?= ($stockFilter ?? '') === '' ? 'selected' : '' ?>>All stock</option>
+                            <option value="low" <?= ($stockFilter ?? '') === 'low' ? 'selected' : '' ?>>Low stock</option>
+                            <option value="out" <?= ($stockFilter ?? '') === 'out' ? 'selected' : '' ?>>Out of stock</option>
+                        </select>
+                        <div class="tbl-filter-actions">
+                            <a href="/products" class="tbl-btn">Clear</a>
+                            <button type="submit" class="tbl-btn tbl-btn-soft">Apply</button>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="tbl-btn" onclick="openModal('importProductModal')"><i class="bi bi-upload"></i> Import</button>
+                <a href="/products/export-csv" class="tbl-btn"><i class="bi bi-download"></i> Export</a>
+            </div>
         </div>
-    </div>
+        <div class="tbl-search">
+            <label class="ui-search">
+                <i class="bi bi-search"></i>
+                <input type="text" name="q" value="<?= htmlspecialchars($search ?? '') ?>" placeholder="Search name or SKU..." aria-label="Search products">
+            </label>
+        </div>
+    </form>
 
     <table class="data-table">
         <thead>
             <tr>
-                <th class="checkbox-col"><input type="checkbox"></th>
-                <th>Image</th>
                 <th>Product</th>
-                <th>SKU</th>
                 <th>Price</th>
                 <th>Stock</th>
                 <th style="width:60px;">Actions</th>
@@ -126,7 +134,7 @@ $platform = $store['platform'] ?? 'manual';
         </thead>
         <tbody>
             <?php if (empty($products)): ?>
-                <tr><td colspan="7" style="text-align:center; color:#6b7280; padding:30px;">No products found.</td></tr>
+                <tr><td colspan="4" class="ui-empty"><i class="bi bi-box-seam"></i>No products found.</td></tr>
             <?php else: ?>
                 <?php foreach ($products as $i => $product):
                     $avColor = $avatarColors[$i % count($avatarColors)];
@@ -160,16 +168,14 @@ $platform = $store['platform'] ?? 'manual';
                     }
                 ?>
                     <tr>
-                        <td class="checkbox-col"><input type="checkbox"></td>
                         <td>
-                            <?php if (!empty($product['image_url'])): ?>
-                                <img src="<?= htmlspecialchars($product['image_url']) ?>" alt="" style="width:40px; height:40px; border-radius:8px; object-fit:cover; border:1px solid var(--border-color);">
-                            <?php else: ?>
-                                <span class="avatar-circle" style="background:<?= $avColor['bg'] ?>; color:<?= $avColor['text'] ?>;"><i class="bi bi-image"></i></span>
-                            <?php endif; ?>
-                        </td>
-                        <td>
-                            <div class="name-cell">
+                            <div class="name-cell" style="display:flex; align-items:center; gap:10px;">
+                                <!-- Image ab alag column nahi, naam ke saath chhoti si -->
+                                <?php if (!empty($product['image_url'])): ?>
+                                    <img src="<?= htmlspecialchars($product['image_url']) ?>" alt="" style="width:36px; height:36px; border-radius:8px; object-fit:cover; border:1px solid var(--border-color); flex-shrink:0;">
+                                <?php else: ?>
+                                    <span class="avatar-circle" style="background:<?= $avColor['bg'] ?>; color:<?= $avColor['text'] ?>; flex-shrink:0;"><i class="bi bi-image"></i></span>
+                                <?php endif; ?>
                                 <?php if ($variantCount > 0): ?>
                                     <a href="#" onclick="toggleVariants('<?= $rowId ?>'); return false;" style="text-decoration:none; color:inherit; display:flex; align-items:center; gap:6px;">
                                         <i class="bi bi-chevron-right" id="chevron-<?= $product['id'] ?>" style="font-size:11px; color:var(--text-muted); transition: transform 0.15s;"></i>
@@ -181,7 +187,6 @@ $platform = $store['platform'] ?? 'manual';
                                 <?php endif; ?>
                             </div>
                         </td>
-                        <td><?= htmlspecialchars($product['sku'] ?? '-') ?></td>
                         <td>
                             <?= $variantCount > 0 ? 'From ' : '' ?><?= $currencySymbol ?> <?= htmlspecialchars(number_format((float)($product['display_price'] ?? $product['price'] ?? 0), 2)) ?>
                         </td>
@@ -206,7 +211,8 @@ $platform = $store['platform'] ?? 'manual';
                                     <!-- Product delete sirf Admin / Manager -->
                                     <div class="row-menu-divider"></div>
                                     <a href="#" class="row-menu-danger" onclick="if(confirm('Delete this product? This cannot be undone.')){document.getElementById('deleteProductForm<?= $product['id'] ?>').submit();} return false;"><i class="bi bi-trash"></i> Delete</a>
-                                <?php endif; ?>                            </div>
+                                <?php endif; ?>
+                            </div>
                             <form id="deleteProductForm<?= $product['id'] ?>" action="/products/delete" method="POST" style="display:none;">
                                 <input type="hidden" name="id" value="<?= $product['id'] ?>">
                             </form>
@@ -214,13 +220,11 @@ $platform = $store['platform'] ?? 'manual';
                     </tr>
                     <?php if ($variantCount > 0): ?>
                         <tr id="<?= $rowId ?>" style="display:none;">
-                            <td></td>
-                            <td colspan="6" style="padding:0 0 14px 0;">
+                            <td colspan="4" style="padding:0 0 14px 0;">
                                 <table style="width:100%; background:#f9fafb; border-radius:8px; overflow:hidden;">
                                     <thead>
                                         <tr style="font-size:12px; color:var(--text-muted);">
                                             <th style="text-align:left; padding:8px 16px;">Variant</th>
-                                            <th style="text-align:left; padding:8px 16px;">SKU</th>
                                             <th style="text-align:left; padding:8px 16px;">Price</th>
                                             <th style="text-align:left; padding:8px 16px;">Stock</th>
                                         </tr>
@@ -229,7 +233,6 @@ $platform = $store['platform'] ?? 'manual';
                                         <?php foreach ($product['variants'] as $v): ?>
                                             <tr style="font-size:13px;">
                                                 <td style="padding:8px 16px;"><?= htmlspecialchars($v['label']) ?></td>
-                                                <td style="padding:8px 16px; color:var(--text-muted);"><?= htmlspecialchars($v['sku'] ?: '-') ?></td>
                                                 <td style="padding:8px 16px;"><?= $currencySymbol ?> <?= number_format((float) $v['price'], 2) ?></td>
                                                 <td style="padding:8px 16px;">
                                                     <?php $vStock = (int) $v['stock_quantity']; ?>

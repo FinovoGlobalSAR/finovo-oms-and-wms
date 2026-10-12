@@ -21,8 +21,14 @@ class StoreController extends Controller
     {
         $stores = $this->storeModel->all();
         require_once __DIR__ . '/PrestaShopConnectController.php';
+        require_once __DIR__ . '/OrderPushController.php';
         foreach ($stores as &$s) {
             $s['warehouses'] = $this->warehouseModel->allByStore((int) $s['id']);
+            // Tracking platform pe jaani baaqi (sirf un platforms pe jahan tracking bhej sakte hain)
+            $platformKey = strtolower((string) ($s['platform'] ?? ''));
+            $s['orders_awaiting_sync'] = in_array($platformKey, OrderPushController::CAN_TRACK, true)
+                ? $this->storeModel->ordersAwaitingSync((int) $s['id'], OrderPushController::PLATFORMS[$platformKey]['column'])
+                : 0;
             // PrestaShop module ke liye "connection code" (is ke bina module keys nahi bhej sakta)
             $s['ps_connect_code'] = PrestaShopConnectController::connectCode((int) $s['id']);
         }

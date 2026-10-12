@@ -52,6 +52,9 @@ $avatarColors = [
         <h1>Employee Management <span class="count-badge"><?= $totalEmployees ?></span></h1>
         <p>Create employees, assign roles and manage your team.</p>
     </div>
+    <div class="ui-head-right">
+        <button type="button" class="ui-btn ui-btn-primary" onclick="openEmployeeModal()"><i class="bi bi-person-plus"></i> Add Employee</button>
+    </div>
 </div>
 
 <?php if ($success): ?>
@@ -92,31 +95,42 @@ $avatarColors = [
     </div>
 </div>
 
-<div class="ui-card">
+<div class="ui-card tbl-card">
     <!-- Search / filters: server pe chalte hain, har page ka result sahi -->
-    <form method="GET" action="<?= $baseUrl ?>/employees" class="emp-toolbar">
-        <label class="ui-search emp-search">
-            <i class="bi bi-search"></i>
-            <input name="q" type="text" value="<?= htmlspecialchars($search) ?>" placeholder="Search by name or email..." aria-label="Search employees">
-        </label>
-        <select name="role" class="ui-btn" aria-label="Filter by role" style="padding-right:10px;" onchange="this.form.submit()">
-            <option value="">All Roles</option>
-            <?php foreach ($roles as $role): ?>
-                <?php $rv = strtolower($role['name']); ?>
-                <option value="<?= htmlspecialchars($rv) ?>" <?= $roleFilter === $rv ? 'selected' : '' ?>><?= htmlspecialchars($role['name']) ?></option>
-            <?php endforeach; ?>
-        </select>
-        <select name="status" class="ui-btn" aria-label="Filter by status" style="padding-right:10px;" onchange="this.form.submit()">
-            <option value="">All Status</option>
-            <option value="active" <?= $statusFilter === 'active' ? 'selected' : '' ?>>Active</option>
-            <option value="inactive" <?= $statusFilter === 'inactive' ? 'selected' : '' ?>>Inactive</option>
-        </select>
-        <button type="submit" class="ui-btn"><i class="bi bi-search"></i> Search</button>
-        <?php if ($isFiltered): ?>
-            <a href="<?= $baseUrl ?>/employees" class="ui-btn"><i class="bi bi-x"></i> Clear</a>
-        <?php endif; ?>
-        <div class="emp-toolbar-actions">
-            <button type="button" class="ui-btn ui-btn-primary" onclick="openEmployeeModal()"><i class="bi bi-person-plus"></i> Add Employee</button>
+    <form method="GET" action="<?= $baseUrl ?>/employees">
+        <div class="tbl-head">
+            <h2>All Employees</h2>
+            <div class="tbl-tools">
+                <div class="ui-menu">
+                    <button type="button" class="tbl-btn" data-menu-toggle><i class="bi bi-sliders"></i> Filters<?php $nf = ($roleFilter !== '') + ($statusFilter !== ''); if ($nf): ?> <span class="tbl-count"><?= $nf ?></span><?php endif; ?></button>
+                    <div class="ui-menu-list tbl-filter-panel">
+                        <label for="empRole">Role</label>
+                        <select name="role" id="empRole" onchange="this.form.submit()">
+                            <option value="">All Roles</option>
+                            <?php foreach ($roles as $role): ?>
+                                <?php $rv = strtolower($role['name']); ?>
+                                <option value="<?= htmlspecialchars($rv) ?>" <?= $roleFilter === $rv ? 'selected' : '' ?>><?= htmlspecialchars($role['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <label for="empStatus">Status</label>
+                        <select name="status" id="empStatus" onchange="this.form.submit()">
+                            <option value="">All Status</option>
+                            <option value="active" <?= $statusFilter === 'active' ? 'selected' : '' ?>>Active</option>
+                            <option value="inactive" <?= $statusFilter === 'inactive' ? 'selected' : '' ?>>Inactive</option>
+                        </select>
+                        <div class="tbl-filter-actions">
+                            <a href="<?= $baseUrl ?>/employees" class="tbl-btn">Clear</a>
+                            <button type="submit" class="tbl-btn tbl-btn-soft">Apply</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="tbl-search">
+            <label class="ui-search">
+                <i class="bi bi-search"></i>
+                <input name="q" type="text" value="<?= htmlspecialchars($search) ?>" placeholder="Search by name or email..." aria-label="Search employees">
+            </label>
         </div>
     </form>
 
@@ -323,10 +337,6 @@ $avatarColors = [
 </div>
 
 <style>
-.emp-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; padding: 14px 20px; border-bottom: 1px solid var(--border-color); overflow-x: auto; }
-.emp-search { flex: 1 1 auto; min-width: 180px; height: 34px; }
-.emp-toolbar-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: auto; }
-.emp-toolbar .ui-btn { height: 34px; padding: 0 10px; font-size: 12.5px; white-space: nowrap; }
 .emp-input { width: 100%; box-sizing: border-box; border: 1px solid var(--border-color); border-radius: 9px; padding: 9px 12px; font-size: 13.5px; font-family: inherit; background: #f8fafc; }
 .emp-input:focus { outline: none; border-color: #93b4f5; background: #fff; box-shadow: 0 0 0 3px rgba(29,78,216,0.12); }
 .emp-radio-group { display: flex; gap: 10px; }

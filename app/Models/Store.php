@@ -191,4 +191,28 @@ class Store extends Model
         $stmt = $this->query("SELECT COUNT(*) as c FROM orders WHERE store_id = ?", [$id]);
         return (int) ($stmt->fetch()['c'] ?? 0);
     }
+
+    /**
+     * Platform ke orders jin ka shipment (tracking number) ban gaya hai
+     * lekin tracking abhi platform pe nahi bheji gayi ("Orders Awaiting Sync").
+     * $orderColumn: us platform ka order ID column (OrderPushController::PLATFORMS se).
+     */
+    public function ordersAwaitingSync(int $storeId, string $orderColumn): int
+    {
+        if (!preg_match('/^external_[a-z_]+_id$/', $orderColumn)) {
+            return 0;
+        }
+        $stmt = $this->query(
+            "SELECT COUNT(DISTINCT o.{$orderColumn}) AS c
+               FROM orders o
+               JOIN shipments s ON s.id = o.shipment_id AND s.store_id = o.store_id
+              WHERE o.store_id = ?
+                AND o.{$orderColumn} IS NOT NULL AND o.{$orderColumn} <> ''
+                AND o.platform_tracking_pushed_at IS NULL
+                AND o.status <> 'cancelled'
+                AND TRIM(COALESCE(s.tracking_number, '')) <> ''",
+            [$storeId]
+        );
+        return (int) ($stmt->fetch()['c'] ?? 0);
+    }
 }

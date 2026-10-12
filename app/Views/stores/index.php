@@ -1,8 +1,8 @@
 <?php
 // ---------- Display helpers (sirf UI ke liye) ----------
 $platformInfo = [
-    'shopify'     => ['label' => 'Shopify',        'icon' => 'bi-bag',             'bg' => '#dcfce7', 'fg' => '#166534'],
-    'woocommerce' => ['label' => 'WooCommerce',    'icon' => 'bi-cart3',           'bg' => '#f3e8ff', 'fg' => '#6b21a8'],
+    'shopify'     => ['label' => 'Shopify',        'icon' => 'bi-bag',             'bg' => '#e6f4ea', 'fg' => '#16a34a'],
+    'woocommerce' => ['label' => 'WooCommerce',    'icon' => 'bi-cart3',           'bg' => '#f5f3ff', 'fg' => '#7c3aed'],
     'bigcommerce' => ['label' => 'BigCommerce',    'icon' => 'bi-shop-window',     'bg' => '#e0e7ff', 'fg' => '#3730a3'],
     'prestashop'  => ['label' => 'PrestaShop',     'icon' => 'bi-bag-heart',       'bg' => '#fce7f3', 'fg' => '#9d174d'],
     'opencart'    => ['label' => 'OpenCart',       'icon' => 'bi-cart',            'bg' => '#e0f2fe', 'fg' => '#075985'],
@@ -15,31 +15,59 @@ $platformInfo = [
     'manual'      => ['label' => 'Manual',         'icon' => 'bi-file-earmark-text', 'bg' => '#f1f5f9', 'fg' => '#334155'],
 ];
 
-$healthInfo = [
-    'connected'    => ['label' => 'Connected',    'color' => '#166534'],
-    'sync_error'   => ['label' => 'Sync Error',   'color' => '#b91c1c'],
-    'disconnected' => ['label' => 'Disconnected', 'color' => '#64748b'],
+// Figma ke status: Active (hara), Setup Incomplete (narangi), Sync Error (laal)
+$statusInfo = [
+    'active'     => ['label' => 'Active',           'color' => '#047857'],
+    'incomplete' => ['label' => 'Setup Incomplete', 'color' => '#e48508'],
+    'sync_error' => ['label' => 'Sync Error',       'color' => '#dc2626'],
 ];
 
 $connectedCount = 0;
 $syncErrorCount = 0;
-$noWarehouseCount = 0;
-foreach ($stores as $s) {
-    $h = $s['health_status'] ?? 'disconnected';
-    if ($h === 'connected')  { $connectedCount++; }
-    if ($h === 'sync_error') { $syncErrorCount++; }
-    if (empty($s['warehouses'])) { $noWarehouseCount++; }
+$attentionCount = 0;
+$awaitingSyncTotal = 0;
+foreach ($stores as &$s) {
+    $health = $s['health_status'] ?? 'disconnected';
+    $isManualStore = in_array(strtolower($s['platform'] ?? 'manual'), ['manual', ''], true);
+
+    if ($health === 'sync_error') {
+        $s['ui_status'] = 'sync_error';
+    } elseif (empty($s['warehouses']) || (!$isManualStore && $health !== 'connected')) {
+        // Warehouse link nahi, ya platform abhi connect nahi hua
+        $s['ui_status'] = 'incomplete';
+    } else {
+        $s['ui_status'] = 'active';
+    }
+
+    if ($health === 'connected') { $connectedCount++; }
+    if ($health === 'sync_error') { $syncErrorCount++; }
+    if ($s['ui_status'] !== 'active') { $attentionCount++; }
+    $awaitingSyncTotal += (int) ($s['orders_awaiting_sync'] ?? 0);
 }
+unset($s);
+$totalStores = count($stores);
+
+// Table mein sirf latest 5 stores (sab se naye pehle). Upar ke numbers phir bhi saare stores se.
+$latestStores = $stores;
+usort($latestStores, fn($a, $b) => (int) $b['id'] <=> (int) $a['id']);
+$latestStores = array_slice($latestStores, 0, 5);
 ?>
 
-<div class="ui-head" style="align-items:center;">
+<div class="ui-head">
     <div class="ui-head-left">
         <div class="breadcrumb">Finovo <i class="bi bi-chevron-right"></i> <span class="current">Stores</span></div>
-        <h1>Stores <span class="count-badge"><?= count($stores) ?></span></h1>
+        <h1>Stores <span class="count-badge"><?= $totalStores ?></span></h1>
         <p>Manage your sales channels and link them with warehouses.</p>
     </div>
     <div class="ui-head-right">
         <button type="button" class="ui-btn ui-btn-primary" onclick="openModal('createStoreModal')"><i class="bi bi-plus-lg"></i> Add Store</button>
+        <div class="ui-info">
+            <div class="ui-info-icon"><i class="bi bi-shop"></i></div>
+            <div>
+                <strong>Connect your stores</strong>
+                <span>Link your stores with warehouses to streamline inventory and order fulfillment.</span>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -51,12 +79,24 @@ foreach ($stores as $s) {
 <?php if (!empty($_GET['shopify_connected'])): ?><div class="banner banner-success"><i class="bi bi-check-circle"></i> Shopify connected successfully!</div><?php endif; ?>
 <?php if (!empty($error)): ?><div class="banner banner-error"><i class="bi bi-exclamation-circle"></i> <?= htmlspecialchars($error) ?></div><?php endif; ?>
 
+<?php if ($attentionCount > 0): ?>
+    <div class="ui-alert" id="storeAttention">
+        <div class="ui-tip-icon"><i class="bi bi-lightbulb"></i></div>
+        <div class="ui-alert-body">
+            <strong>Some stores need attention</strong>
+            <span><?= $attentionCount ?> <?= $attentionCount === 1 ? 'store needs' : 'stores need' ?> setup completion or <?= $attentionCount === 1 ? 'has' : 'have' ?> sync issues. Review details below.</span>
+        </div>
+        <a href="#allStoresCard" class="st-view-detail" onclick="filterStores('attention');">View Detail <i class="bi bi-arrow-right"></i></a>
+        <button type="button" class="st-alert-close" aria-label="Dismiss" onclick="document.getElementById('storeAttention').style.display='none';"><i class="bi bi-x-lg"></i></button>
+    </div>
+<?php endif; ?>
+
 <div class="ui-stats">
     <div class="ui-stat">
         <div class="ui-stat-icon"><i class="bi bi-shop"></i></div>
         <div>
             <div class="ui-stat-label">Total Stores</div>
-            <div class="ui-stat-value"><b><?= count($stores) ?></b><span class="ui-pill ui-pill-blue">Active</span></div>
+            <div class="ui-stat-value"><b><?= $totalStores ?></b><span class="ui-pill ui-pill-blue">Active</span></div>
         </div>
     </div>
     <div class="ui-stat">
@@ -64,10 +104,10 @@ foreach ($stores as $s) {
         <div>
             <div class="ui-stat-label">Connected Stores</div>
             <div class="ui-stat-value"><b><?= $connectedCount ?></b>
-                <?php if ($connectedCount === count($stores) && count($stores) > 0): ?>
+                <?php if ($connectedCount === $totalStores && $totalStores > 0): ?>
                     <span class="ui-pill ui-pill-green">All Connected</span>
                 <?php else: ?>
-                    <span class="ui-pill ui-pill-gray"><?= count($stores) - $connectedCount ?> not connected</span>
+                    <span class="ui-pill ui-pill-gray"><?= $totalStores - $connectedCount ?> not connected</span>
                 <?php endif; ?>
             </div>
         </div>
@@ -82,18 +122,18 @@ foreach ($stores as $s) {
         </div>
     </div>
     <div class="ui-stat">
-        <div class="ui-stat-icon"><i class="bi bi-house-door"></i></div>
+        <div class="ui-stat-icon"><i class="bi bi-cart3"></i></div>
         <div>
-            <div class="ui-stat-label">No Warehouse Linked</div>
-            <div class="ui-stat-value"><b><?= $noWarehouseCount ?></b>
-                <span class="ui-pill <?= $noWarehouseCount > 0 ? 'ui-pill-amber' : 'ui-pill-green' ?>"><?= $noWarehouseCount > 0 ? 'Link needed' : 'All linked' ?></span>
+            <div class="ui-stat-label">Order Awaiting Sync</div>
+            <div class="ui-stat-value"><b><?= $awaitingSyncTotal ?></b>
+                <span class="ui-pill <?= $awaitingSyncTotal > 0 ? 'ui-pill-amber' : 'ui-pill-green' ?>"><?= $awaitingSyncTotal > 0 ? 'Pending' : 'Up to date' ?></span>
             </div>
         </div>
     </div>
 </div>
 
 <div class="ui-card" id="allStoresCard" style="overflow:visible;">
-    <div class="ui-card-head" style="padding-bottom:18px;">
+    <div class="ui-card-head">
         <div class="ui-card-title">
             <div class="ui-card-title-icon"><i class="bi bi-database"></i></div>
             <div>
@@ -101,50 +141,52 @@ foreach ($stores as $s) {
                 <div class="sub">View and manage your sales channels.</div>
             </div>
         </div>
-        <label class="ui-search" style="width:260px;">
-            <i class="bi bi-search"></i>
-            <input type="text" id="storeSearch" placeholder="Search stores..." aria-label="Search stores">
-        </label>
+        <div class="ui-menu">
+            <button type="button" class="ui-btn" data-menu-toggle id="storeFilterBtn"><i class="bi bi-sliders"></i> <span id="storeFilterLabel">Filter</span></button>
+            <div class="ui-menu-list">
+                <button type="button" onclick="filterStores('all')">All stores</button>
+                <button type="button" onclick="filterStores('active')">Active</button>
+                <button type="button" onclick="filterStores('attention')">Needs attention</button>
+            </div>
+        </div>
     </div>
 
     <div style="overflow-x:auto; overflow-y:visible;">
-        <table class="data-table">
+        <table class="data-table st-table">
             <thead>
                 <tr>
-                    <th>Store</th>
-                    <th>Platform</th>
-                    <th>Linked Warehouses</th>
-                    <th>Status</th>
-                    <th>Last Sync</th>
+                    <th style="width:200px;">Store</th>
+                    <th style="width:150px;">Platform</th>
+                    <th style="width:310px;">Linked Warehouses</th>
+                    <th style="width:135px;">Status</th>
+                    <th style="width:130px;">Last Sync</th>
+                    <th style="width:130px;">Orders Awaiting Sync</th>
                     <th style="text-align:right;">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($stores)): ?>
-                    <tr><td colspan="6" class="ui-empty"><i class="bi bi-shop"></i>No stores yet. Click "Add Store" to connect your first sales channel.</td></tr>
+                    <tr><td colspan="7" class="ui-empty"><i class="bi bi-shop"></i>No stores yet. Click "Add Store" to connect your first sales channel.</td></tr>
                 <?php else: ?>
-                    <?php foreach ($stores as $s):
+                    <?php foreach ($latestStores as $s):
                         $pKey = strtolower($s['platform'] ?? 'manual');
                         $pInfo = $platformInfo[$pKey] ?? ['label' => ucfirst($pKey), 'icon' => 'bi-shop', 'bg' => '#f1f5f9', 'fg' => '#334155'];
-                        $hStatus = $s['health_status'] ?? 'disconnected';
-                        $hInfo = $healthInfo[$hStatus] ?? $healthInfo['disconnected'];
+                        $sInfo = $statusInfo[$s['ui_status']];
                         $isManaging = $storeContextActive && (int) $s['id'] === (int) $currentStoreId;
                     ?>
-                        <tr class="store-row" data-search="<?= htmlspecialchars(strtolower($s['name'] . ' ' . $pInfo['label'])) ?>">
+                        <tr class="store-row" data-status="<?= $s['ui_status'] === 'active' ? 'active' : 'attention' ?>">
                             <td>
-                                <div style="display:flex; align-items:center; gap:10px;">
-                                    <span style="width:30px; height:30px; border-radius:8px; background:var(--primary-light); color:var(--primary); display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="bi bi-shop"></i></span>
-                                    <div style="display:flex; flex-direction:column; align-items:flex-start; gap:3px;">
-                                        <span style="font-weight:700;"><?= htmlspecialchars($s['name']) ?></span>
-                                        <?php if ($isManaging): ?>
-                                            <span class="ui-pill ui-pill-green">Managing</span>
-                                        <?php endif; ?>
+                                <div class="st-store">
+                                    <span class="st-store-icon"><i class="bi bi-shop"></i></span>
+                                    <div>
+                                        <span class="st-store-name"><?= htmlspecialchars($s['name']) ?></span>
+                                        <?php if ($isManaging): ?><span class="st-managing">Managing</span><?php endif; ?>
                                     </div>
                                 </div>
                             </td>
                             <td>
-                                <span style="display:inline-flex; align-items:center; gap:8px; color:#334155;">
-                                    <span style="width:22px; height:22px; border-radius:6px; background:<?= $pInfo['bg'] ?>; color:<?= $pInfo['fg'] ?>; display:flex; align-items:center; justify-content:center; font-size:12px;"><i class="bi <?= $pInfo['icon'] ?>"></i></span>
+                                <span class="st-platform">
+                                    <span class="st-platform-icon" style="background:<?= $pInfo['bg'] ?>; color:<?= $pInfo['fg'] ?>;"><i class="bi <?= $pInfo['icon'] ?>"></i></span>
                                     <?= htmlspecialchars($pInfo['label']) ?>
                                 </span>
                             </td>
@@ -152,25 +194,26 @@ foreach ($stores as $s) {
                                 <?php if (empty($s['warehouses'])): ?>
                                     <span class="ui-tag ui-pill-red"><i class="bi bi-exclamation-circle"></i> No warehouse linked</span>
                                 <?php else: ?>
-                                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                                    <div class="st-wh-list">
                                         <?php foreach ($s['warehouses'] as $w): ?>
-                                            <span class="ui-tag" style="background:var(--primary-light); color:var(--primary-dark); border:1px solid var(--primary-border); font-weight:500;" <?= (int) $w['is_default'] === 1 ? 'title="Default warehouse"' : '' ?>>
+                                            <span class="st-wh" <?= (int) $w['is_default'] === 1 ? 'title="Default warehouse"' : '' ?>>
                                                 <?= htmlspecialchars($w['name']) ?>
-                                                <?php if ((int) $w['is_default'] === 1): ?><i class="bi bi-star-fill" style="color:#b45309; font-size:10px;"></i><?php endif; ?>
+                                                <?php if ((int) $w['is_default'] === 1): ?><i class="bi bi-star-fill"></i><?php endif; ?>
                                             </span>
                                         <?php endforeach; ?>
                                     </div>
                                 <?php endif; ?>
                             </td>
                             <td>
-                                <span class="ui-dot" style="color:<?= $hInfo['color'] ?>;" title="<?= htmlspecialchars($s['last_error'] ?? '') ?>"><?= $hInfo['label'] ?></span>
+                                <span class="ui-dot" style="color:<?= $sInfo['color'] ?>; white-space:nowrap;" title="<?= htmlspecialchars($s['last_error'] ?? '') ?>"><?= $sInfo['label'] ?></span>
                             </td>
-                            <td style="color:#334155; white-space:nowrap;">
-                                <?= !empty($s['last_successful_sync']) ? date('d M Y', strtotime($s['last_successful_sync'])) : '<span style="color:#94a3b8;">Never</span>' ?>
+                            <td class="st-muted" style="white-space:nowrap;">
+                                <?= !empty($s['last_successful_sync']) ? date('d M Y', strtotime($s['last_successful_sync'])) : 'Never' ?>
                             </td>
+                            <td class="st-muted" style="text-align:center;"><?= (int) ($s['orders_awaiting_sync'] ?? 0) ?></td>
                             <td>
                                 <div style="display:flex; align-items:center; justify-content:flex-end; gap:6px;">
-                                    <a href="/stores/manage?store_id=<?= $s['id'] ?>" class="ui-btn ui-btn-soft ui-btn-sm"><i class="bi bi-gear"></i> Manage</a>
+                                    <a href="/stores/manage?store_id=<?= $s['id'] ?>" class="ui-btn ui-btn-soft ui-btn-sm"><i class="bi bi-gear-wide-connected"></i> Manage</a>
                                     <div class="ui-menu">
                                         <button type="button" class="ui-btn ui-btn-icon" data-menu-toggle aria-label="More actions for <?= htmlspecialchars($s['name']) ?>"><i class="bi bi-three-dots-vertical"></i></button>
                                         <div class="ui-menu-list">
@@ -188,34 +231,63 @@ foreach ($stores as $s) {
                             </td>
                         </tr>
                     <?php endforeach; ?>
-                    <tr id="storeNoMatch" style="display:none;"><td colspan="6" class="ui-empty"><i class="bi bi-search"></i>No stores match your search.</td></tr>
+                    <tr id="storeNoMatch" style="display:none;"><td colspan="7" class="ui-empty"><i class="bi bi-funnel"></i>No stores match this filter.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
     </div>
 
     <div class="pagination-bar">
-        <span id="storeShowing">Showing <?= count($stores) ?> of <?= count($stores) ?> stores</span>
+        <span id="storeShowing">Showing latest <?= count($latestStores) ?> of <?= $totalStores ?> stores</span>
     </div>
 </div>
 
+<style>
+    .st-view-detail { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #1d59e5; text-decoration: none; margin-right: 28px; white-space: nowrap; }
+    .st-view-detail:hover { text-decoration: underline; }
+    .st-alert-close { border: none; background: none; cursor: pointer; color: var(--text-dark); font-size: 13px; padding: 4px; }
+    /* Stores table Figma mein thoda alag hai (chhote, normal-case headings) */
+    table.data-table.st-table th { padding: 12px 24px; font-size: 11px; font-weight: 600; text-transform: none; color: var(--text-body); background: var(--bg-soft); }
+    table.data-table.st-table td { padding: 16px 24px; border-bottom-color: var(--border-soft); color: var(--text-dark); }
+    .st-store { display: flex; align-items: center; gap: 12px; }
+    .st-store-icon { width: 32px; height: 32px; flex-shrink: 0; border-radius: 8px; background: var(--primary-light); color: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 14px; }
+    .st-store-name { display: block; font-size: 13px; font-weight: 600; color: var(--text-dark); }
+    .st-managing { display: inline-block; margin-top: 2px; padding: 2px 6px; border-radius: 4px; background: #ecfdf5; color: #047857; font-size: 10px; font-weight: 600; }
+    .st-platform { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--text-dark); white-space: nowrap; }
+    .st-platform-icon { width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+    .st-wh-list { display: flex; gap: 6px; flex-wrap: wrap; }
+    .st-wh { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 8px; background: var(--primary-light); border: 1px solid var(--primary-border); color: var(--primary-dark); font-size: 12px; font-weight: 500; white-space: nowrap; }
+    .st-wh i { font-size: 10px; color: var(--primary-dark); }
+    .st-muted { color: var(--text-body) !important; }
+</style>
+
 <script>
+// Filter (All / Active / Needs attention) — browser mein, sirf latest 5 rows ke andar (pages nahi)
 (function () {
-    var input = document.getElementById('storeSearch');
-    if (!input) { return; }
     var rows = Array.prototype.slice.call(document.querySelectorAll('.store-row'));
-    input.addEventListener('input', function () {
-        var q = input.value.trim().toLowerCase();
+    var total = <?= (int) $totalStores ?>;
+    var filter = 'all';
+
+    function render() {
         var shown = 0;
         rows.forEach(function (r) {
-            var ok = q === '' || r.dataset.search.indexOf(q) !== -1;
+            var ok = filter === 'all' || r.dataset.status === filter;
             r.style.display = ok ? '' : 'none';
             if (ok) { shown++; }
         });
-        var nm = document.getElementById('storeNoMatch');
-        if (nm) { nm.style.display = shown === 0 ? '' : 'none'; }
-        document.getElementById('storeShowing').textContent = 'Showing ' + shown + ' of ' + rows.length + ' stores';
-    });
+        var noMatch = document.getElementById('storeNoMatch');
+        if (noMatch) { noMatch.style.display = (rows.length > 0 && shown === 0) ? '' : 'none'; }
+        document.getElementById('storeShowing').textContent = 'Showing latest ' + shown + ' of ' + total + ' stores';
+    }
+
+    window.filterStores = function (value) {
+        filter = value;
+        var labels = { all: 'Filter', active: 'Active', attention: 'Needs attention' };
+        document.getElementById('storeFilterLabel').textContent = labels[value] || 'Filter';
+        render();
+    };
+
+    render();
 })();
 </script>
 

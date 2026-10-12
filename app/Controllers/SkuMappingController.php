@@ -26,7 +26,7 @@ class SkuMappingController extends Controller
         $store = $this->getCurrentStore();
         $allMappings = $this->mappingModel->all((int) $store['id']);
 
-        // Search (?q=) + state (?state=) server pe, phir 25-25 ke pages
+        // Search (?q=) + state (?state=) server pe, phir sirf latest 5 records (Paginator::latest)
         $search = trim((string) ($_GET['q'] ?? ''));
         $stateFilter = in_array($_GET['state'] ?? '', ['mapped', 'unmapped', 'conflict', 'disabled'], true) ? $_GET['state'] : '';
         $needle = mb_strtolower($search);
@@ -37,7 +37,7 @@ class SkuMappingController extends Controller
             $text = $m['product_name'] . ' ' . ($m['external_product_id'] ?? '') . ' ' . ($m['external_sku'] ?? '') . ' ' . ($m['barcode'] ?? '');
             return $needle === '' || str_contains(mb_strtolower($text), $needle);
         });
-        $pager = Paginator::make($filtered);
+        $pager = Paginator::latest($filtered, $allMappings);
 
         $this->view('sku-mappings/index', [
             'mappings' => $pager['items'],

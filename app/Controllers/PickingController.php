@@ -8,7 +8,7 @@ require_once __DIR__ . '/../../core/Paginator.php';
  *
  * Pehle: cancelled orders bhi list mein aate the (cancel maal pack ho kar parcel mein chala jata),
  * kisi bhi store ka order id bhej kar status badal sakte the, aur saare orders ek saath page pe aate the.
- * Ab: cancelled bahar, sirf isi store ke orders, aur server pe search + 25-25 ke pages.
+ * Ab: cancelled bahar, sirf isi store ke orders, aur server pe search; table mein sirf latest 5 orders.
  */
 class PickingController extends Controller
 {
@@ -46,7 +46,7 @@ class PickingController extends Controller
             return $needle === '' || str_contains(mb_strtolower($text), $needle);
         }));
 
-        // Export: filter ke mutabiq SAARE orders (sirf is page ke nahi)
+        // Export: filter ke mutabiq SAARE orders (sirf table wale 5 nahi)
         if (($_GET['export'] ?? '') === 'csv') {
             header('Content-Type: text/csv; charset=utf-8');
             header('Content-Disposition: attachment; filename="picking-orders.csv"');
@@ -60,7 +60,15 @@ class PickingController extends Controller
             exit;
         }
 
-        $pager = Paginator::make($filtered);
+        $pager = Paginator::latest($filtered, $allOrders);
+
+        // "Ready to Dispatch": pack ho chuke, abhi shipment mein nahi gaye
+        $readyStmt = $db->prepare(
+            "SELECT COUNT(*) FROM orders
+             WHERE store_id = ? AND shipment_id IS NULL AND picking_status = 'packed' AND status != 'cancelled'"
+        );
+        $readyStmt->execute([(int) $store['id']]);
+        $readyToDispatch = (int) $readyStmt->fetchColumn();
 
         $this->view('picking/index', [
             'orders' => $pager['items'],
@@ -68,6 +76,7 @@ class PickingController extends Controller
             'pager' => $pager,
             'search' => $search,
             'statusFilter' => $statusFilter,
+            'readyToDispatch' => $readyToDispatch,
             'updated' => $_GET['updated'] ?? null,
             'error' => $_GET['error'] ?? null,
         ]);

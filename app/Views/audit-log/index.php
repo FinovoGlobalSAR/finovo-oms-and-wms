@@ -13,6 +13,9 @@ foreach ($logs as $l) {
     $actors[$l['actor']] = true;
 }
 ksort($actionCounts);
+
+// Table mein sirf latest 5 entries (list pehle se naye se purane). Upar ke numbers phir bhi saari list se.
+$latestLogs = array_slice($logs, 0, 5);
 ?>
 
 <div class="ui-head">
@@ -54,21 +57,30 @@ ksort($actionCounts);
     </div>
 </div>
 
-<div class="ui-card">
-    <div class="al-toolbar">
-        <label class="ui-search al-search">
-            <i class="bi bi-search"></i>
-            <input type="text" id="alSearch" placeholder="Search actor, entity or details..." aria-label="Search audit log">
-        </label>
-        <select id="alActionFilter" class="ui-btn" aria-label="Filter by action" style="padding-right:10px;">
-            <option value="">All actions</option>
-            <?php foreach ($actionCounts as $act => $cnt): ?>
-                <option value="<?= htmlspecialchars($act) ?>"><?= htmlspecialchars(ucwords(str_replace('_', ' ', $act))) ?> (<?= $cnt ?>)</option>
-            <?php endforeach; ?>
-        </select>
-        <div style="margin-left:auto; flex-shrink:0; display:flex; align-items:center; gap:6px; font-size:12px; color:#64748b; white-space:nowrap;">
-            <i class="bi bi-shield-lock"></i> Entries can't be edited or deleted
+<div class="ui-card tbl-card">
+    <div class="tbl-head">
+        <h2>All Entries</h2>
+        <div class="tbl-tools">
+            <span class="tbl-note"><i class="bi bi-shield-lock"></i> Entries can't be edited or deleted</span>
+            <div class="ui-menu">
+                <button type="button" class="tbl-btn" data-menu-toggle><i class="bi bi-sliders"></i> Filters</button>
+                <div class="ui-menu-list tbl-filter-panel">
+                    <label for="alActionFilter">Action</label>
+                    <select id="alActionFilter">
+                        <option value="">All actions</option>
+                        <?php foreach ($actionCounts as $act => $cnt): ?>
+                            <option value="<?= htmlspecialchars($act) ?>"><?= htmlspecialchars(ucwords(str_replace('_', ' ', $act))) ?> (<?= $cnt ?>)</option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
         </div>
+    </div>
+    <div class="tbl-search">
+        <label class="ui-search">
+            <i class="bi bi-search"></i>
+            <input type="text" id="alSearch" placeholder="Search actor or details..." aria-label="Search audit log">
+        </label>
     </div>
 
     <div style="overflow-x:auto;">
@@ -77,20 +89,18 @@ ksort($actionCounts);
                 <tr>
                     <th>Actor</th>
                     <th>Action</th>
-                    <th>Entity</th>
                     <th>Details</th>
                     <th>When</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($logs)): ?>
-                    <tr><td colspan="5" class="ui-empty"><i class="bi bi-journal-text"></i>No audit entries yet.</td></tr>
+                    <tr><td colspan="4" class="ui-empty"><i class="bi bi-journal-text"></i>No audit entries yet.</td></tr>
                 <?php else: ?>
-                    <?php foreach ($logs as $l):
+                    <?php foreach ($latestLogs as $l):
                         $color = $actionColors[$l['action']] ?? ['bg' => '#f1f5f9', 'text' => '#334155'];
-                        $entity = $l['entity_type'] . ($l['entity_id'] ? ' #' . $l['entity_id'] : '');
                     ?>
-                        <tr class="al-row" data-action="<?= htmlspecialchars($l['action']) ?>" data-search="<?= htmlspecialchars(strtolower($l['actor'] . ' ' . $entity . ' ' . ($l['details'] ?? ''))) ?>">
+                        <tr class="al-row" data-action="<?= htmlspecialchars($l['action']) ?>" data-search="<?= htmlspecialchars(strtolower($l['actor'] . ' ' . ($l['details'] ?? ''))) ?>">
                             <td>
                                 <div style="display:flex; align-items:center; gap:10px;">
                                     <span style="width:28px; height:28px; border-radius:50%; background:#1e293b; color:#fff; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0;"><?= htmlspecialchars(strtoupper(substr($l['actor'], 0, 1))) ?></span>
@@ -102,7 +112,6 @@ ksort($actionCounts);
                                     <?= ucwords(str_replace('_', ' ', $l['action'])) ?>
                                 </span>
                             </td>
-                            <td style="color:#334155; white-space:nowrap;"><?= htmlspecialchars($entity) ?></td>
                             <td style="max-width:340px; font-size:12.5px; color:#475569;"><?= htmlspecialchars($l['details'] ?? '-') ?></td>
                             <td style="white-space:nowrap; font-size:12.5px; line-height:1.4;">
                                 <?= date('d M Y', strtotime($l['created_at'])) ?><br>
@@ -110,22 +119,17 @@ ksort($actionCounts);
                             </td>
                         </tr>
                     <?php endforeach; ?>
-                    <tr id="alNoMatch" style="display:none;"><td colspan="5" class="ui-empty"><i class="bi bi-search"></i>No entries match your search.</td></tr>
+                    <tr id="alNoMatch" style="display:none;"><td colspan="4" class="ui-empty"><i class="bi bi-search"></i>No entries match your search.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
     </div>
 
     <div class="pagination-bar">
-        <span id="alShowing">Showing <?= count($logs) ?> of <?= count($logs) ?> entries</span>
+        <span id="alShowing">Showing latest <?= count($latestLogs) ?> of <?= count($logs) ?> entries</span>
     </div>
 </div>
 
-<style>
-.al-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; padding: 14px 20px; border-bottom: 1px solid var(--border-color); overflow-x: auto; }
-.al-search { flex: 0 1 380px; min-width: 180px; height: 34px; }
-.al-toolbar .ui-btn { height: 34px; padding: 0 10px; font-size: 12.5px; white-space: nowrap; }
-</style>
 
 <script>
 (function () {
@@ -143,7 +147,7 @@ ksort($actionCounts);
         });
         var nm = document.getElementById('alNoMatch');
         if (nm) { nm.style.display = shown === 0 ? '' : 'none'; }
-        document.getElementById('alShowing').textContent = 'Showing ' + shown + ' of ' + rows.length + ' entries';
+        document.getElementById('alShowing').textContent = 'Showing latest ' + shown + ' of <?= count($logs) ?> entries';
     }
     input.addEventListener('input', apply);
     filter.addEventListener('change', apply);

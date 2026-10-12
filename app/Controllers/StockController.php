@@ -43,17 +43,55 @@ class StockController extends Controller
     {
         $store = $this->getCurrentStore();
         $products = $this->productModel->all((int) $store['id']);
+        $warehouses = $this->warehouseModel->allByStore((int) $store['id']);
 
         $this->view('stock/index', [
             'transfers' => $this->transferModel->all((int) $store['id']),
             'adjustments' => $this->adjustmentModel->all((int) $store['id']),
-            'warehouses' => $this->warehouseModel->allByStore((int) $store['id']),
+            'warehouses' => $warehouses,
             'products' => $products,
             'stockItems' => self::stockItems($products),
+            'stockMap' => self::stockMap($products, $warehouses),
             'error' => $_GET['error'] ?? null,
             'transferred' => $_GET['transferred'] ?? null,
             'adjusted' => $_GET['adjusted'] ?? null,
         ]);
+    }
+
+    /**
+     * "Available Stock" box ke liye: har dropdown value ka har warehouse mein stock
+     *   ['12' => [3 => 250, 4 => 10], '15:40' => [3 => 5]]
+     */
+    private static function stockMap(array $products, array $warehouses): array
+    {
+        $productIds = array_map(fn($p) => (int) $p['id'], $products);
+        $warehouseIds = array_map(fn($w) => (int) $w['id'], $warehouses);
+        if (empty($productIds) || empty($warehouseIds)) {
+            return [];
+        }
+
+        $db = Database::getConnection();
+        $pIn = implode(',', array_fill(0, count($productIds), '?'));
+        $wIn = implode(',', array_fill(0, count($warehouseIds), '?'));
+        $map = [];
+
+        $stmt = $db->prepare("SELECT product_id, warehouse_id, stock_quantity FROM product_warehouse_stock
+                              WHERE product_id IN ({$pIn}) AND warehouse_id IN ({$wIn})");
+        $stmt->execute(array_merge($productIds, $warehouseIds));
+        foreach ($stmt->fetchAll() as $row) {
+            $map[(string) (int) $row['product_id']][(int) $row['warehouse_id']] = (int) $row['stock_quantity'];
+        }
+
+        $stmt = $db->prepare("SELECT pv.product_id, vws.variant_id, vws.warehouse_id, vws.stock_quantity
+                              FROM variant_warehouse_stock vws
+                              INNER JOIN product_variants pv ON pv.id = vws.variant_id
+                              WHERE pv.product_id IN ({$pIn}) AND vws.warehouse_id IN ({$wIn})");
+        $stmt->execute(array_merge($productIds, $warehouseIds));
+        foreach ($stmt->fetchAll() as $row) {
+            $map[(int) $row['product_id'] . ':' . (int) $row['variant_id']][(int) $row['warehouse_id']] = (int) $row['stock_quantity'];
+        }
+
+        return $map;
     }
 
     /**

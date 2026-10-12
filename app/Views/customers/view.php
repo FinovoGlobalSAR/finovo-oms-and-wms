@@ -24,6 +24,11 @@ foreach ($orders as $o) {
     }
 }
 
+// Table mein is customer ke sirf latest 5 orders (baaki sirf database mein). Upar ke numbers phir bhi saare orders se.
+$latestOrders = $orders;
+usort($latestOrders, fn($a, $b) => (int) $b['id'] <=> (int) $a['id']);
+$latestOrders = array_slice($latestOrders, 0, 5);
+
 $editData = [
     'id' => (int) $customer['id'], 'name' => $customer['name'], 'email' => $customer['email'] ?? '', 'phone' => $customer['phone'] ?? '',
     'address' => $customer['address'] ?? '', 'city' => $customer['city'] ?? '', 'country' => $customer['country'] ?? '',
@@ -145,7 +150,7 @@ $contactRows = [
             <div class="ui-card-title-icon"><i class="bi bi-receipt"></i></div>
             <div>
                 <h2>Order History</h2>
-                <div class="sub">Every order placed by <?= htmlspecialchars($customerName) ?>.</div>
+                <div class="sub">Latest 5 orders placed by <?= htmlspecialchars($customerName) ?>.</div>
             </div>
         </div>
         <label class="ui-search" style="width:260px; height:34px;">
@@ -160,17 +165,15 @@ $contactRows = [
                 <tr>
                     <th>Order</th>
                     <th>Product</th>
-                    <th>Qty</th>
-                    <th>Price</th>
                     <th>Status</th>
                     <th>Date</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($orders)): ?>
-                    <tr><td colspan="6" class="ui-empty"><i class="bi bi-receipt"></i>No orders found for this customer.</td></tr>
+                    <tr><td colspan="4" class="ui-empty"><i class="bi bi-receipt"></i>No orders found for this customer.</td></tr>
                 <?php endif; ?>
-                <?php foreach ($orders as $o):
+                <?php foreach ($latestOrders as $o):
                     $statusColor = $statusColors[$o['status']] ?? ['bg' => '#f1f5f9', 'text' => '#334155'];
                 ?>
                     <tr class="cv-row" data-search="<?= htmlspecialchars(strtolower('#' . $o['id'] . ' ' . $o['product_name'] . ' ' . ($o['order_group'] ?? ''))) ?>">
@@ -186,8 +189,6 @@ $contactRows = [
                                 <div style="font-size:11.5px; color:var(--text-muted);"><?= htmlspecialchars($o['variant_label']) ?></div>
                             <?php endif; ?>
                         </td>
-                        <td style="font-weight:600;"><?= (int) $o['quantity'] ?></td>
-                        <td style="white-space:nowrap;"><?= $o['currency_symbol'] ?> <?= number_format((float) $o['price'], 2) ?></td>
                         <td>
                             <span class="ui-tag" style="background:<?= $statusColor['bg'] ?>; color:<?= $statusColor['text'] ?>;">
                                 <?= ucfirst($o['status']) ?>
@@ -196,13 +197,13 @@ $contactRows = [
                         <td style="color:#334155; white-space:nowrap;"><?= date('d M Y', strtotime($o['created_at'])) ?></td>
                     </tr>
                 <?php endforeach; ?>
-                <tr id="cvNoMatch" style="display:none;"><td colspan="6" class="ui-empty"><i class="bi bi-search"></i>No orders match your search.</td></tr>
+                <tr id="cvNoMatch" style="display:none;"><td colspan="4" class="ui-empty"><i class="bi bi-search"></i>No orders match your search.</td></tr>
             </tbody>
         </table>
     </div>
 
     <div class="pagination-bar">
-        <span id="cvShowing">Showing <?= count($orders) ?> of <?= count($orders) ?> order lines</span>
+        <span id="cvShowing">Showing latest <?= count($latestOrders) ?> of <?= count($orders) ?> order lines</span>
     </div>
 </div>
 
@@ -228,7 +229,7 @@ $contactRows = [
             if (ok) { shown++; }
         });
         document.getElementById('cvNoMatch').style.display = (rows.length > 0 && shown === 0) ? '' : 'none';
-        document.getElementById('cvShowing').textContent = 'Showing ' + shown + ' of ' + rows.length + ' order lines';
+        document.getElementById('cvShowing').textContent = 'Showing latest ' + shown + ' of <?= count($orders) ?> order lines';
     });
 })();
 </script>

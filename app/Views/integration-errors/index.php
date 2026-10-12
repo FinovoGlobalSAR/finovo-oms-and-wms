@@ -13,6 +13,9 @@ foreach ($errors as $e) {
 }
 ksort($connectors);
 $openCount = $errCounts['pending'] + $errCounts['dead_letter'];
+
+// Table mein sirf latest 5 errors (list pehle se naye se purane). Upar ke numbers phir bhi saari list se.
+$latestErrors = array_slice($errors, 0, 5);
 ?>
 
 <div class="ui-head">
@@ -68,24 +71,36 @@ $openCount = $errCounts['pending'] + $errCounts['dead_letter'];
     </div>
 </div>
 
-<div class="ui-card">
-    <div class="ie-toolbar">
-        <label class="ui-search ie-search">
+<div class="ui-card tbl-card">
+    <div class="tbl-head">
+        <h2>All Errors</h2>
+        <div class="tbl-tools">
+            <div class="ui-menu">
+                <button type="button" class="tbl-btn" data-menu-toggle><i class="bi bi-sliders"></i> Filters</button>
+                <div class="ui-menu-list tbl-filter-panel">
+                    <label for="ieStatusFilter">Status</label>
+                    <select id="ieStatusFilter">
+                        <option value="">All statuses</option>
+                        <option value="pending">Pending</option>
+                        <option value="dead_letter">Dead Letter</option>
+                        <option value="resolved">Resolved</option>
+                    </select>
+                    <label for="ieConnectorFilter">Connector</label>
+                    <select id="ieConnectorFilter">
+                        <option value="">All connectors</option>
+                        <?php foreach (array_keys($connectors) as $cn): ?>
+                            <option value="<?= htmlspecialchars($cn) ?>"><?= htmlspecialchars(ucfirst($cn)) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="tbl-search">
+        <label class="ui-search">
             <i class="bi bi-search"></i>
-            <input type="text" id="ieSearch" placeholder="Search operation or error message..." aria-label="Search errors">
+            <input type="text" id="ieSearch" placeholder="Search error message..." aria-label="Search errors">
         </label>
-        <select id="ieStatusFilter" class="ui-btn" aria-label="Filter by status" style="padding-right:10px;">
-            <option value="">All statuses</option>
-            <option value="pending">Pending</option>
-            <option value="dead_letter">Dead Letter</option>
-            <option value="resolved">Resolved</option>
-        </select>
-        <select id="ieConnectorFilter" class="ui-btn" aria-label="Filter by connector" style="padding-right:10px;">
-            <option value="">All connectors</option>
-            <?php foreach (array_keys($connectors) as $cn): ?>
-                <option value="<?= htmlspecialchars($cn) ?>"><?= htmlspecialchars(ucfirst($cn)) ?></option>
-            <?php endforeach; ?>
-        </select>
     </div>
 
     <div style="overflow-x:auto;">
@@ -93,39 +108,25 @@ $openCount = $errCounts['pending'] + $errCounts['dead_letter'];
             <thead>
                 <tr>
                     <th>Connector</th>
-                    <th>Operation</th>
-                    <th>HTTP</th>
                     <th>Error</th>
-                    <th>Attempts</th>
                     <th>Status</th>
                     <th style="width:140px; text-align:right;">Action</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($errors)): ?>
-                    <tr><td colspan="7" class="ui-empty"><i class="bi bi-check2-circle"></i>No integration errors — everything is syncing cleanly.</td></tr>
+                    <tr><td colspan="4" class="ui-empty"><i class="bi bi-check2-circle"></i>No integration errors — everything is syncing cleanly.</td></tr>
                 <?php else: ?>
-                    <?php foreach ($errors as $e):
+                    <?php foreach ($latestErrors as $e):
                         $color = $statusColors[$e['status']] ?? ['bg' => '#f1f5f9', 'text' => '#334155'];
-                        $attempts = (int) $e['attempts'];
-                        $attemptPct = min(100, round($attempts / 5 * 100));
-                        $http = $e['http_status'] ?? null;
                         $msg = (string) $e['error_message'];
                     ?>
-                        <tr class="ie-row" data-status="<?= htmlspecialchars($e['status']) ?>" data-connector="<?= htmlspecialchars($e['connector']) ?>" data-search="<?= htmlspecialchars(strtolower($e['operation'] . ' ' . $msg)) ?>">
+                        <tr class="ie-row" data-status="<?= htmlspecialchars($e['status']) ?>" data-connector="<?= htmlspecialchars($e['connector']) ?>" data-search="<?= htmlspecialchars(strtolower($msg)) ?>">
                             <td>
                                 <div style="display:flex; align-items:center; gap:10px;">
                                     <span style="width:28px; height:28px; border-radius:8px; background:var(--primary-light); color:var(--primary); display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="bi bi-plug"></i></span>
                                     <span style="font-weight:600;"><?= htmlspecialchars(ucfirst($e['connector'])) ?></span>
                                 </div>
-                            </td>
-                            <td class="ie-code"><?= htmlspecialchars($e['operation']) ?></td>
-                            <td>
-                                <?php if ($http): ?>
-                                    <span class="ui-tag <?= (int) $http >= 500 ? 'ui-pill-red' : 'ui-pill-amber' ?>"><?= htmlspecialchars((string) $http) ?></span>
-                                <?php else: ?>
-                                    <span style="color:#94a3b8;">—</span>
-                                <?php endif; ?>
                             </td>
                             <td style="max-width:320px;">
                                 <?php if (mb_strlen($msg) > 60): ?>
@@ -136,12 +137,6 @@ $openCount = $errCounts['pending'] + $errCounts['dead_letter'];
                                 <?php else: ?>
                                     <span style="font-size:12.5px; color:#334155;"><?= htmlspecialchars($msg) ?></span>
                                 <?php endif; ?>
-                            </td>
-                            <td style="min-width:90px;">
-                                <div style="font-size:12.5px; font-weight:600; margin-bottom:4px;"><?= $attempts ?> / 5</div>
-                                <div style="height:5px; border-radius:4px; background:#eef2f7; overflow:hidden;">
-                                    <div style="height:100%; width:<?= $attemptPct ?>%; background:<?= $attempts >= 5 ? '#dc2626' : '#f59e0b' ?>;"></div>
-                                </div>
                             </td>
                             <td>
                                 <span class="ui-tag" style="background:<?= $color['bg'] ?>; color:<?= $color['text'] ?>; white-space:nowrap;">
@@ -160,22 +155,18 @@ $openCount = $errCounts['pending'] + $errCounts['dead_letter'];
                             </td>
                         </tr>
                     <?php endforeach; ?>
-                    <tr id="ieNoMatch" style="display:none;"><td colspan="7" class="ui-empty"><i class="bi bi-search"></i>No errors match your filters.</td></tr>
+                    <tr id="ieNoMatch" style="display:none;"><td colspan="4" class="ui-empty"><i class="bi bi-search"></i>No errors match your filters.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
     </div>
 
     <div class="pagination-bar">
-        <span id="ieShowing">Showing <?= count($errors) ?> of <?= count($errors) ?> errors</span>
+        <span id="ieShowing">Showing latest <?= count($latestErrors) ?> of <?= count($errors) ?> errors</span>
     </div>
 </div>
 
 <style>
-.ie-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; padding: 14px 20px; border-bottom: 1px solid var(--border-color); overflow-x: auto; }
-.ie-search { flex: 0 1 380px; min-width: 180px; height: 34px; }
-.ie-toolbar .ui-btn { height: 34px; padding: 0 10px; font-size: 12.5px; white-space: nowrap; }
-td.ie-code { color: #334155; font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; font-size: 12.5px; }
 .ie-details summary { cursor: pointer; font-size: 12.5px; color: #334155; list-style: none; }
 .ie-details summary::-webkit-details-marker { display: none; }
 .ie-details summary::after { content: ' Show more'; color: var(--primary); font-weight: 600; font-size: 11.5px; }
@@ -203,7 +194,7 @@ td.ie-code { color: #334155; font-family: ui-monospace, 'Cascadia Code', Consola
         });
         var nm = document.getElementById('ieNoMatch');
         if (nm) { nm.style.display = shown === 0 ? '' : 'none'; }
-        document.getElementById('ieShowing').textContent = 'Showing ' + shown + ' of ' + rows.length + ' errors';
+        document.getElementById('ieShowing').textContent = 'Showing latest ' + shown + ' of <?= count($errors) ?> errors';
     }
     input.addEventListener('input', apply);
     statusF.addEventListener('change', apply);

@@ -75,7 +75,7 @@ class EmployeeController extends Controller
             return true;
         });
 
-        $pager = Paginator::make($employees);
+        $pager = Paginator::latest($employees, $allEmployees);
 
         // Har row pe: kya yeh user is employee ko Edit / Delete kar sakta hai?
         $currentUserId = (int) ($_SESSION['user']['id'] ?? 0);

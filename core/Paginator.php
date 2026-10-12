@@ -4,6 +4,9 @@ class Paginator
 {
     public const PER_PAGE = 25;
 
+    /** Har table mein kitne latest records dikhen */
+    public const LATEST = 5;
+
     public static function make(array $items, int $perPage = self::PER_PAGE): array
     {
         $items = array_values($items);
@@ -20,6 +23,44 @@ class Paginator
             'perPage' => $perPage,
             'from' => $total > 0 ? $offset + 1 : 0,
             'to' => min($total, $offset + $perPage),
+        ];
+    }
+
+    /**
+     * Table mein sirf LATEST records (team lead: "thoda sa data latest display ke liye, baaki sirf database mein").
+     *
+     * $all      = poori list (bina search / filter ke)
+     * $filtered = search / filter ke baad wali list
+     * Pehle $all se sabse naye $limit records chunte hain, phir unhi mein se jo $filtered mein hain woh dikhte hain.
+     * Is tarah search / filter se bhi purana record table mein nahi aata. Pages (Prev / Next) nahi hain.
+     *
+     * $sortById = true  → "latest" ka matlab sab se bara id (naya record)
+     * $sortById = false → list jis tarteeb mein aayi wohi (jaise customers: jis ka order sab se naya)
+     */
+    public static function latest(array $filtered, array $all, int $limit = self::LATEST, bool $sortById = true): array
+    {
+        $all = array_values($all);
+        $filtered = array_values($filtered);
+        if ($sortById) {
+            $byIdDesc = fn($a, $b) => (int) ($b['id'] ?? 0) <=> (int) ($a['id'] ?? 0);
+            usort($all, $byIdDesc);
+            usort($filtered, $byIdDesc);
+        }
+
+        $latestIds = [];
+        foreach (array_slice($all, 0, $limit) as $row) {
+            $latestIds[(int) ($row['id'] ?? 0)] = true;
+        }
+        $items = array_values(array_filter($filtered, fn($row) => isset($latestIds[(int) ($row['id'] ?? 0)])));
+
+        return [
+            'items' => $items,
+            'page' => 1,
+            'pages' => 1,
+            'total' => count($all),   // database mein kul kitne (sirf ginti dikhti hai, records nahi)
+            'perPage' => $limit,
+            'from' => $items ? 1 : 0,
+            'to' => count($items),
         ];
     }
 

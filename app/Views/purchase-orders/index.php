@@ -1,5 +1,5 @@
 <?php
-// Upar ke numbers POORI list se ($allPurchaseOrders); table mein sirf is page ki rows ($purchaseOrders)
+// Upar ke numbers POORI list se ($allPurchaseOrders); table mein sirf latest 5 rows ($purchaseOrders)
 $allPurchaseOrders = $allPurchaseOrders ?? $purchaseOrders;
 $search = $search ?? '';
 $statusFilter = $statusFilter ?? '';
@@ -21,6 +21,9 @@ foreach ($allPurchaseOrders as $po) {
         <div class="breadcrumb">Finovo <i class="bi bi-chevron-right"></i> <span class="current">Purchase Orders</span></div>
         <h1>Purchase Orders <span class="count-badge"><?= count($allPurchaseOrders) ?></span></h1>
         <p>Order stock from suppliers and receive it into a warehouse.</p>
+    </div>
+    <div class="ui-head-right">
+        <button type="button" class="ui-btn ui-btn-primary" onclick="openModal('createPoModal')" <?= empty($suppliers) ? 'disabled title="Add a supplier first"' : '' ?>><i class="bi bi-plus-lg"></i> New Purchase Order</button>
     </div>
 </div>
 
@@ -70,28 +73,36 @@ foreach ($allPurchaseOrders as $po) {
     </div>
 </div>
 
-<div class="ui-card" style="overflow: visible;">
+<div class="ui-card tbl-card">
     <!-- Search / status filter: server pe chalte hain, har page ka result sahi -->
-    <form method="GET" action="/purchase-orders" class="po-toolbar">
-        <label class="ui-search po-search">
-            <i class="bi bi-search"></i>
-            <input type="text" name="q" value="<?= htmlspecialchars($search) ?>" placeholder="Search supplier, warehouse or product..." aria-label="Search purchase orders">
-        </label>
-        <select name="status" onchange="this.form.submit()" class="ui-btn" aria-label="Filter by status" style="padding-right:10px;">
-            <option value="">All statuses</option>
-            <?php foreach ($statuses as $st): ?>
-                <option value="<?= $st ?>" <?= $statusFilter === $st ? 'selected' : '' ?>><?= ucfirst($st) ?></option>
-            <?php endforeach; ?>
-        </select>
-        <button type="submit" class="ui-btn"><i class="bi bi-search"></i> Search</button>
-        <?php if ($search !== '' || $statusFilter !== ''): ?>
-            <a href="/purchase-orders" class="ui-btn"><i class="bi bi-x"></i> Clear</a>
-        <?php endif; ?>
-        <div class="po-toolbar-actions">
-            <a href="/suppliers" class="ui-btn"><i class="bi bi-truck"></i> Suppliers</a>
-            <button type="button" class="ui-btn ui-btn-primary" onclick="openModal('createPoModal')" <?= empty($suppliers) ? 'disabled title="Add a supplier first"' : '' ?>>
-                <i class="bi bi-plus-lg"></i> New Purchase Order
-            </button>
+    <form method="GET" action="/purchase-orders">
+        <div class="tbl-head">
+            <h2>All Purchase Orders</h2>
+            <div class="tbl-tools">
+                <a href="/suppliers" class="tbl-btn"><i class="bi bi-truck"></i> Suppliers</a>
+                <div class="ui-menu">
+                    <button type="button" class="tbl-btn" data-menu-toggle><i class="bi bi-sliders"></i> Filters<?php if ($statusFilter !== ''): ?> <span class="tbl-count">1</span><?php endif; ?></button>
+                    <div class="ui-menu-list tbl-filter-panel">
+                        <label for="poStatus">Status</label>
+                        <select name="status" id="poStatus" onchange="this.form.submit()">
+                            <option value="">All statuses</option>
+                            <?php foreach ($statuses as $st): ?>
+                                <option value="<?= $st ?>" <?= $statusFilter === $st ? 'selected' : '' ?>><?= ucfirst($st) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="tbl-filter-actions">
+                            <a href="/purchase-orders" class="tbl-btn">Clear</a>
+                            <button type="submit" class="tbl-btn tbl-btn-soft">Apply</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="tbl-search">
+            <label class="ui-search">
+                <i class="bi bi-search"></i>
+                <input type="text" name="q" value="<?= htmlspecialchars($search) ?>" placeholder="Search supplier, warehouse or product..." aria-label="Search purchase orders">
+            </label>
         </div>
     </form>
 
@@ -101,34 +112,24 @@ foreach ($allPurchaseOrders as $po) {
                 <tr>
                     <th>PO</th>
                     <th>Supplier</th>
-                    <th>Warehouse</th>
-                    <th>Items</th>
                     <th>Status</th>
                     <th style="width:210px;">Update Status</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($purchaseOrders)): ?>
-                    <tr><td colspan="6" class="ui-empty"><i class="bi bi-clipboard"></i>No purchase orders yet. Click "New Purchase Order" to order stock from a supplier.</td></tr>
+                    <tr><td colspan="4" class="ui-empty"><i class="bi bi-clipboard"></i>No purchase orders yet. Click "New Purchase Order" to order stock from a supplier.</td></tr>
                 <?php else: ?>
                     <?php foreach ($purchaseOrders as $po):
                         $statusColor = $statusColors[$po['status']] ?? ['bg' => '#f1f5f9', 'text' => '#334155'];
-                        $itemText = implode(', ', array_map(fn($i) => $i['product_name'] . ' x' . $i['quantity'], $po['items']));
-                        $totalUnits = array_sum(array_map(fn($i) => (int) $i['quantity'], $po['items']));
                     ?>
-                        <tr class="po-row" data-status="<?= htmlspecialchars($po['status']) ?>" data-search="<?= htmlspecialchars(strtolower('#' . $po['id'] . ' ' . $po['supplier_name'] . ' ' . $po['warehouse_name'] . ' ' . $itemText)) ?>">
+                        <tr class="po-row">
                             <td style="font-weight:700;">#<?= (int) $po['id'] ?></td>
                             <td>
                                 <div style="display:flex; align-items:center; gap:10px;">
                                     <span style="width:28px; height:28px; border-radius:8px; background:var(--primary-light); color:var(--primary); display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="bi bi-truck"></i></span>
                                     <span style="font-weight:600;"><?= htmlspecialchars($po['supplier_name']) ?></span>
                                 </div>
-                            </td>
-                            <td style="color:#334155;"><i class="bi bi-house-door" style="color:#94a3b8;"></i> <?= htmlspecialchars($po['warehouse_name']) ?></td>
-                            <td>
-                                <span class="ui-tag ui-pill-gray" title="<?= htmlspecialchars($itemText) ?>">
-                                    <i class="bi bi-box"></i> <?= count($po['items']) ?> product(s) · <?= $totalUnits ?> units
-                                </span>
                             </td>
                             <td>
                                 <span class="ui-tag" style="background:<?= $statusColor['bg'] ?>; color:<?= $statusColor['text'] ?>;">
@@ -210,11 +211,6 @@ foreach ($allPurchaseOrders as $po) {
 </div>
 
 <style>
-.po-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; padding: 14px 20px; border-bottom: 1px solid var(--border-color); overflow-x: auto; }
-.po-search { flex: 1 1 auto; min-width: 180px; height: 34px; }
-.po-toolbar-actions { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; flex-shrink: 0; margin-left: auto; }
-.po-toolbar .ui-btn { height: 34px; padding: 0 10px; font-size: 12.5px; white-space: nowrap; }
-.po-toolbar .ui-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .po-modal-select { width: 100%; border: 1px solid var(--border-color); border-radius: 9px; padding: 9px 12px; font-size: 13.5px; font-family: inherit; background: #f8fafc; }
 .po-item-row { display: grid; grid-template-columns: 2fr 80px 100px 36px; gap: 8px; padding: 8px; border: 1px solid var(--border-color); border-radius: 10px; background: #f8fafc; }
 .po-item-row select, .po-item-row input { height: 36px; border: 1px solid var(--border-color); border-radius: 8px; padding: 0 8px; font-size: 13px; font-family: inherit; background: #fff; min-width: 0; }

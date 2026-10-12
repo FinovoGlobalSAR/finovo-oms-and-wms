@@ -16,7 +16,7 @@ class ShipmentController extends Controller
         $this->shipmentModel = new Shipment();
     }
 
-        /** Search (?q=) + status (?status=) — $text(row) = row ka search wala text */
+    /** Search (?q=) + status (?status=) — $text(row) = row ka search wala text */
     private static function filterList(array $rows, callable $text): array
     {
         $q = mb_strtolower(trim((string) ($_GET['q'] ?? '')));
@@ -35,11 +35,11 @@ class ShipmentController extends Controller
 
         $allShipments = $this->shipmentModel->all((int) $store['id']);
 
-        // Search + status filter server pe, phir 25-25 ke pages
+        // Search + status filter server pe, phir sirf latest 5 records (Paginator::latest)
         $filtered = self::filterList($allShipments, fn($s) => ($s['customer_name'] ?? '') . ' ' . $s['courier_name'] . ' ' . ($s['tracking_number'] ?? '') . ' #' . $s['id']);
-        $pager = Paginator::make($filtered);
+        $pager = Paginator::latest($filtered, $allShipments);
 
-        // Orders sirf is page ki shipments ke (pehle har shipment ke liye query chalti thi)
+        // Orders sirf table wali (latest 5) shipments ke (pehle har shipment ke liye query chalti thi)
         $shipments = $pager['items'];
         foreach ($shipments as &$s) {
             $s['orders'] = $this->shipmentModel->ordersForShipment((int) $s['id']);
@@ -61,7 +61,7 @@ class ShipmentController extends Controller
         ]);
     }
 
-        public function create(): void
+    public function create(): void
     {
         $store = $this->getCurrentStore();
 

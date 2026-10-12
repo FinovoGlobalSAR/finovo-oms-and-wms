@@ -14,7 +14,7 @@ require_once __DIR__ . '/../Models/Store.php';
  * Sidebar mein Employees ki tarah hamesha dikhta hai (store "Manage" karna zaroori nahi):
  * saare stores ke customers ek jagah, "Store" filter ke saath.
  * Customer ki details "Edit" se badli ja sakti hain; jis customer ka koi order na ho use Admin/Manager delete kar sakta hai.
- * List pages mein aati hai (25 per page); search / store / type filter server pe chalte hain.
+ * Table mein sirf latest 5 customers aate hain (baaki sirf database mein); search / store / type filter server pe chalte hain.
  */
 class CustomerController extends Controller
 {
@@ -91,10 +91,13 @@ class CustomerController extends Controller
             return true;
         });
 
-        $pager = Paginator::make($customers);
+        // Table mein sirf latest 5 customers (jis ka order sab se naya). "Latest" chunne ke liye
+        // chuna hua store gina jata hai, search / type filter nahi — warna doosre store ke customers 5 ki jagah le lete.
+        $storeCustomers = array_filter($allCustomers, fn($c) => $selectedStoreId === 0 || (int) $c['store_id'] === $selectedStoreId);
+        $pager = Paginator::latest($customers, $storeCustomers, Paginator::LATEST, false);
         $customers = $pager['items'];
 
-        // Total kharcha sirf is page ke customers ka (currency ke hisaab se alag — $ aur Rs. jorte nahi)
+        // Total kharcha sirf in 5 customers ka (currency ke hisaab se alag — $ aur Rs. jorte nahi)
         $ids = array_map(fn($c) => (int) $c['id'], $customers);
         $totals = [];
         if (!empty($ids)) {

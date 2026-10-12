@@ -94,7 +94,7 @@ foreach ($allProducts as $p) {
     </div>
 </div>
 
-<div class="ui-card">
+<div class="ui-card" style="overflow:visible;">
     <div class="ui-card-head">
         <div class="ui-card-title">
             <div class="ui-card-title-icon"><i class="bi bi-box-seam"></i></div>
@@ -105,38 +105,41 @@ foreach ($allProducts as $p) {
         </div>
     </div>
     <!-- Search / stock level filter server pe (har page ka result sahi) -->
-    <form method="GET" action="/warehouses/view" class="ui-card-search" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+    <form method="GET" action="/warehouses/view" class="tbl-search" style="padding-top:0;">
         <input type="hidden" name="id" value="<?= (int) $warehouse['id'] ?>">
-        <label class="ui-search" style="flex:1 1 240px;">
+        <label class="ui-search">
             <i class="bi bi-search"></i>
             <input type="text" name="q" value="<?= htmlspecialchars($search) ?>" placeholder="Search by product name or SKU..." aria-label="Search products">
         </label>
-        <select name="level" class="ui-btn" aria-label="Filter by stock level" style="padding-right:10px;" onchange="this.form.submit()">
-            <?php foreach (['' => 'All stock levels', 'ok' => 'In stock', 'low' => 'Low stock', 'out' => 'Out of stock', 'variants' => 'Has variants'] as $value => $label): ?>
-                <option value="<?= $value ?>" <?= $levelFilter === $value ? 'selected' : '' ?>><?= $label ?></option>
-            <?php endforeach; ?>
-        </select>
-        <button type="submit" class="ui-btn">Search</button>
-        <?php if ($search !== '' || $levelFilter !== ''): ?>
-            <a href="/warehouses/view?id=<?= (int) $warehouse['id'] ?>" class="ui-btn ui-btn-soft">Clear</a>
-        <?php endif; ?>
+        <div class="ui-menu">
+            <button type="button" class="tbl-btn" data-menu-toggle><i class="bi bi-sliders"></i> Filters<?php if ($levelFilter !== ''): ?> <span class="tbl-count">1</span><?php endif; ?></button>
+            <div class="ui-menu-list tbl-filter-panel">
+                <label for="whLevel">Stock level</label>
+                <select name="level" id="whLevel" onchange="this.form.submit()">
+                    <?php foreach (['' => 'All stock levels', 'ok' => 'In stock', 'low' => 'Low stock', 'out' => 'Out of stock', 'variants' => 'Has variants'] as $value => $label): ?>
+                        <option value="<?= $value ?>" <?= $levelFilter === $value ? 'selected' : '' ?>><?= $label ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <div class="tbl-filter-actions">
+                    <a href="/warehouses/view?id=<?= (int) $warehouse['id'] ?>" class="tbl-btn">Clear</a>
+                    <button type="submit" class="tbl-btn tbl-btn-soft">Apply</button>
+                </div>
+            </div>
+        </div>
     </form>
 
     <div style="overflow-x:auto;">
         <table class="data-table">
             <thead>
                 <tr>
-                    <th>Image</th>
                     <th>Product</th>
-                    <th>SKU</th>
-                    <th>Price</th>
                     <th>Stock Here</th>
                     <th>Receive More</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($products)): ?>
-                    <tr><td colspan="6" class="ui-empty">
+                    <tr><td colspan="3" class="ui-empty">
                         <?php if ($search !== '' || $levelFilter !== ''): ?>
                             <i class="bi bi-search"></i>No products match your search.
                         <?php else: ?>
@@ -157,19 +160,19 @@ foreach ($allProducts as $p) {
                             $level = 'ok';
                         }
                         $levelPill = ['out' => 'ui-pill-red', 'low' => 'ui-pill-amber', 'ok' => 'ui-pill-green', 'variants' => 'ui-pill-blue'][$level];
-                        $currencySymbol = !empty($p['external_product_id']) ? '$' : 'Rs.';
                     ?>
-                        <tr class="whv-row" data-level="<?= $level ?>" data-search="<?= htmlspecialchars(strtolower($p['name'] . ' ' . ($p['sku'] ?? ''))) ?>">
+                        <tr class="whv-row">
                             <td>
-                                <?php if (!empty($p['image_url'])): ?>
-                                    <img src="<?= htmlspecialchars($p['image_url']) ?>" alt="" style="width:38px; height:38px; border-radius:8px; object-fit:cover; border:1px solid var(--border-color);">
-                                <?php else: ?>
-                                    <span style="width:38px; height:38px; border-radius:8px; background:#f1f5f9; color:#94a3b8; display:flex; align-items:center; justify-content:center;"><i class="bi bi-image"></i></span>
-                                <?php endif; ?>
+                                <!-- Image ab alag column nahi, naam ke saath chhoti si -->
+                                <div style="display:flex; align-items:center; gap:10px;">
+                                    <?php if (!empty($p['image_url'])): ?>
+                                        <img src="<?= htmlspecialchars($p['image_url']) ?>" alt="" style="width:36px; height:36px; border-radius:8px; object-fit:cover; border:1px solid var(--border-color); flex-shrink:0;">
+                                    <?php else: ?>
+                                        <span style="width:36px; height:36px; border-radius:8px; background:#f1f5f9; color:#94a3b8; display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="bi bi-image"></i></span>
+                                    <?php endif; ?>
+                                    <span style="font-weight:600;"><?= htmlspecialchars($p['name']) ?></span>
+                                </div>
                             </td>
-                            <td style="font-weight:600;"><?= htmlspecialchars($p['name']) ?></td>
-                            <td style="color:#475569;"><?= htmlspecialchars($p['sku'] ?? '-') ?></td>
-                            <td style="white-space:nowrap;"><?= $currencySymbol ?> <?= number_format((float) $p['price'], 2) ?></td>
                             <td>
                                 <?php if ($hasVariants): ?>
                                     <span class="ui-tag <?= $levelPill ?>"><i class="bi bi-diagram-3"></i> Multiple variants</span>

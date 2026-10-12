@@ -98,7 +98,7 @@ class WarehouseController extends Controller
         }
         unset($p);
 
-        // Search (?q=) + stock level (?level=) server pe, phir 25-25 ke pages
+        // Search (?q=) + stock level (?level=) server pe, phir sirf latest 5 records (Paginator::latest)
         $search = trim((string) ($_GET['q'] ?? ''));
         $levelFilter = in_array($_GET['level'] ?? '', ['ok', 'low', 'out', 'variants'], true) ? $_GET['level'] : '';
         $needle = mb_strtolower($search);
@@ -113,7 +113,7 @@ class WarehouseController extends Controller
             $level = $p['has_variants'] ? 'variants' : ($stock <= 0 ? 'out' : ($stock <= 5 ? 'low' : 'ok'));
             return $level === $levelFilter;
         });
-        $pager = Paginator::make($filtered);
+        $pager = Paginator::latest($filtered, $allProducts);
 
         $this->view('warehouses/view', [
             'warehouse' => $warehouse,

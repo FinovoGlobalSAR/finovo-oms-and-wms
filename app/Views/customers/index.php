@@ -8,18 +8,10 @@ $avatarColors = [
     ['bg' => '#cffafe', 'text' => '#0e7490'],
 ];
 
-// Customer kahan se aaya (kis platform ke order se)
-$sourceLabels = [
-    'shopify' => 'Shopify', 'woocommerce' => 'WooCommerce', 'bigcommerce' => 'BigCommerce',
-    'prestashop' => 'PrestaShop', 'opencart' => 'OpenCart', 'oscommerce' => 'osCommerce',
-    'wix' => 'Wix', 'ebay' => 'eBay', 'magento' => 'Magento', 'custom_bridge' => 'Custom Store',
-    'manual' => 'Manual', 'api_push' => 'API', 'csv' => 'CSV',
-];
-
 $stores = $stores ?? [];
 $selectedStoreId = (int) ($selectedStoreId ?? 0);
-$showStoreColumn = count($stores) > 1;    // Ek hi store ho to "Store" column ki zaroorat nahi
-$colCount = $showStoreColumn ? 9 : 8;
+$showStoreColumn = count($stores) > 1;    // Ek hi store ho to "Store" filter ki zaroorat nahi
+$colCount = 4;                            // Customer, Orders, Total Spent, Actions
 
 // ---------- Upar ke numbers: controller POORI list se deta hai (sirf is page se nahi) ----------
 $stats = $stats ?? ['total' => count($customers), 'orders' => 0, 'repeat' => 0, 'contact' => 0];
@@ -73,30 +65,45 @@ $isFiltered = $search !== '' || $type !== '' || $selectedStoreId > 0;
     </div>
 </div>
 
-<div class="ui-card">
+<div class="ui-card tbl-card">
     <!-- Search / filters: GET form — server pe chalte hain, har page ka result sahi -->
-    <form method="GET" action="/customers" class="cust-toolbar">
-        <label class="ui-search cust-search">
-            <i class="bi bi-search"></i>
-            <input type="text" name="q" value="<?= htmlspecialchars($search) ?>" placeholder="Search by name, email, phone or city..." aria-label="Search customers">
-        </label>
-        <?php if ($showStoreColumn): ?>
-            <select name="store" class="ui-btn" aria-label="Filter by store" style="padding-right:10px;" onchange="this.form.submit()">
-                <option value="0">All stores</option>
-                <?php foreach ($stores as $storeId => $storeName): ?>
-                    <option value="<?= (int) $storeId ?>" <?= $selectedStoreId === (int) $storeId ? 'selected' : '' ?>><?= htmlspecialchars($storeName) ?></option>
-                <?php endforeach; ?>
-            </select>
-        <?php endif; ?>
-        <select name="type" class="ui-btn" aria-label="Filter customers" style="padding-right:10px;" onchange="this.form.submit()">
-            <option value="" <?= $type === '' ? 'selected' : '' ?>>All customers</option>
-            <option value="repeat" <?= $type === 'repeat' ? 'selected' : '' ?>>Repeat customers</option>
-            <option value="once" <?= $type === 'once' ? 'selected' : '' ?>>One-time customers</option>
-        </select>
-        <button type="submit" class="ui-btn ui-btn-primary"><i class="bi bi-search"></i> Search</button>
-        <?php if ($isFiltered): ?>
-            <a href="/customers?store=0" class="ui-btn"><i class="bi bi-x"></i> Clear</a>
-        <?php endif; ?>
+    <form method="GET" action="/customers">
+        <div class="tbl-head">
+            <h2>All Customers</h2>
+            <div class="tbl-tools">
+                <div class="ui-menu">
+                    <?php $nf = ($type !== '') + ($showStoreColumn && $selectedStoreId > 0); ?>
+                    <button type="button" class="tbl-btn" data-menu-toggle><i class="bi bi-sliders"></i> Filters<?php if ($nf): ?> <span class="tbl-count"><?= $nf ?></span><?php endif; ?></button>
+                    <div class="ui-menu-list tbl-filter-panel">
+                        <?php if ($showStoreColumn): ?>
+                            <label for="custStore">Store</label>
+                            <select name="store" id="custStore" onchange="this.form.submit()">
+                                <option value="0">All stores</option>
+                                <?php foreach ($stores as $storeId => $storeName): ?>
+                                    <option value="<?= (int) $storeId ?>" <?= $selectedStoreId === (int) $storeId ? 'selected' : '' ?>><?= htmlspecialchars($storeName) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        <?php endif; ?>
+                        <label for="custType">Customers</label>
+                        <select name="type" id="custType" onchange="this.form.submit()">
+                            <option value="" <?= $type === '' ? 'selected' : '' ?>>All customers</option>
+                            <option value="repeat" <?= $type === 'repeat' ? 'selected' : '' ?>>Repeat customers</option>
+                            <option value="once" <?= $type === 'once' ? 'selected' : '' ?>>One-time customers</option>
+                        </select>
+                        <div class="tbl-filter-actions">
+                            <a href="/customers?store=0" class="tbl-btn">Clear</a>
+                            <button type="submit" class="tbl-btn tbl-btn-soft">Apply</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="tbl-search">
+            <label class="ui-search">
+                <i class="bi bi-search"></i>
+                <input type="text" name="q" value="<?= htmlspecialchars($search) ?>" placeholder="Search by name, email, phone or city..." aria-label="Search customers">
+            </label>
+        </div>
     </form>
 
     <div style="overflow-x:auto;">
@@ -104,13 +111,8 @@ $isFiltered = $search !== '' || $type !== '' || $selectedStoreId > 0;
             <thead>
                 <tr>
                     <th>Customer</th>
-                    <?php if ($showStoreColumn): ?><th>Store</th><?php endif; ?>
-                    <th>Phone</th>
-                    <th>Location</th>
-                    <th>Source</th>
                     <th>Orders</th>
                     <th>Total Spent</th>
-                    <th>Last Order</th>
                     <th style="text-align:right;">Actions</th>
                 </tr>
             </thead>
@@ -126,7 +128,6 @@ $isFiltered = $search !== '' || $type !== '' || $selectedStoreId > 0;
                         $avColor = $avatarColors[$i % count($avatarColors)]; $i++;
                         $orderCount = (int) $c['order_count'];
                         $isRepeat = $orderCount > 1;
-                        $location = implode(', ', array_filter([$c['city'] ?? '', $c['country'] ?? '']));
                         $editData = [
                             'id' => (int) $c['id'], 'name' => $c['name'], 'email' => $c['email'] ?? '', 'phone' => $c['phone'] ?? '',
                             'address' => $c['address'] ?? '', 'city' => $c['city'] ?? '', 'country' => $c['country'] ?? '',
@@ -145,16 +146,6 @@ $isFiltered = $search !== '' || $type !== '' || $selectedStoreId > 0;
                                     </span>
                                 </a>
                             </td>
-                            <?php if ($showStoreColumn): ?>
-                                <td style="color:#334155; white-space:nowrap;"><i class="bi bi-shop" style="color:var(--text-muted);"></i> <?= htmlspecialchars($c['store_name'] ?? '') ?></td>
-                            <?php endif; ?>
-                            <td style="color:#334155; white-space:nowrap;"><?= htmlspecialchars($c['phone'] ?: '-') ?></td>
-                            <td style="color:#334155;"><?= htmlspecialchars($location !== '' ? $location : '-') ?></td>
-                            <td>
-                                <?php if (!empty($c['source'])): ?>
-                                    <span class="ui-pill ui-pill-blue"><?= htmlspecialchars($sourceLabels[$c['source']] ?? ucfirst($c['source'])) ?></span>
-                                <?php else: ?>-<?php endif; ?>
-                            </td>
                             <td style="font-weight:600;"><?= $orderCount ?></td>
                             <td style="white-space:nowrap;">
                                 <?php if (empty($c['totals'])): ?>-<?php endif; ?>
@@ -162,7 +153,6 @@ $isFiltered = $search !== '' || $type !== '' || $selectedStoreId > 0;
                                     <div style="font-weight:600;"><?= $currency ?> <?= number_format($total, 2) ?></div>
                                 <?php endforeach; ?>
                             </td>
-                            <td style="color:#334155; white-space:nowrap;"><?= !empty($c['last_order']) ? date('d M Y', strtotime($c['last_order'])) : '-' ?></td>
                             <td>
                                 <div style="display:flex; justify-content:flex-end; gap:6px;">
                                     <a href="/customers/view?id=<?= (int) $c['id'] ?>" class="ui-btn ui-btn-soft ui-btn-sm"><i class="bi bi-eye"></i> View</a>
@@ -186,9 +176,3 @@ $isFiltered = $search !== '' || $type !== '' || $selectedStoreId > 0;
 </div>
 
 <?php $editBack = 'list'; require __DIR__ . '/_edit_modal.php'; ?>
-
-<style>
-.cust-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; padding: 14px 20px; border-bottom: 1px solid var(--border-color); overflow-x: auto; }
-.cust-search { flex: 0 1 380px; min-width: 180px; height: 34px; }
-.cust-toolbar .ui-btn { height: 34px; padding: 0 10px; font-size: 12.5px; white-space: nowrap; }
-</style>

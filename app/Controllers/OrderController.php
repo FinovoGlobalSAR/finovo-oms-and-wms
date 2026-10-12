@@ -88,10 +88,12 @@ class OrderController extends Controller
             'csv'         => 'csv_import',
         ];
 
+        // Is store ke saare orders — table mein inhi mein se sirf latest 5 dikhte hain
+        $allOrders = $this->orderModel->allByStore((int) $store['id']);
         if ($platform !== 'all' && isset($sourceMap[$platform])) {
             $orders = $this->orderModel->filterBySourceAndStore($sourceMap[$platform], (int) $store['id']);
         } else {
-            $orders = $this->orderModel->allByStore((int) $store['id']);
+            $orders = $allOrders;
         }
 
         $search = trim($_GET['search'] ?? '');
@@ -121,8 +123,8 @@ class OrderController extends Controller
             if (empty($shipmentMap[(int) $o['id']])) { $stats['notDispatched']++; }
         }
 
-        // Sirf is page ki 25 rows (pehle saari rows render hoti thin, har row pe ek alag query)
-        $pager = Paginator::make($orders);
+        // Table mein sirf latest 5 orders (baaki sirf database mein)
+        $pager = Paginator::latest($orders, $allOrders);
         $orders = $pager['items'];
 
         $externalSources = externalOrderSources();
@@ -360,7 +362,8 @@ class OrderController extends Controller
 
         $this->redirect('/orders');
     }
-        // apiCreate() ab ApiOrderController mein hai (POST /api/orders) — yeh controller login maangta hai,
+
+    // apiCreate() ab ApiOrderController mein hai (POST /api/orders) — yeh controller login maangta hai,
     // is liye bahar ke systems ki API request login page pe chali jati thi.
 
     // ---------- Edit / Delete (CRUD) ----------
@@ -705,7 +708,8 @@ class OrderController extends Controller
             echo json_encode(['ok' => false, 'message' => "Connection failed (HTTP {$httpCode}). Please check your credentials."]);
         }
     }
-        // ---------- Shopify: Orders Pull ----------
+
+    // ---------- Shopify: Orders Pull ----------
 
     public function syncShopify(): void
     {
@@ -1021,7 +1025,8 @@ class OrderController extends Controller
         $this->storeModel->markHealthy((int) $store['id']);
         $this->redirect('/orders?synced=' . $importedCount);
     }
-        // ---------- OpenCart: Orders Pull (direct DB read) ----------
+
+    // ---------- OpenCart: Orders Pull (direct DB read) ----------
 
     public function syncOpenCart(): void
     {

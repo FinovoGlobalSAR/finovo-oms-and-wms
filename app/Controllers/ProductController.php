@@ -87,10 +87,10 @@ class ProductController extends Controller
             return true;
         });
 
-        $pager = Paginator::make($products);
+        $pager = Paginator::latest($products, $allProducts);
         $products = $pager['items'];
 
-        // Variants sirf is page ke products ke (pehle har product ke liye query chalti thi)
+        // Variants sirf table wale (latest 5) products ke (pehle har product ke liye query chalti thi)
         $productIds = array_map(fn($p) => (int) $p['id'], $products);
         $variantCounts = $this->productModel->variantCountsForProducts($productIds);
 
@@ -180,7 +180,7 @@ class ProductController extends Controller
         $this->redirect('/products?imported=' . $importedCount);
     }
 
-        public function updateStock(): void
+    public function updateStock(): void
     {
         $id = (int) ($_POST['id'] ?? 0);
         $stock = max(0, (int) ($_POST['stock_quantity'] ?? 0));
@@ -287,6 +287,7 @@ class ProductController extends Controller
 
         $this->redirect('/products?deleted=1');
     }
+
     public function exportCsv(): void
     {
         $store = $this->getCurrentStore();

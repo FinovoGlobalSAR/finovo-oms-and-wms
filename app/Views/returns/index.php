@@ -1,5 +1,5 @@
 <?php
-// Upar ke numbers POORI list se ($allReturns); table mein sirf is page ki rows ($returns)
+// Upar ke numbers POORI list se ($allReturns); table mein sirf latest 5 rows ($returns)
 $allReturns = $allReturns ?? $returns;
 $search = $search ?? '';
 $statusFilter = $statusFilter ?? '';
@@ -22,6 +22,9 @@ foreach ($allReturns as $r) {
         <div class="breadcrumb">Finovo <i class="bi bi-chevron-right"></i> <span class="current">Returns</span></div>
         <h1>Returns <span class="count-badge"><?= count($allReturns) ?></span></h1>
         <p>Track returned items and refunds. Completing a resellable return restores warehouse stock.</p>
+    </div>
+    <div class="ui-head-right">
+        <button type="button" class="ui-btn ui-btn-primary" onclick="openModal('createReturnModal')"><i class="bi bi-arrow-return-left"></i> New Return</button>
     </div>
 </div>
 
@@ -62,25 +65,35 @@ foreach ($allReturns as $r) {
     </div>
 </div>
 
-<div class="ui-card" style="overflow: visible;">
+<div class="ui-card tbl-card">
     <!-- Search / status filter: server pe chalte hain, har page ka result sahi -->
-    <form method="GET" action="/returns" class="ret-toolbar">
-        <label class="ui-search ret-search">
-            <i class="bi bi-search"></i>
-            <input type="text" name="q" value="<?= htmlspecialchars($search) ?>" placeholder="Search order, customer or product..." aria-label="Search returns">
-        </label>
-        <select name="status" onchange="this.form.submit()" class="ui-btn" aria-label="Filter by status" style="padding-right:10px;">
-            <option value="">All statuses</option>
-            <?php foreach ($statuses as $st): ?>
-                <option value="<?= $st ?>" <?= $statusFilter === $st ? 'selected' : '' ?>><?= ucfirst($st) ?></option>
-            <?php endforeach; ?>
-        </select>
-        <button type="submit" class="ui-btn"><i class="bi bi-search"></i> Search</button>
-        <?php if ($search !== '' || $statusFilter !== ''): ?>
-            <a href="/returns" class="ui-btn"><i class="bi bi-x"></i> Clear</a>
-        <?php endif; ?>
-        <div class="ret-toolbar-actions">
-            <button type="button" class="ui-btn ui-btn-primary" onclick="openModal('createReturnModal')"><i class="bi bi-arrow-return-left"></i> New Return</button>
+    <form method="GET" action="/returns">
+        <div class="tbl-head">
+            <h2>All Returns</h2>
+            <div class="tbl-tools">
+                <div class="ui-menu">
+                    <button type="button" class="tbl-btn" data-menu-toggle><i class="bi bi-sliders"></i> Filters<?php if ($statusFilter !== ''): ?> <span class="tbl-count">1</span><?php endif; ?></button>
+                    <div class="ui-menu-list tbl-filter-panel">
+                        <label for="retStatus">Status</label>
+                        <select name="status" id="retStatus" onchange="this.form.submit()">
+                            <option value="">All statuses</option>
+                            <?php foreach ($statuses as $st): ?>
+                                <option value="<?= $st ?>" <?= $statusFilter === $st ? 'selected' : '' ?>><?= ucfirst($st) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="tbl-filter-actions">
+                            <a href="/returns" class="tbl-btn">Clear</a>
+                            <button type="submit" class="tbl-btn tbl-btn-soft">Apply</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="tbl-search">
+            <label class="ui-search">
+                <i class="bi bi-search"></i>
+                <input type="text" name="q" value="<?= htmlspecialchars($search) ?>" placeholder="Search order, customer or product..." aria-label="Search returns">
+            </label>
         </div>
     </form>
 
@@ -91,22 +104,19 @@ foreach ($allReturns as $r) {
                     <th>Return</th>
                     <th>Order</th>
                     <th>Product</th>
-                    <th>Qty</th>
-                    <th>Refund</th>
                     <th>Status</th>
                     <th style="width:280px;">Update</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($returns)): ?>
-                    <tr><td colspan="7" class="ui-empty"><i class="bi bi-arrow-return-left"></i>No returns yet. Click "New Return" when a customer sends something back.</td></tr>
+                    <tr><td colspan="5" class="ui-empty"><i class="bi bi-arrow-return-left"></i>No returns yet. Click "New Return" when a customer sends something back.</td></tr>
                 <?php else: ?>
                     <?php foreach ($returns as $r):
                         $statusColor = $statusColors[$r['status']] ?? ['bg' => '#f1f5f9', 'text' => '#334155'];
-                        $currency = $r['currency_symbol'] ?? 'Rs.';
                         $isFinal = $r['status'] === 'completed' || $r['status'] === 'rejected';
                     ?>
-                        <tr class="ret-row" data-status="<?= htmlspecialchars($r['status']) ?>" data-search="<?= htmlspecialchars(strtolower('#' . $r['id'] . ' #' . $r['order_id'] . ' ' . $r['customer_name'] . ' ' . $r['product_name'])) ?>">
+                        <tr class="ret-row">
                             <td style="font-weight:700;">#<?= (int) $r['id'] ?></td>
                             <td>
                                 <div style="display:flex; flex-direction:column; gap:2px;">
@@ -115,8 +125,6 @@ foreach ($allReturns as $r) {
                                 </div>
                             </td>
                             <td style="color:#334155;"><?= htmlspecialchars($r['product_name']) ?></td>
-                            <td style="font-weight:600;"><?= (int) $r['quantity'] ?></td>
-                            <td style="white-space:nowrap; font-weight:600;"><?= $currency ?> <?= number_format((float) $r['refund_amount'], 2) ?></td>
                             <td>
                                 <span class="ui-tag" style="background:<?= $statusColor['bg'] ?>; color:<?= $statusColor['text'] ?>;">
                                     <?= ucfirst($r['status']) ?>
@@ -191,12 +199,6 @@ foreach ($allReturns as $r) {
     </div>
 </div>
 
-<style>
-.ret-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; padding: 14px 20px; border-bottom: 1px solid var(--border-color); overflow-x: auto; }
-.ret-search { flex: 1 1 auto; min-width: 180px; height: 34px; }
-.ret-toolbar-actions { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; flex-shrink: 0; margin-left: auto; }
-.ret-toolbar .ui-btn { height: 34px; padding: 0 10px; font-size: 12.5px; white-space: nowrap; }
-</style>
 
 <script>
 function openModal(id) { document.getElementById(id).classList.add('show'); }

@@ -63,24 +63,35 @@ $notRemittedCount = count($allShipments) - $remittedCount;
     </div>
 </div>
 
-<div class="ui-card">
+<div class="ui-card tbl-card">
     <!-- Search / status filter server pe (har page ka result sahi) -->
-    <form method="GET" action="/3pl/remittance" class="rem-toolbar">
-        <label class="ui-search rem-search">
-            <i class="bi bi-search"></i>
-            <input type="text" name="q" value="<?= htmlspecialchars($search) ?>" placeholder="Search AWB, courier or customer..." aria-label="Search remittance">
-        </label>
-        <select name="status" class="ui-btn" aria-label="Filter by remittance status" style="padding-right:10px;" onchange="this.form.submit()">
-            <?php foreach (['' => 'All', 'not_remitted' => 'Not Remitted', 'remitted' => 'Remitted'] as $value => $label): ?>
-                <option value="<?= $value ?>" <?= $statusFilter === $value ? 'selected' : '' ?>><?= $label ?></option>
-            <?php endforeach; ?>
-        </select>
-        <button type="submit" class="ui-btn">Search</button>
-        <?php if ($search !== '' || $statusFilter !== ''): ?>
-            <a href="/3pl/remittance" class="ui-btn">Clear</a>
-        <?php endif; ?>
-        <div style="margin-left:auto; flex-shrink:0; font-size:12.5px; color:#475569; white-space:nowrap;">
-            Received so far: <b style="color:#166534;">Rs. <?= number_format($remittedAmount, 2) ?></b>
+    <form method="GET" action="/3pl/remittance">
+        <div class="tbl-head">
+            <h2>COD Remittance</h2>
+            <div class="tbl-tools">
+                <span class="tbl-note">Received so far: <b style="color:#047857;">Rs. <?= number_format($remittedAmount, 2) ?></b></span>
+                <div class="ui-menu">
+                    <button type="button" class="tbl-btn" data-menu-toggle><i class="bi bi-sliders"></i> Filters<?php if ($statusFilter !== ''): ?> <span class="tbl-count">1</span><?php endif; ?></button>
+                    <div class="ui-menu-list tbl-filter-panel">
+                        <label for="remStatus">Remittance status</label>
+                        <select name="status" id="remStatus" onchange="this.form.submit()">
+                            <?php foreach (['' => 'All', 'not_remitted' => 'Not Remitted', 'remitted' => 'Remitted'] as $value => $label): ?>
+                                <option value="<?= $value ?>" <?= $statusFilter === $value ? 'selected' : '' ?>><?= $label ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="tbl-filter-actions">
+                            <a href="/3pl/remittance" class="tbl-btn">Clear</a>
+                            <button type="submit" class="tbl-btn tbl-btn-soft">Apply</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="tbl-search">
+            <label class="ui-search">
+                <i class="bi bi-search"></i>
+                <input type="text" name="q" value="<?= htmlspecialchars($search) ?>" placeholder="Search AWB, courier or customer..." aria-label="Search remittance">
+            </label>
         </div>
     </form>
 
@@ -89,7 +100,6 @@ $notRemittedCount = count($allShipments) - $remittedCount;
             <thead>
                 <tr>
                     <th>AWB No.</th>
-                    <th>Courier</th>
                     <th>Customer</th>
                     <th>Order Total</th>
                     <th>Status</th>
@@ -99,15 +109,14 @@ $notRemittedCount = count($allShipments) - $remittedCount;
             <tbody>
                 <?php if (empty($shipments)): ?>
                     <?php if ($search !== '' || $statusFilter !== ''): ?>
-                        <tr><td colspan="6" class="ui-empty"><i class="bi bi-search"></i>No shipments match your search.</td></tr>
+                        <tr><td colspan="5" class="ui-empty"><i class="bi bi-search"></i>No shipments match your search.</td></tr>
                     <?php else: ?>
-                        <tr><td colspan="6" class="ui-empty"><i class="bi bi-cash-coin"></i>No handed-over shipments yet. Use LM Inventory Scan to hand parcels to the courier.</td></tr>
+                        <tr><td colspan="5" class="ui-empty"><i class="bi bi-cash-coin"></i>No handed-over shipments yet. Use LM Inventory Scan to hand parcels to the courier.</td></tr>
                     <?php endif; ?>
                 <?php else: ?>
                     <?php foreach ($shipments as $s): ?>
-                        <tr class="rem-row" data-status="<?= htmlspecialchars($s['remittance_status']) ?>" data-search="<?= htmlspecialchars(strtolower($s['tracking_number'] . ' ' . $s['courier_name'] . ' ' . ($s['customer_name'] ?? ''))) ?>">
+                        <tr class="rem-row">
                             <td style="font-weight:700; font-family:ui-monospace, 'Cascadia Code', Consolas, monospace; font-size:12.5px;"><?= htmlspecialchars($s['tracking_number']) ?></td>
-                            <td style="color:#334155;"><?= htmlspecialchars($s['courier_name']) ?></td>
                             <td style="color:#334155; font-weight:500;"><?= htmlspecialchars($s['customer_name'] ?? '-') ?></td>
                             <td style="white-space:nowrap; font-weight:600;">Rs. <?= number_format((float) $s['order_total'], 2) ?></td>
                             <td>
@@ -139,9 +148,3 @@ $notRemittedCount = count($allShipments) - $remittedCount;
 
     <?php $pagerLabel = 'shipments'; require __DIR__ . '/../partials/pagination.php'; ?>
 </div>
-
-<style>
-.rem-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; padding: 14px 20px; border-bottom: 1px solid var(--border-color); overflow-x: auto; }
-.rem-search { flex: 0 1 360px; min-width: 180px; height: 34px; }
-.rem-toolbar .ui-btn { height: 34px; padding: 0 10px; font-size: 12.5px; white-space: nowrap; }
-</style>

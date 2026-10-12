@@ -8,21 +8,6 @@ $avatarColors = [
     ['bg' => '#cffafe', 'text' => '#0e7490'],
 ];
 
-$sourceColors = [
-    'shopify_pull'     => ['bg' => '#ede9fe', 'text' => '#6d28d9'],
-    'woocommerce_pull' => ['bg' => '#dcfce7', 'text' => '#15803d'],
-    'bigcommerce_pull' => ['bg' => '#dbeafe', 'text' => '#1d4ed8'],
-    'prestashop_pull'  => ['bg' => '#fce7f3', 'text' => '#be185d'],
-    'opencart_pull'    => ['bg' => '#fef9c3', 'text' => '#854d0e'],
-    'oscommerce_pull'  => ['bg' => '#e0f2fe', 'text' => '#0369a1'],
-    'wix_pull'         => ['bg' => '#ffe4e6', 'text' => '#be123c'],
-    'ebay_pull'        => ['bg' => '#e0e7ff', 'text' => '#4338ca'],
-    'magento_pull'     => ['bg' => '#ffe4e6', 'text' => '#be123c'],
-    'manual'           => ['bg' => '#ffedd5', 'text' => '#c2410c'],
-    'api_push'         => ['bg' => '#cffafe', 'text' => '#0e7490'],
-    'csv_import'       => ['bg' => '#fce7f3', 'text' => '#be185d'],
-];
-
 $statusColors = [
     'pending'    => ['bg' => '#fef3c7', 'text' => '#92400e'],
     'processing' => ['bg' => '#dbeafe', 'text' => '#1d4ed8'],
@@ -31,18 +16,9 @@ $statusColors = [
     'cancelled'  => ['bg' => '#fee2e2', 'text' => '#991b1b'],
 ];
 
-$shipmentColors = [
-    'pending'     => ['bg' => '#f1f5f9', 'text' => '#334155'],
-    'packed'      => ['bg' => '#fef3c7', 'text' => '#b45309'],
-    'dispatched'  => ['bg' => '#dbeafe', 'text' => '#1d4ed8'],
-    'in_transit'  => ['bg' => '#e0e7ff', 'text' => '#4338ca'],
-    'delivered'   => ['bg' => '#dcfce7', 'text' => '#15803d'],
-    'returned'    => ['bg' => '#fee2e2', 'text' => '#991b1b'],
-];
-
 $platform = $store['platform'] ?? 'manual';
 
-// ---------- Summary numbers — controller POORI list se bhejta hai ($orders sirf is page ki rows hain) ----------
+// ---------- Summary numbers — controller POORI list se bhejta hai ($orders sirf latest 5 rows hain) ----------
 $totalCount = (int) ($stats['total'] ?? count($orders));
 $pendingCount = (int) ($stats['pending'] ?? 0);
 $unpaidCount = (int) ($stats['unpaid'] ?? 0);
@@ -70,6 +46,9 @@ $showCjSync = ($platform === 'cj') || !empty($store['cj_api_key']);
         <div class="breadcrumb">Finovo <i class="bi bi-chevron-right"></i> <span class="current">Orders</span></div>
         <h1>Orders <span class="count-badge"><?= $totalCount ?></span></h1>
         <p>Manage your orders and track fulfillment across all sources.</p>
+    </div>
+    <div class="ui-head-right">
+        <a href="/orders/create" class="ui-btn ui-btn-primary"><i class="bi bi-plus-lg"></i> Add Order</a>
     </div>
 </div>
 
@@ -137,213 +116,180 @@ $showCjSync = ($platform === 'cj') || !empty($store['cj_api_key']);
     </div>
 </div>
 
-<div class="ui-card" style="overflow: visible;">
-    <div class="ui-card-head">
-        <h2>All Orders</h2>
-    </div>
-
-    <!-- Ek hi line: search + filters + Search ... Import / Export / Shipments / Sync / Settings / Add Order -->
-    <form method="GET" action="/orders" class="orders-toolbar">
-        <label class="ui-search orders-search">
-            <i class="bi bi-search"></i>
-            <input type="text" name="search" placeholder="Search orders..." value="<?= htmlspecialchars($_GET['search'] ?? '') ?>" aria-label="Search customer or product">
-        </label>
-        <select name="platform" class="orders-select" aria-label="Filter by platform" onchange="this.form.submit()">
-            <option value="all" <?= $selectedPlatform === 'all' ? 'selected' : '' ?>>All platforms</option>
-            <option value="manual" <?= $selectedPlatform === 'manual' ? 'selected' : '' ?>>Manual</option>
-            <option value="custom" <?= $selectedPlatform === 'custom' ? 'selected' : '' ?>>API push</option>
-            <option value="shopify" <?= $selectedPlatform === 'shopify' ? 'selected' : '' ?>>Shopify</option>
-            <option value="woocommerce" <?= $selectedPlatform === 'woocommerce' ? 'selected' : '' ?>>WooCommerce</option>
-            <option value="bigcommerce" <?= $selectedPlatform === 'bigcommerce' ? 'selected' : '' ?>>BigCommerce</option>
-            <option value="prestashop" <?= $selectedPlatform === 'prestashop' ? 'selected' : '' ?>>PrestaShop</option>
-            <option value="opencart" <?= $selectedPlatform === 'opencart' ? 'selected' : '' ?>>OpenCart</option>
-            <option value="oscommerce" <?= $selectedPlatform === 'oscommerce' ? 'selected' : '' ?>>osCommerce</option>
-            <option value="wix" <?= $selectedPlatform === 'wix' ? 'selected' : '' ?>>Wix</option>
-            <option value="ebay" <?= $selectedPlatform === 'ebay' ? 'selected' : '' ?>>eBay</option>
-            <option value="magento" <?= $selectedPlatform === 'magento' ? 'selected' : '' ?>>Magento</option>
-            <option value="csv" <?= $selectedPlatform === 'csv' ? 'selected' : '' ?>>CSV import</option>
-        </select>
-        <select name="status" id="orderStatusFilter" class="orders-select" aria-label="Filter by status" onchange="this.form.submit()">
-            <option value="">All statuses</option>
-            <?php foreach (['pending' => 'Pending', 'processing' => 'Processing', 'delivered' => 'Delivered', 'completed' => 'Completed', 'cancelled' => 'Cancelled'] as $sv => $sl): ?>
-                <option value="<?= $sv ?>" <?= $selectedStatus === $sv ? 'selected' : '' ?>><?= $sl ?></option>
-            <?php endforeach; ?>
-        </select>
-        <button type="submit" class="ui-btn ui-btn-primary"><i class="bi bi-search"></i> Search</button>
-
-        <div class="orders-toolbar-right">
-            <button type="button" class="ui-btn" onclick="openModal('importOrderModal')"><i class="bi bi-upload"></i> Import CSV</button>
-            <a href="/orders/export-csv" class="ui-btn"><i class="bi bi-download"></i> Export CSV</a>
-            <a href="/shipments" class="ui-btn"><i class="bi bi-truck"></i> Shipments</a>
-            <span class="orders-toolbar-divider"></span>
-            <?php if (isset($syncLinks[$platform])): ?>
-                <a href="<?= $syncLinks[$platform][0] ?>" class="ui-btn ui-btn-soft"><i class="bi bi-arrow-repeat"></i> Sync <?= $syncLinks[$platform][1] ?></a>
-            <?php endif; ?>
-            <?php if ($showCjSync): ?>
-                <a href="/orders/sync-cj" class="ui-btn ui-btn-soft"><i class="bi bi-arrow-repeat"></i> Sync CJ</a>
-            <?php endif; ?>
-            <?php if (in_array(strtolower(trim($_SESSION['user']['role'] ?? '')), ['admin', 'manager'], true)): ?>
-                <a href="/orders/settings" class="ui-btn"><i class="bi bi-gear"></i> Settings</a>
-            <?php endif; ?>
-            <a href="/orders/create" class="ui-btn ui-btn-primary"><i class="bi bi-plus-lg"></i> Add Order</a>
+<div class="ui-card tbl-card">
+    <!-- Search + filters (server pe) ... Sync / Import / Export / Settings -->
+    <form method="GET" action="/orders">
+        <div class="tbl-head">
+            <h2>All Orders</h2>
+            <div class="tbl-tools">
+                <?php if (isset($syncLinks[$platform])): ?>
+                    <a href="<?= $syncLinks[$platform][0] ?>" class="tbl-btn tbl-btn-soft"><i class="bi bi-arrow-repeat"></i> Sync <?= $syncLinks[$platform][1] ?></a>
+                <?php endif; ?>
+                <?php if ($showCjSync): ?>
+                    <a href="/orders/sync-cj" class="tbl-btn tbl-btn-soft"><i class="bi bi-arrow-repeat"></i> Sync CJ</a>
+                <?php endif; ?>
+                <div class="ui-menu">
+                    <?php $nf = ($selectedPlatform !== 'all') + ($selectedStatus !== ''); ?>
+                    <button type="button" class="tbl-btn" data-menu-toggle><i class="bi bi-sliders"></i> Filters<?php if ($nf): ?> <span class="tbl-count"><?= $nf ?></span><?php endif; ?></button>
+                    <div class="ui-menu-list tbl-filter-panel">
+                        <label for="orderPlatformFilter">Platform</label>
+                        <select name="platform" id="orderPlatformFilter" onchange="this.form.submit()">
+                            <option value="all" <?= $selectedPlatform === 'all' ? 'selected' : '' ?>>All platforms</option>
+                            <option value="manual" <?= $selectedPlatform === 'manual' ? 'selected' : '' ?>>Manual</option>
+                            <option value="custom" <?= $selectedPlatform === 'custom' ? 'selected' : '' ?>>API push</option>
+                            <option value="shopify" <?= $selectedPlatform === 'shopify' ? 'selected' : '' ?>>Shopify</option>
+                            <option value="woocommerce" <?= $selectedPlatform === 'woocommerce' ? 'selected' : '' ?>>WooCommerce</option>
+                            <option value="bigcommerce" <?= $selectedPlatform === 'bigcommerce' ? 'selected' : '' ?>>BigCommerce</option>
+                            <option value="prestashop" <?= $selectedPlatform === 'prestashop' ? 'selected' : '' ?>>PrestaShop</option>
+                            <option value="opencart" <?= $selectedPlatform === 'opencart' ? 'selected' : '' ?>>OpenCart</option>
+                            <option value="oscommerce" <?= $selectedPlatform === 'oscommerce' ? 'selected' : '' ?>>osCommerce</option>
+                            <option value="wix" <?= $selectedPlatform === 'wix' ? 'selected' : '' ?>>Wix</option>
+                            <option value="ebay" <?= $selectedPlatform === 'ebay' ? 'selected' : '' ?>>eBay</option>
+                            <option value="magento" <?= $selectedPlatform === 'magento' ? 'selected' : '' ?>>Magento</option>
+                            <option value="csv" <?= $selectedPlatform === 'csv' ? 'selected' : '' ?>>CSV import</option>
+                        </select>
+                        <label for="orderStatusFilter">Status</label>
+                        <select name="status" id="orderStatusFilter" onchange="this.form.submit()">
+                            <option value="">All statuses</option>
+                            <?php foreach (['pending' => 'Pending', 'processing' => 'Processing', 'delivered' => 'Delivered', 'completed' => 'Completed', 'cancelled' => 'Cancelled'] as $sv => $sl): ?>
+                                <option value="<?= $sv ?>" <?= $selectedStatus === $sv ? 'selected' : '' ?>><?= $sl ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="tbl-filter-actions">
+                            <a href="/orders" class="tbl-btn">Clear</a>
+                            <button type="submit" class="tbl-btn tbl-btn-soft">Apply</button>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="tbl-btn" onclick="openModal('importOrderModal')"><i class="bi bi-upload"></i> Import</button>
+                <a href="/orders/export-csv" class="tbl-btn"><i class="bi bi-download"></i> Export</a>
+                <?php if (in_array(strtolower(trim($_SESSION['user']['role'] ?? '')), ['admin', 'manager'], true)): ?>
+                    <a href="/orders/settings" class="tbl-btn" title="Order settings"><i class="bi bi-gear"></i> Settings</a>
+                <?php endif; ?>
+            </div>
+        </div>
+        <div class="tbl-search">
+            <label class="ui-search">
+                <i class="bi bi-search"></i>
+                <input type="text" name="search" placeholder="Search orders, customers or products..." value="<?= htmlspecialchars($_GET['search'] ?? '') ?>" aria-label="Search customer or product">
+            </label>
         </div>
     </form>
 
     <div style="overflow-x:auto;">
-    <table class="data-table">
-        <thead>
-            <tr>
-                <th class="checkbox-col"><input type="checkbox" id="orderSelectAll" aria-label="Select all orders"></th>
-                <th>Order</th>
-                <th>Customer</th>
-                <th>Product</th>
-                <th>Qty</th>
-                <th>Price</th>
-                <th>Source</th>
-                <th>Status</th>
-                <th>Payment</th>
-                <th>Shipment</th>
-                <th style="width:60px;">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php if (empty($orders)): ?>
-                <tr><td colspan="11" class="ui-empty"><i class="bi bi-receipt"></i>No orders found. Try a different search, or click "Add Order".</td></tr>
-            <?php else: ?>
-                <?php foreach ($orders as $i => $order):
-                    $avColor = $avatarColors[$i % count($avatarColors)];
-                    $srcKey = $order['source'] ?? 'manual';
-                    $srcColor = $sourceColors[$srcKey] ?? ['bg' => '#f1f5f9', 'text' => '#334155'];
-                    $currencySymbol = $order['currency_symbol'] ?? 'Rs.';
-                    $statusKey = $order['status'] ?? 'pending';
-                    $statusColor = $statusColors[$statusKey] ?? ['bg' => '#f1f5f9', 'text' => '#334155'];
-                    $payKey = $order['payment_status'] ?? 'unpaid';
-                    $shipment = $shipmentMap[(int) $order['id']] ?? null;
-                ?>
-                    <tr class="order-row" data-status="<?= htmlspecialchars($statusKey) ?>">
-                        <td class="checkbox-col"><input type="checkbox" class="order-check" aria-label="Select order #<?= (int) $order['id'] ?>"></td>
-                        <td>
-                            <div style="display:flex; align-items:center; gap:8px;">
-                                <span style="width:28px; height:28px; border-radius:50%; background:<?= $avColor['bg'] ?>; color:<?= $avColor['text'] ?>; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0;"><?= strtoupper(substr($order['customer_name'] ?? 'O', 0, 1)) ?></span>
-                                <span style="font-weight:700;">#<?= htmlspecialchars($order['id']) ?></span>
-                            </div>
-                        </td>
-                        <td style="color:#334155; font-weight:500;"><?= htmlspecialchars($order['customer_name'] ?? '-') ?></td>
-                        <td style="color:#334155;">
-                            <?= htmlspecialchars($order['product_name'] ?? '-') ?>
-                            <?php if (!empty($order['variant_label'])): ?>
-                                <span style="color:var(--text-muted); font-size:12px;">(<?= htmlspecialchars($order['variant_label']) ?>)</span>
-                            <?php endif; ?>
-                        </td>
-                        <td style="font-weight:600;"><?= htmlspecialchars($order['quantity'] ?? 1) ?></td>
-                        <td style="white-space:nowrap;"><?= $currencySymbol ?> <?= htmlspecialchars(number_format((float)($order['price'] ?? 0), 2)) ?></td>
-                        <td>
-                            <span class="ui-tag" style="background:<?= $srcColor['bg'] ?>; color:<?= $srcColor['text'] ?>; white-space:nowrap;">
-                                <?= htmlspecialchars(ucfirst(str_replace('_', ' ', $srcKey))) ?>
-                            </span>
-                        </td>
-                        <td style="white-space:nowrap;">
-                            <span class="ui-tag" style="background:<?= $statusColor['bg'] ?>; color:<?= $statusColor['text'] ?>;">
-                                <?= htmlspecialchars(ucfirst($statusKey)) ?>
-                            </span>
-                            <?php if (!empty($order['stock_warning'])): ?>
-                                <span class="ui-tag ui-pill-red" style="margin-left:4px;" title="Not enough stock was available when this order was pulled in">
-                                    <i class="bi bi-exclamation-triangle"></i>
-                                </span>
-                            <?php endif; ?>
-                        </td>
-                        <td>
-                            <span class="ui-dot" style="color:<?= $payKey === 'paid' ? '#166534' : '#b91c1c' ?>;">
-                                <?= htmlspecialchars(ucfirst($payKey)) ?>
-                            </span>
-                            <?php if (!empty($order['payment_method'])): ?>
-                                <div style="font-size:11px; color:var(--text-muted); margin-top:3px;"><?= htmlspecialchars($order['payment_method']) ?></div>
-                            <?php endif; ?>
-                            <?php if ($payKey !== 'paid' && in_array($order['payment_method'] ?? '', ['Card'], true)): ?>
-                                <a href="/payment/initiate?order_id=<?= $order['id'] ?>" style="display:inline-flex; align-items:center; gap:4px; margin-top:4px; font-size:11.5px; font-weight:600; color:var(--primary); text-decoration:none;">
-                                    <i class="bi bi-credit-card"></i> Pay Now
-                                </a>
-                            <?php endif; ?>
-                        </td>
-                        <td>
-                            <?php if ($shipment): ?>
-                                <?php $shColor = $shipmentColors[$shipment['status']] ?? ['bg' => '#f1f5f9', 'text' => '#334155']; ?>
-                                <span class="ui-tag" style="background:<?= $shColor['bg'] ?>; color:<?= $shColor['text'] ?>; white-space:nowrap;" title="<?= htmlspecialchars($shipment['courier_name']) ?><?= $shipment['tracking_number'] ? ' — ' . htmlspecialchars($shipment['tracking_number']) : '' ?>">
-                                    <?= htmlspecialchars(ucwords(str_replace('_', ' ', $shipment['status']))) ?>
-                                </span>
-                            <?php else: ?>
-                                <span class="ui-tag" style="background:#f1f5f9; color:#64748b; white-space:nowrap;">Not dispatched</span>
-                            <?php endif; ?>
-                            <?php if (!empty($order['cj_order_id'])): ?>
-                                <div style="font-size:11px; color:var(--text-muted); margin-top:4px; white-space:nowrap;" title="CJ order <?= htmlspecialchars($order['cj_order_id']) ?>">
-                                    <i class="bi bi-truck"></i> CJ: <?= htmlspecialchars($order['cj_order_status'] ?? 'CREATED') ?>
-                                    <?php if (!empty($order['cj_tracking_number'])): ?>
-                                        <br><span style="font-family:monospace;"><?= htmlspecialchars($order['cj_tracking_number']) ?></span>
-                                    <?php endif; ?>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Order</th>
+                    <th>Customer</th>
+                    <th>Product</th>
+                    <th>Price</th>
+                    <th>Status</th>
+                    <th style="width:60px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (empty($orders)): ?>
+                    <tr><td colspan="6" class="ui-empty"><i class="bi bi-receipt"></i>No orders found. Try a different search, or click "Add Order".</td></tr>
+                <?php else: ?>
+                    <?php foreach ($orders as $i => $order):
+                        $avColor = $avatarColors[$i % count($avatarColors)];
+                        $currencySymbol = $order['currency_symbol'] ?? 'Rs.';
+                        $statusKey = $order['status'] ?? 'pending';
+                        $statusColor = $statusColors[$statusKey] ?? ['bg' => '#f1f5f9', 'text' => '#334155'];
+                        $payKey = $order['payment_status'] ?? 'unpaid';
+                        $shipment = $shipmentMap[(int) $order['id']] ?? null;
+                    ?>
+                        <tr class="order-row" data-status="<?= htmlspecialchars($statusKey) ?>">
+                            <td>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <span style="width:28px; height:28px; border-radius:50%; background:<?= $avColor['bg'] ?>; color:<?= $avColor['text'] ?>; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0;"><?= strtoupper(substr($order['customer_name'] ?? 'O', 0, 1)) ?></span>
+                                    <span style="font-weight:700;">#<?= htmlspecialchars($order['id']) ?></span>
                                 </div>
-                            <?php endif; ?>
-                        </td>
-                        <td>
-                            <button type="button" class="row-menu-btn" aria-label="Actions for order #<?= (int) $order['id'] ?>" onclick="toggleRowMenu(event, 'order-menu-<?= $order['id'] ?>')">
-                                <i class="bi bi-three-dots-vertical"></i>
-                            </button>
-                            <div class="row-menu" id="order-menu-<?= $order['id'] ?>">
-                                <a href="/orders/edit?id=<?= $order['id'] ?>"><i class="bi bi-pencil"></i> Edit</a>
-                                <a href="/orders/invoice?order_id=<?= $order['id'] ?>"><i class="bi bi-file-earmark-pdf"></i> Download Invoice</a>
-                                <a href="/orders/cj-fulfill?id=<?= $order['id'] ?>"><i class="bi bi-truck"></i> Send to CJdropshipping</a>
-                                <?php
-                                // Push sirf usi platform ka dikhao jis ka yeh store hai.
-                                //  - "Push to X": Finovo ka order X pe banao (jo pehle se X pe hai us ka nahi)
-                                //  - "Send tracking to X": X wale order ko shipment ke tracking number ke saath "Shipped" karo
-                                $storePlatform = strtolower($store['platform'] ?? '');
-                                $pushColumns = [
-                                    'shopify' => 'external_order_id', 'woocommerce' => 'external_wc_order_id',
-                                    'bigcommerce' => 'external_bc_order_id', 'wix' => 'external_wix_order_id',
-                                    'magento' => 'external_magento_order_id', 'prestashop' => 'external_ps_order_id',
-                                    'ebay' => 'external_ebay_order_id',
-                                ];
-                                $pushLabels = [
-                                    'shopify' => 'Shopify', 'woocommerce' => 'WooCommerce', 'bigcommerce' => 'BigCommerce',
-                                    'wix' => 'Wix', 'magento' => 'Magento', 'prestashop' => 'PrestaShop', 'ebay' => 'eBay',
-                                ];
-                                $canCreate = in_array($storePlatform, ['shopify', 'woocommerce', 'bigcommerce', 'wix', 'magento', 'prestashop'], true);
-                                $canTrack = in_array($storePlatform, ['shopify', 'woocommerce', 'bigcommerce', 'magento', 'ebay'], true);
-                                $inPlatform = isset($pushColumns[$storePlatform]) && !empty($order[$pushColumns[$storePlatform]]);
-                                $hasTracking = ($shipment && !empty($shipment['tracking_number'])) || !empty($order['cj_tracking_number']);
-                                $pushLabel = $pushLabels[$storePlatform] ?? '';
-                                ?>
-                                <?php if ($canCreate || ($canTrack && $inPlatform && $hasTracking)): ?>
-                                    <div class="row-menu-divider"></div>
-                                    <?php if ($canCreate && !$inPlatform): ?>
-                                        <a href="/orders/push?id=<?= $order['id'] ?>"><i class="bi bi-box-arrow-up-right"></i> Push to <?= $pushLabel ?></a>
-                                    <?php elseif ($canCreate): ?>
-                                        <span class="row-menu-note"><i class="bi bi-check2-circle"></i> Already in <?= $pushLabel ?></span>
+                            </td>
+                            <td style="color:#334155; font-weight:500;"><?= htmlspecialchars($order['customer_name'] ?? '-') ?></td>
+                            <td style="color:#334155;">
+                                <?= htmlspecialchars($order['product_name'] ?? '-') ?>
+                                <?php if (!empty($order['variant_label'])): ?>
+                                    <span style="color:var(--text-muted); font-size:12px;">(<?= htmlspecialchars($order['variant_label']) ?>)</span>
+                                <?php endif; ?>
+                            </td>
+                            <td style="white-space:nowrap;"><?= $currencySymbol ?> <?= htmlspecialchars(number_format((float)($order['price'] ?? 0), 2)) ?></td>
+                            <td style="white-space:nowrap;">
+                                <span class="ui-tag" style="background:<?= $statusColor['bg'] ?>; color:<?= $statusColor['text'] ?>;">
+                                    <?= htmlspecialchars(ucfirst($statusKey)) ?>
+                                </span>
+                                <?php if (!empty($order['stock_warning'])): ?>
+                                    <span class="ui-tag ui-pill-red" style="margin-left:4px;" title="Not enough stock was available when this order was pulled in">
+                                        <i class="bi bi-exclamation-triangle"></i>
+                                    </span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <button type="button" class="row-menu-btn" aria-label="Actions for order #<?= (int) $order['id'] ?>" onclick="toggleRowMenu(event, 'order-menu-<?= $order['id'] ?>')">
+                                    <i class="bi bi-three-dots-vertical"></i>
+                                </button>
+                                <div class="row-menu" id="order-menu-<?= $order['id'] ?>">
+                                    <a href="/orders/edit?id=<?= $order['id'] ?>"><i class="bi bi-pencil"></i> Edit</a>
+                                    <a href="/orders/invoice?order_id=<?= $order['id'] ?>"><i class="bi bi-file-earmark-pdf"></i> Download Invoice</a>
+                                    <?php if ($payKey !== 'paid' && in_array($order['payment_method'] ?? '', ['Card'], true)): ?>
+                                        <!-- Payment column hat gaya, is liye "Pay Now" ab yahan menu mein -->
+                                        <a href="/payment/initiate?order_id=<?= $order['id'] ?>"><i class="bi bi-credit-card"></i> Pay Now</a>
                                     <?php endif; ?>
-                                    <?php if ($canTrack && $inPlatform && $hasTracking): ?>
-                                        <?php if (!empty($order['platform_tracking_pushed_at'])): ?>
-                                            <span class="row-menu-note"><i class="bi bi-check2-circle"></i> Tracking sent to <?= $pushLabel ?></span>
-                                        <?php else: ?>
-                                            <a href="/orders/push-tracking?id=<?= $order['id'] ?>"><i class="bi bi-truck"></i> Send tracking to <?= $pushLabel ?></a>
+                                    <a href="/orders/cj-fulfill?id=<?= $order['id'] ?>"><i class="bi bi-truck"></i> Send to CJdropshipping</a>
+                                    <?php
+                                    // Push sirf usi platform ka dikhao jis ka yeh store hai.
+                                    //  - "Push to X": Finovo ka order X pe banao (jo pehle se X pe hai us ka nahi)
+                                    //  - "Send tracking to X": X wale order ko shipment ke tracking number ke saath "Shipped" karo
+                                    $storePlatform = strtolower($store['platform'] ?? '');
+                                    $pushColumns = [
+                                        'shopify' => 'external_order_id', 'woocommerce' => 'external_wc_order_id',
+                                        'bigcommerce' => 'external_bc_order_id', 'wix' => 'external_wix_order_id',
+                                        'magento' => 'external_magento_order_id', 'prestashop' => 'external_ps_order_id',
+                                        'ebay' => 'external_ebay_order_id',
+                                    ];
+                                    $pushLabels = [
+                                        'shopify' => 'Shopify', 'woocommerce' => 'WooCommerce', 'bigcommerce' => 'BigCommerce',
+                                        'wix' => 'Wix', 'magento' => 'Magento', 'prestashop' => 'PrestaShop', 'ebay' => 'eBay',
+                                    ];
+                                    $canCreate = in_array($storePlatform, ['shopify', 'woocommerce', 'bigcommerce', 'wix', 'magento', 'prestashop'], true);
+                                    $canTrack = in_array($storePlatform, ['shopify', 'woocommerce', 'bigcommerce', 'magento', 'ebay'], true);
+                                    $inPlatform = isset($pushColumns[$storePlatform]) && !empty($order[$pushColumns[$storePlatform]]);
+                                    $hasTracking = ($shipment && !empty($shipment['tracking_number'])) || !empty($order['cj_tracking_number']);
+                                    $pushLabel = $pushLabels[$storePlatform] ?? '';
+                                    ?>
+                                    <?php if ($canCreate || ($canTrack && $inPlatform && $hasTracking)): ?>
+                                        <div class="row-menu-divider"></div>
+                                        <?php if ($canCreate && !$inPlatform): ?>
+                                            <a href="/orders/push?id=<?= $order['id'] ?>"><i class="bi bi-box-arrow-up-right"></i> Push to <?= $pushLabel ?></a>
+                                        <?php elseif ($canCreate): ?>
+                                            <span class="row-menu-note"><i class="bi bi-check2-circle"></i> Already in <?= $pushLabel ?></span>
+                                        <?php endif; ?>
+                                        <?php if ($canTrack && $inPlatform && $hasTracking): ?>
+                                            <?php if (!empty($order['platform_tracking_pushed_at'])): ?>
+                                                <span class="row-menu-note"><i class="bi bi-check2-circle"></i> Tracking sent to <?= $pushLabel ?></span>
+                                            <?php else: ?>
+                                                <a href="/orders/push-tracking?id=<?= $order['id'] ?>"><i class="bi bi-truck"></i> Send tracking to <?= $pushLabel ?></a>
+                                            <?php endif; ?>
                                         <?php endif; ?>
                                     <?php endif; ?>
+                                    <?php if (in_array(strtolower(trim($_SESSION['user']['role'] ?? '')), ['admin', 'manager'], true)): ?>
+                                        <!-- Order delete sirf Admin / Manager -->
+                                        <div class="row-menu-divider"></div>
+                                        <a href="#" class="row-menu-danger" onclick="if(confirm('Delete this order? Stock will be returned to the warehouse.')){document.getElementById('deleteOrderForm<?= $order['id'] ?>').submit();} return false;"><i class="bi bi-trash"></i> Delete</a>
+                                    <?php endif; ?>
+                                </div>
+                                <?php if (in_array(strtolower(trim($_SESSION['user']['role'] ?? '')), ['admin', 'manager'], true)): ?>
+                                    <form id="deleteOrderForm<?= $order['id'] ?>" action="/orders/delete" method="POST" style="display:none;">
+                                        <input type="hidden" name="id" value="<?= $order['id'] ?>">
+                                    </form>
                                 <?php endif; ?>
-                                                               <?php if (in_array(strtolower(trim($_SESSION['user']['role'] ?? '')), ['admin', 'manager'], true)): ?>
-                                    <!-- Order delete sirf Admin / Manager -->
-                                    <div class="row-menu-divider"></div>
-                                    <a href="#" class="row-menu-danger" onclick="if(confirm('Delete this order? Stock will be returned to the warehouse.')){document.getElementById('deleteOrderForm<?= $order['id'] ?>').submit();} return false;"><i class="bi bi-trash"></i> Delete</a>
-                                <?php endif; ?>
-                            </div>
-                            <?php if (in_array(strtolower(trim($_SESSION['user']['role'] ?? '')), ['admin', 'manager'], true)): ?>
-                                <form id="deleteOrderForm<?= $order['id'] ?>" action="/orders/delete" method="POST" style="display:none;">
-                                    <input type="hidden" name="id" value="<?= $order['id'] ?>">
-                                </form>
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-            <?php endif; ?>
-        </tbody>
-    </table>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
     </div>
 
     <?php $pagerLabel = 'order lines'; require __DIR__ . '/../partials/pagination.php'; ?>
@@ -370,63 +316,6 @@ $showCjSync = ($platform === 'cj') || !empty($store['cj_api_key']);
 </div>
 
 <style>
-/* ---------- Orders page: saare buttons ek hi line mein ---------- */
-.orders-toolbar {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
-    row-gap: 10px;
-    padding: 14px 20px 16px;
-}
-.orders-toolbar .ui-btn,
-.orders-toolbar .ui-search,
-.orders-toolbar .orders-select {
-    height: 36px;
-    box-sizing: border-box;
-    flex-shrink: 0;
-}
-.orders-toolbar .ui-btn { padding: 0 10px; font-size: 12.5px; gap: 5px; }
-.orders-toolbar .orders-search {
-    flex: 1 1 130px;
-    max-width: 260px;
-    min-width: 130px;
-    flex-shrink: 1;
-}
-.orders-select {
-    padding: 0 26px 0 10px;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 16 16'%3E%3Cpath fill='%2364748b' d='M8 11L3 6h10z'/%3E%3C/svg%3E") no-repeat right 8px center;
-    -webkit-appearance: none;
-    appearance: none;
-    font: inherit;
-    font-size: 12.5px;
-    font-weight: 600;
-    color: var(--text-body);
-    cursor: pointer;
-}
-.orders-select:hover { background-color: var(--bg-hover); }
-.orders-toolbar-right {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-left: auto;
-    flex-wrap: nowrap;
-}
-.orders-toolbar-divider {
-    width: 1px;
-    height: 24px;
-    background: var(--border-color);
-    margin: 0 1px;
-    flex-shrink: 0;
-}
-/* Jagah kam ho to poora button-group agli line mein (page na toote) */
-@media (max-width: 700px) {
-    .orders-toolbar .orders-search { flex: 1 1 100%; max-width: none; }
-    .orders-toolbar-right { margin-left: 0; flex-wrap: wrap; }
-    .orders-toolbar-divider { display: none; }
-}
 
 .row-menu-btn {
     width: 32px;
@@ -526,15 +415,4 @@ document.addEventListener('click', function() {
 window.addEventListener('scroll', function() {
     document.querySelectorAll('.row-menu.show').forEach(m => m.classList.remove('show'));
 }, true);
-</script>
-
-<script>
-// ---------- "Select all" sirf is page ki rows (pagination ab server pe hoti hai) ----------
-(function () {
-    var selectAll = document.getElementById('orderSelectAll');
-    if (!selectAll) { return; }
-    selectAll.addEventListener('change', function () {
-        document.querySelectorAll('.order-row .order-check').forEach(function (c) { c.checked = selectAll.checked; });
-    });
-})();
 </script>
