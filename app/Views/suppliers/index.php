@@ -98,6 +98,14 @@
     </div>
 </div>
 
+<style>
+/* Email ka khana bhi baaki khanon jaisa (border, padding, font) */
+#createSupplierModal .form-group input[type="email"] {
+    width: 100%; border: 1px solid var(--border-input); border-radius: 8px; padding: 9px 12px;
+    font-size: 13.5px; font-family: inherit; color: var(--text-dark); background: #ffffff; box-sizing: border-box;
+}
+</style>
+
 <script>
 function openModal(id) { document.getElementById(id).classList.add('show'); }
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }

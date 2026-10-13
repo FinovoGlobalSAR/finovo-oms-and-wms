@@ -14,15 +14,27 @@ class DashboardController extends Controller
     public function index(): void
     {
         $db = Database::getConnection();
+        $role = $this->currentRole();
+
+        // Admin / Manager ne abhi koi store "Manage" nahi kiya → neutral dashboard
+        // (kisi bhi store ka revenue / orders nahi dikhana, warna pata nahi chalta kis store ka hai)
+        if ($this->isAdminOrManager() && empty($_SESSION['store_context_active'])) {
+            $this->view('dashboard/index', $this->neutralData($db, $role));
+            return;
+        }
+
         $store = $this->getCurrentStore();
         $storeId = (int) $store['id'];
-        $role = $this->currentRole();
         $productModel = new Product();
 
         $data = [
+            'neutral' => false,
             'role' => $role,
             'userName' => $_SESSION['user']['name'] ?? 'User',
             'storeName' => $store['name'] ?? 'Finovo',
+            'storePlatform' => strtolower($store['platform'] ?? 'manual'),
+            'storeHealth' => $store['health_status'] ?? 'disconnected',
+            'storeLastSync' => $store['last_successful_sync'] ?? null,
         ];
 
         // ---------- Shared stats (used by more than one role) ----------
@@ -33,7 +45,7 @@ class DashboardController extends Controller
 
         [$data['totalRevenueUsd'], $data['totalRevenuePkr']] = $this->splitRevenueByCurrency($db, $storeId, $productModel);
 
-        $recentOrdersStmt = $db->prepare("SELECT * FROM orders WHERE store_id = ? ORDER BY id DESC LIMIT 8");
+        $recentOrdersStmt = $db->prepare("SELECT * FROM orders WHERE store_id = ? ORDER BY id DESC LIMIT 5");
         $recentOrdersStmt->execute([$storeId]);
         $recentOrders = $recentOrdersStmt->fetchAll();
 
@@ -83,6 +95,14 @@ class DashboardController extends Controller
         $statusStmt->execute([$storeId]);
         $data['ordersByStatus'] = $statusStmt->fetchAll();
 
+        // Pending orders (jin pe abhi kaam baaki hai)
+        $data['pendingOrders'] = 0;
+        foreach ($data['ordersByStatus'] as $s) {
+            if (in_array($s['status'], ['pending', 'processing'], true)) {
+                $data['pendingOrders'] += (int) $s['c'];
+            }
+        }
+
         // ---------- Role-specific stats ----------
 
         if (in_array($role, ['admin', 'manager'], true)) {
@@ -91,7 +111,7 @@ class DashboardController extends Controller
             $data['ordersBySource'] = $sourceStmt->fetchAll();
 
             $topProductsStmt = $db->prepare(
-                "SELECT product_name, SUM(quantity) as qty FROM orders WHERE store_id = ? AND status != 'cancelled' GROUP BY product_name ORDER BY qty DESC LIMIT 5"           
+                "SELECT product_name, SUM(quantity) as qty FROM orders WHERE store_id = ? AND status != 'cancelled' GROUP BY product_name ORDER BY qty DESC LIMIT 5"
             );
             $topProductsStmt->execute([$storeId]);
             $data['topProducts'] = $topProductsStmt->fetchAll();
@@ -111,12 +131,7 @@ class DashboardController extends Controller
             $lowStockStmt = $db->prepare("SELECT COUNT(*) as c FROM products WHERE store_id = ? AND stock_quantity <= low_stock_threshold");
             $lowStockStmt->execute([$storeId]);
             $data['lowStockCount'] = (int) $lowStockStmt->fetch()['c'];
-
-            $employeeCountStmt = $db->query("SELECT COUNT(*) as c FROM users");
-            $data['employeeCount'] = (int) $employeeCountStmt->fetch()['c'];
-
-            $storeCountStmt = $db->query("SELECT COUNT(*) as c FROM stores");
-            $data['storeCount'] = (int) $storeCountStmt->fetch()['c'];
+            // Employees / Stores ki ginti ab neutral dashboard pe hai (woh kisi ek store ki nahi)
         }
 
         if ($role === 'warehouse staff') {
@@ -147,7 +162,7 @@ class DashboardController extends Controller
             $lowStockListStmt = $db->prepare(
                 "SELECT name, sku, stock_quantity, low_stock_threshold FROM products
                  WHERE store_id = ? AND stock_quantity <= low_stock_threshold
-                 ORDER BY stock_quantity ASC LIMIT 8"
+                 ORDER BY stock_quantity ASC LIMIT 5"
             );
             $lowStockListStmt->execute([$storeId]);
             $data['lowStockList'] = $lowStockListStmt->fetchAll();
@@ -167,6 +182,53 @@ class DashboardController extends Controller
         }
 
         $this->view('dashboard/index', $data);
+    }
+
+    private function neutralData(PDO $db, string $role): array
+    {
+        $stores = $db->query(
+            "SELECT s.id, s.name, s.platform, s.health_status, s.last_successful_sync,
+                    (SELECT COUNT(*) FROM store_warehouses sw WHERE sw.store_id = s.id) AS warehouse_count,
+                    (SELECT COUNT(*) FROM products p WHERE p.store_id = s.id) AS product_count
+             FROM stores s
+             ORDER BY s.id DESC"
+        )->fetchAll();
+
+        $connected = 0;
+        $needsAttention = 0;
+        foreach ($stores as &$s) {
+            $isManual = in_array(strtolower($s['platform'] ?? 'manual'), ['manual', ''], true);
+            $health = $s['health_status'] ?? 'disconnected';
+
+            // Stores page jaisa status: Active / Setup Incomplete / Sync Error
+            if ($health === 'sync_error') {
+                $s['ui_status'] = 'sync_error';
+            } elseif ((int) $s['warehouse_count'] === 0 || (!$isManual && $health !== 'connected')) {
+                $s['ui_status'] = 'incomplete';
+            } else {
+                $s['ui_status'] = 'active';
+            }
+
+            if (!$isManual && $health === 'connected') {
+                $connected++;
+            }
+            if ($s['ui_status'] !== 'active') {
+                $needsAttention++;
+            }
+        }
+        unset($s);
+
+        return [
+            'neutral' => true,
+            'role' => $role,
+            'userName' => $_SESSION['user']['name'] ?? 'User',
+            'stores' => $stores,
+            'storeCount' => count($stores),
+            'connectedCount' => $connected,
+            'attentionCount' => $needsAttention,
+            'warehouseCount' => (int) $db->query("SELECT COUNT(*) AS c FROM warehouses")->fetch()['c'],
+            'employeeCount' => (int) $db->query("SELECT COUNT(*) AS c FROM users")->fetch()['c'],
+        ];
     }
 
     private function splitRevenueByCurrency(PDO $db, int $storeId, Product $productModel): array

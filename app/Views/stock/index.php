@@ -374,15 +374,13 @@ function renderMovementRows(array $list): void
 /* Stock Movements — Figma "finovo-stock-movements" */
 .sm-page { font-family: var(--font-body); }
 .sm-page .ui-head { margin-bottom: 28px; }
-.sm-page .breadcrumb { font-family: var(--font-ui); font-weight: 400; gap: 8px; }
+.sm-page .breadcrumb { gap: 8px; }
 .sm-crumb { color: var(--text-light); text-decoration: none; }
 .sm-crumb:hover { text-decoration: underline; }
-.sm-page .ui-head h1 { font-family: var(--font-ui); font-weight: 400; }
-.sm-page .ui-head p { font-family: var(--font-ui); }
-.sm-info { width: 420px; max-width: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px; background: var(--primary-light); border: 1px solid var(--border-color); border-radius: 10px; font-family: var(--font-ui); box-sizing: border-box; }
+.sm-info { width: 420px; max-width: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px; background: var(--primary-light); border: 1px solid var(--border-color); border-radius: 10px; box-sizing: border-box; }
 .sm-info > i { color: var(--brand); font-size: 18px; }
 .sm-info-text { flex: 1; min-width: 0; }
-.sm-info-text strong { display: block; font-size: 13px; font-weight: 400; color: var(--brand); margin-bottom: 2px; }
+.sm-info-text strong { display: block; font-size: 13px; font-weight: 700; color: var(--brand); margin-bottom: 2px; }
 .sm-info-text span { display: block; font-size: 11px; line-height: 1.4; color: var(--text-body); }
 .sm-info-btn { flex-shrink: 0; padding: 6px 10px; background: #fff; border: 1px solid var(--border-input); border-radius: 6px; font-family: inherit; font-size: 11px; color: var(--text-dark); cursor: pointer; }
 .sm-help { display: none; flex-basis: 100%; margin: 0; padding: 8px 10px; background: #fff; border: 1px solid var(--primary-border); border-radius: 8px; font-size: 12px; line-height: 1.45; color: var(--text-body); }
@@ -392,28 +390,24 @@ function renderMovementRows(array $list): void
 .sm-page .ui-stats { gap: 12px; margin-bottom: 28px; }
 .sm-page .ui-stat { padding: 16px; gap: 14px; border-radius: 14px; }
 .sm-page .ui-stat-icon { width: 40px; height: 40px; border-radius: 10px; font-size: 18px; }
-.sm-page .ui-stat-label { font-weight: 400; color: var(--text-muted); }
 .sm-page .ui-stat-value { gap: 6px; margin-top: 3px; }
-.sm-page .ui-stat-value b { font-weight: 400; color: #1e293b; }
-.sm-page .ui-stat .ui-pill { font-size: 10px; font-weight: 400; padding: 2px 7px; border-radius: 5px; }
-.sm-page .ui-tip strong { font-weight: 400; }
 
 .sm-tabs { display: flex; gap: 5px; margin-bottom: 10px; flex-wrap: wrap; }
-.sm-tab { display: inline-flex; align-items: center; gap: 10px; height: 37px; padding: 0 10px; border: none; border-bottom: 2px solid transparent; border-radius: 5px; background: #fff; font-family: var(--font-ui); font-size: 14px; color: var(--text-muted); cursor: pointer; }
-.sm-tab.active { border-bottom-color: var(--primary); color: var(--primary); }
+.sm-tab { display: inline-flex; align-items: center; gap: 10px; height: 37px; padding: 0 10px; border: none; border-bottom: 2px solid transparent; border-radius: 5px; background: #fff; font-family: inherit; font-size: 14px; font-weight: 500; color: var(--text-muted); cursor: pointer; }
+.sm-tab.active { border-bottom-color: var(--primary); color: var(--primary); font-weight: 600; }
 
-.sm-form-card { display: flex; flex-direction: column; gap: 20px; padding: 28px; margin-bottom: 28px; background: #fff; border: 1px solid var(--border-color); border-radius: 16px; font-family: var(--font-ui); }
+.sm-form-card { display: flex; flex-direction: column; gap: 20px; padding: 28px; margin-bottom: 28px; background: #fff; border: 1px solid var(--border-color); border-radius: 16px; }
 .sm-form-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 20px; border-bottom: 1px solid var(--border-color); }
 .sm-form-title { display: flex; align-items: center; gap: 12px; }
 .sm-form-icon { padding: 8px; border-radius: 10px; background: var(--primary-light); color: var(--primary); font-size: 18px; line-height: 1; display: flex; }
-.sm-form-title h2 { margin: 0; font-size: 16px; font-weight: 400; color: var(--text-dark); }
+.sm-form-title h2 { margin: 0; font-size: 16px; font-weight: 700; color: var(--text-dark); }
 .sm-form-title p { margin: 2px 0 0; font-size: 12px; color: var(--text-muted); }
-.sm-pill { padding: 4px 10px; border-radius: 100px; background: var(--primary-light); color: var(--brand); font-size: 12px; }
+.sm-pill { padding: 4px 10px; border-radius: 100px; background: var(--primary-light); color: var(--brand); font-size: 12px; font-weight: 600; }
 .sm-form { display: flex; flex-direction: column; gap: 16px; }
 .sm-row { display: flex; gap: 16px; flex-wrap: wrap; }
 .sm-row > .sm-field { flex: 1 1 280px; min-width: 0; }
 .sm-field { display: flex; flex-direction: column; gap: 6px; }
-.sm-field label { font-size: 13px; color: var(--text-dark); }
+.sm-field label { font-size: 13px; font-weight: 500; color: var(--text-dark); }
 .sm-input { position: relative; display: flex; align-items: center; gap: 10px; height: 55px; padding: 0 14px; background: #f8fafc; border: 1px solid var(--border-input); border-radius: 8px; color: var(--text-dark); }
 .sm-input > i { font-size: 16px; }
 .sm-input:focus-within { border-color: #93b4f5; background: #fff; box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
@@ -425,9 +419,9 @@ function renderMovementRows(array $list): void
 .sm-available[hidden] { display: none; }
 .sm-available > i { font-size: 20px; }
 .sm-available > div { flex: 1; display: flex; flex-direction: column; gap: 3px; }
-.sm-available-link { font-size: 14px; color: var(--brand); text-decoration: none; white-space: nowrap; }
+.sm-available-link { font-size: 14px; font-weight: 600; color: var(--brand); text-decoration: none; white-space: nowrap; }
 .sm-available-link:hover { text-decoration: underline; }
-.sm-submit { display: flex; align-items: center; justify-content: center; gap: 8px; height: 55px; margin-top: 26px; border: none; border-radius: 10px; background: var(--brand); color: #fff; font-family: var(--font-ui); font-size: 18px; cursor: pointer; }
+.sm-submit { display: flex; align-items: center; justify-content: center; gap: 8px; height: 55px; margin-top: 26px; border: none; border-radius: 10px; background: var(--brand); color: #fff; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer; }
 .sm-submit:hover { background: #1a46b8; }
 
 .sm-table-card { border-radius: 14px; padding: 22px 0 20px; }

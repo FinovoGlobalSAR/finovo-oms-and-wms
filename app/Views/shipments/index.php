@@ -113,13 +113,14 @@ foreach ($allShipments as $s) {
                     <th>Shipment</th>
                     <th>Customer</th>
                     <th>Courier</th>
+                    <th>Tracking Number</th>
                     <th>Status</th>
                     <th style="width:230px;">Update Status</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($shipments)): ?>
-                    <tr><td colspan="5" class="ui-empty"><i class="bi bi-truck"></i>No shipments yet. Click "Dispatch Order" to send your first one.</td></tr>
+                    <tr><td colspan="6" class="ui-empty"><i class="bi bi-truck"></i>No shipments yet. Click "Dispatch Order" to send your first one.</td></tr>
                 <?php else: ?>
                     <?php foreach ($shipments as $s):
                         $statusColor = $statusColors[$s['status']] ?? ['bg' => '#f1f5f9', 'text' => '#334155'];
@@ -128,6 +129,17 @@ foreach ($allShipments as $s) {
                             <td style="font-weight:700;">#<?= (int) $s['id'] ?></td>
                             <td style="color:#334155; font-weight:500;"><?= htmlspecialchars($s['customer_name'] ?? '-') ?></td>
                             <td style="color:#334155;"><?= htmlspecialchars($s['courier_name']) ?></td>
+                            <td>
+                                <?php if (!empty($s['tracking_number'])): ?>
+                                    <!-- Copy karke LM Scan mein paste kar sakte hain -->
+                                    <span class="trk">
+                                        <code class="trk-no"><?= htmlspecialchars($s['tracking_number']) ?></code>
+                                        <button type="button" class="trk-copy" data-copy="<?= htmlspecialchars($s['tracking_number']) ?>" title="Copy tracking number" aria-label="Copy tracking number <?= htmlspecialchars($s['tracking_number']) ?>"><i class="bi bi-copy"></i></button>
+                                    </span>
+                                <?php else: ?>
+                                    <span style="color:#94a3b8;">—</span>
+                                <?php endif; ?>
+                            </td>
                             <td>
                                 <span class="ui-tag" style="background:<?= $statusColor['bg'] ?>; color:<?= $statusColor['text'] ?>; white-space:nowrap;">
                                     <?= htmlspecialchars(ucwords(str_replace('_', ' ', $s['status']))) ?>
@@ -199,9 +211,46 @@ foreach ($allShipments as $s) {
     </div>
 </div>
 
+<style>
+.trk { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.trk-no { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12.5px; color: var(--text-dark); background: #f1f5f9; border: 1px solid var(--border-color); border-radius: 6px; padding: 3px 8px; user-select: all; }
+.trk-copy { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border-color); border-radius: 6px; background: #fff; color: var(--primary); cursor: pointer; font-size: 13px; }
+.trk-copy:hover { background: var(--primary-light); }
+.trk-copy.copied { background: #dcfce7; border-color: #bbf7d0; color: #166534; }
+</style>
 
 <script>
 function openModal(id) { document.getElementById(id).classList.add('show'); }
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
 
+// Tracking number copy (LM Scan mein paste karne ke liye)
+document.querySelectorAll('.trk-copy').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        var text = btn.getAttribute('data-copy');
+        function done() {
+            btn.classList.add('copied');
+            btn.innerHTML = '<i class="bi bi-check-lg"></i>';
+            btn.title = 'Copied';
+            setTimeout(function () {
+                btn.classList.remove('copied');
+                btn.innerHTML = '<i class="bi bi-copy"></i>';
+                btn.title = 'Copy tracking number';
+            }, 1500);
+        }
+        // https / localhost pe naya tareeka; warna purana tareeka (http pe bhi chalta hai)
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(done);
+        } else {
+            var box = document.createElement('textarea');
+            box.value = text;
+            box.style.position = 'fixed';
+            box.style.opacity = '0';
+            document.body.appendChild(box);
+            box.select();
+            document.execCommand('copy');
+            document.body.removeChild(box);
+            done();
+        }
+    });
+});
 </script>
